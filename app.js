@@ -17,6 +17,9 @@ const TELEGRAM_USERNAME = "alpine710"; // ← Votre @username (si USE_BOT = fals
 // 💰 Devise affichée
 const CURRENCY = "CHF";
 
+// ⭐ API points / récompenses (backend bot) — mets l'URL de ton API (ex: https://ton-bot.onrender.com)
+const POINTS_API_URL = "";  // ex: "https://alps-bot.onrender.com"
+
 // =============================================
 // 🌐 LANGUES / I18N
 // =============================================
@@ -38,7 +41,14 @@ const I18N = {
         choose_variant: '🎨 Choisissez votre variante',
         choose_qty: '📦 Choisissez votre quantité',
         price_from_prefix: 'dès ',
-        no_products: 'Aucun produit trouvé'
+        no_products: 'Aucun produit trouvé',
+        points_label: 'pts',
+        rewards_title: 'Récompenses',
+        rewards_intro: 'Échange tes points contre des avantages.',
+        redeem_btn: 'Échanger',
+        redeem_success: 'Échangé ! On l\'appliquera à ta prochaine commande.',
+        redeem_error: 'Pas assez de points.',
+        open_in_telegram: 'Ouvre depuis Telegram pour gagner des points'
     },
     en: {
         filter_all: '📂 All categories',
@@ -53,7 +63,14 @@ const I18N = {
         choose_variant: '🎨 Choose your variant',
         choose_qty: '📦 Choose your quantity',
         price_from_prefix: 'from ',
-        no_products: 'No products found'
+        no_products: 'No products found',
+        points_label: 'pts',
+        rewards_title: 'Rewards',
+        rewards_intro: 'Exchange your points for perks.',
+        redeem_btn: 'Redeem',
+        redeem_success: 'Redeemed! We\'ll apply it to your next order.',
+        redeem_error: 'Not enough points.',
+        open_in_telegram: 'Open from Telegram to earn points'
     },
     de: {
         filter_all: '📂 Alle Kategorien',
@@ -68,7 +85,14 @@ const I18N = {
         choose_variant: '🎨 Variante wählen',
         choose_qty: '📦 Menge wählen',
         price_from_prefix: 'ab ',
-        no_products: 'Keine Produkte gefunden'
+        no_products: 'Keine Produkte gefunden',
+        points_label: 'Pkt',
+        rewards_title: 'Belohnungen',
+        rewards_intro: 'Tausche Punkte gegen Vorteile.',
+        redeem_btn: 'Einlösen',
+        redeem_success: 'Eingelöst! Wir wenden es bei deiner nächsten Bestellung an.',
+        redeem_error: 'Nicht genug Punkte.',
+        open_in_telegram: 'Öffne über Telegram, um Punkte zu sammeln'
     }
 };
 
@@ -84,6 +108,8 @@ function getInitialLang() {
 }
 
 let currentLang = getInitialLang();
+let userPoints = null;       // null = inconnu, number = solde
+let rewardsList = [];
 
 function t(key) {
     const currentPack = I18N[currentLang] || I18N[DEFAULT_LANG] || {};
@@ -99,6 +125,48 @@ function setLang(lang) {
         localStorage.setItem('ac_lang', lang);
     } catch (e) {}
     applyTranslations();
+}
+
+function getInitData() {
+    const tg = window.Telegram?.WebApp;
+    return (tg && tg.initData) ? tg.initData : '';
+}
+
+async function fetchPoints() {
+    if (!POINTS_API_URL || !getInitData()) return;
+    try {
+        const res = await fetch(`${POINTS_API_URL}/api/points?initData=${encodeURIComponent(getInitData())}`);
+        if (res.ok) {
+            const data = await res.json();
+            userPoints = data.points;
+            updatePointsUI();
+        }
+    } catch (e) {
+        userPoints = null;
+        updatePointsUI();
+    }
+}
+
+async function fetchRewards() {
+    if (!POINTS_API_URL) return;
+    try {
+        const res = await fetch(`${POINTS_API_URL}/api/rewards`);
+        if (res.ok) rewardsList = await res.json();
+    } catch (e) {
+        rewardsList = [];
+    }
+}
+
+function updatePointsUI() {
+    const el = document.getElementById('points-badge');
+    if (!el) return;
+    if (userPoints === null) {
+        el.textContent = '⭐ —';
+        el.title = t('open_in_telegram');
+    } else {
+        el.textContent = `⭐ ${userPoints} ${t('points_label')}`;
+        el.title = t('rewards_title');
+    }
 }
 
 function applyTranslations() {
@@ -130,6 +198,11 @@ function applyTranslations() {
     if (addBtn) {
         addBtn.textContent = t('btn_add_cart');
     }
+    updatePointsUI();
+    const rewardsTitle = document.getElementById('rewards-title');
+    if (rewardsTitle) rewardsTitle.textContent = t('rewards_title');
+    const rewardsIntro = document.getElementById('rewards-intro');
+    if (rewardsIntro) rewardsIntro.textContent = t('rewards_intro');
 }
 
 function getTelegramDestination() {
@@ -498,10 +571,78 @@ function init() {
     buildFilters();
     applyTranslations();
     renderProducts();
+    if (POINTS_API_URL) {
+        fetchRewards();
+        fetchPoints();
+    } else {
+        updatePointsUI();
+    }
     try {
         const tg = window.Telegram?.WebApp;
         if (tg) { tg.expand(); tg.ready(); }
     } catch(e) {}
+}
+
+function openRewardsModal() {
+    const modal = document.getElementById('rewards-modal');
+    if (!modal) return;
+    document.getElementById('rewards-title').textContent = t('rewards_title');
+    document.getElementById('rewards-intro').textContent = t('rewards_intro');
+    const listEl = document.getElementById('rewards-list');
+    const labelKey = currentLang === 'en' ? 'label_en' : currentLang === 'de' ? 'label_de' : 'label_fr';
+    listEl.innerHTML = rewardsList.map((r) => {
+        const label = r[labelKey] || r.label_fr || r.label_en || r.id;
+        const canRedeem = userPoints !== null && userPoints >= r.points;
+        return `<div class="rewards-item">
+            <span class="rewards-item-label">${escapeHtml(label)}</span>
+            <span class="rewards-item-points">${r.points} ${t('points_label')}</span>
+            <button class="btn-redeem" ${canRedeem ? '' : 'disabled'} onclick="redeemReward('${escapeHtml(r.id)}')">${t('redeem_btn')}</button>
+        </div>`;
+    }).join('') || '<p class="rewards-empty">Aucune récompense configurée.</p>';
+    modal.classList.add('active');
+}
+
+function closeRewardsModal(e) {
+    if (e && e.target.id !== 'rewards-modal') return;
+    document.getElementById('rewards-modal').classList.remove('active');
+}
+
+async function redeemReward(rewardId) {
+    if (!POINTS_API_URL || !getInitData()) {
+        showToast(t('open_in_telegram'));
+        return;
+    }
+    try {
+        const res = await fetch(`${POINTS_API_URL}/api/redeem`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ initData: getInitData(), rewardId })
+        });
+        const data = await res.json();
+        if (res.ok) {
+            userPoints = data.points;
+            updatePointsUI();
+            const modal = document.getElementById('rewards-modal');
+            if (modal && modal.classList.contains('active')) {
+                const listEl = document.getElementById('rewards-list');
+                const labelKey = currentLang === 'en' ? 'label_en' : currentLang === 'de' ? 'label_de' : 'label_fr';
+                listEl.innerHTML = rewardsList.map((r) => {
+                    const label = r[labelKey] || r.label_fr || r.label_en || r.id;
+                    const canRedeem = userPoints !== null && userPoints >= r.points;
+                    return `<div class="rewards-item">
+                        <span class="rewards-item-label">${escapeHtml(label)}</span>
+                        <span class="rewards-item-points">${r.points} ${t('points_label')}</span>
+                        <button class="btn-redeem" ${canRedeem ? '' : 'disabled'} onclick="redeemReward('${escapeHtml(r.id)}')">${t('redeem_btn')}</button>
+                    </div>`;
+                }).join('') || '<p class="rewards-empty">Aucune récompense configurée.</p>';
+            }
+            showToast(t('redeem_success'));
+        } else {
+            showToast(data.error === 'Not enough points' ? t('redeem_error') : (data.error || 'Error'));
+        }
+    } catch (e) {
+        showToast('Error');
+    }
 }
 
 function buildFilters() {

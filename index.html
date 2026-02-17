@@ -30,13 +30,16 @@
     </header>
     <!-- #endregion -->
 
-    <!-- #region Filtres + Langue -->
+    <!-- #region Filtres + Langue + Points -->
     <nav class="filter-bar" aria-label="Filtres">
-        <select class="lang-select" id="lang-switch" onchange="setLang(this.value)">
-            <option value="fr">FR</option>
-            <option value="en">EN</option>
-            <option value="de">DE</option>
-        </select>
+        <div class="filter-bar-left">
+            <span class="points-badge" id="points-badge" onclick="openRewardsModal()" title="">⭐ —</span>
+            <select class="lang-select" id="lang-switch" onchange="setLang(this.value)">
+                <option value="fr">FR</option>
+                <option value="en">EN</option>
+                <option value="de">DE</option>
+            </select>
+        </div>
         <select class="filter-select" id="filter-category">
             <option value="" id="filter-all-option">📂 Toutes les catégories</option>
         </select>
@@ -69,6 +72,17 @@
             <button class="modal-close" onclick="closeCart()" style="position:static;">✕</button>
         </div>
         <div id="cart-items"></div>
+    </div>
+</div>
+<!-- #endregion -->
+
+<!-- #region Rewards Modal -->
+<div class="modal-overlay" id="rewards-modal" onclick="closeRewardsModal(event)">
+    <div class="modal-sheet modal-sheet-rewards" onclick="event.stopPropagation()">
+        <button class="modal-close" onclick="closeRewardsModal()">✕</button>
+        <h2 class="rewards-title" id="rewards-title">Récompenses</h2>
+        <p class="rewards-intro" id="rewards-intro"></p>
+        <div class="rewards-list" id="rewards-list"></div>
     </div>
 </div>
 <!-- #endregion -->

@@ -90,6 +90,28 @@ body {
     top: 0;
     z-index: 110;
     background: #000000;
+    align-items: center;
+}
+
+.filter-bar-left {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.points-badge {
+    font-size: 0.85rem;
+    padding: 0.4rem 0.6rem;
+    background: rgba(212, 175, 55, 0.15);
+    border: 1px solid rgba(212, 175, 55, 0.35);
+    border-radius: 8px;
+    color: #e8c674;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.points-badge:hover {
+    background: rgba(212, 175, 55, 0.25);
 }
 
 .lang-select {
@@ -306,6 +328,61 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
+}
+
+/* Rewards modal */
+.modal-sheet-rewards {
+    padding: 2rem 1.25rem 1.5rem;
+}
+.rewards-title {
+    font-family: var(--font-display);
+    font-size: 1.35rem;
+    margin-bottom: 0.5rem;
+}
+.rewards-intro {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    margin-bottom: 1.25rem;
+}
+.rewards-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+.rewards-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    background: var(--bg-card);
+    border-radius: var(--radius-md);
+    border: 1px solid rgba(255,255,255,0.06);
+}
+.rewards-item-label {
+    flex: 1;
+    font-weight: 500;
+}
+.rewards-item-points {
+    color: var(--gold);
+    font-size: 0.9rem;
+}
+.btn-redeem {
+    padding: 0.5rem 1rem;
+    background: var(--gold);
+    color: #0a0a0a;
+    border: none;
+    border-radius: var(--radius-sm);
+    font-weight: 600;
+    font-size: 0.85rem;
+    cursor: pointer;
+}
+.btn-redeem:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+.rewards-empty {
+    color: var(--text-muted);
+    font-size: 0.9rem;
 }
 
 .modal-media {

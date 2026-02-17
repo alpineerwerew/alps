@@ -1,6 +1,7 @@
 node_modules/
 server/node_modules/
 server/.env
+server/points.json
 .DS_Store
 Thumbs.db
 
