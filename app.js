@@ -18,7 +18,7 @@ const TELEGRAM_USERNAME = "alpine710"; // ← Votre @username (si USE_BOT = fals
 const CURRENCY = "CHF";
 
 // ⭐ API points / récompenses (backend bot) — mets l'URL de ton API (ex: https://ton-bot.onrender.com)
-const POINTS_API_URL = "https://alpsbot.netlify.app/";  // ex: "https://alps-bot.onrender.com"
+const POINTS_API_URL = "https://alpine710.com/";  // ex: "https://alps-bot.onrender.com"
 
 // =============================================
 // 🌐 LANGUES / I18Nvu

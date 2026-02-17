@@ -3,16 +3,17 @@
 // - Attribue des points à chaque commande (1 pt par 10 CHF)
 // - API pour consulter les points et échanger des récompenses (via initData Telegram)
 
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 const crypto = require('crypto');
 const fs = require('fs');
-const path = require('path');
 const express = require('express');
 const cors = require('cors');
 const TelegramBot = require('node-telegram-bot-api');
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const OWNER_CHAT_ID = process.env.OWNER_CHAT_ID;
+const CATALOG_URL = process.env.CATALOG_URL || 'https://alpine710.com'; // Lien vers ton catalogue (WebApp ou site)
 const PORT = process.env.PORT || 3000;
 const POINTS_PER_10_CURRENCY = Number(process.env.POINTS_PER_10_CURRENCY) || 1; // 1 point per 10 CHF
 
@@ -107,12 +108,49 @@ const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 
 console.log('✅ Bot started (long polling)');
 
-bot.onText(/\/start/, (msg) => {
+// Image de bienvenue (logo Alpine Connexion — tu peux remplacer par ton image dans .env WELCOME_IMAGE_URL)
+const WELCOME_IMAGE_URL = process.env.WELCOME_IMAGE_URL || 'https://res.cloudinary.com/divcybeds/image/upload/v1771239856/Alpine_Connection_Wonka_LETTERING-V01_Logo_2022_o7rhyc.png';
+
+const START_KEYBOARD = {
+  reply_markup: {
+    keyboard: [
+      ['🌱 Accès boutique'],
+      ['📞 Contactez-nous'],
+      ['ℹ️ Infos']
+    ],
+    resize_keyboard: true,
+    one_time_keyboard: false
+  }
+};
+
+bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
-  let text = '👋 Bienvenue sur le bot Alpine Connexion.\n\n';
-  text += 'Ce bot reçoit les commandes envoyées depuis le catalogue.\n';
-  text += `Ton chat ID : \`${chatId}\`. Copie-le dans \`OWNER_CHAT_ID\` dans server/.env pour recevoir les commandes ici.`;
-  bot.sendMessage(chatId, text, { parse_mode: 'Markdown' });
+  const welcomeText = '🌱 Bienvenue sur notre bot Alpine Connexion ! 🌿\n\nDécouvrez nos produits en cliquant sur le lien ci-dessous ! 👇✨';
+  try {
+    await bot.sendPhoto(chatId, WELCOME_IMAGE_URL, { caption: welcomeText });
+  } catch (err) {
+    await bot.sendMessage(chatId, welcomeText);
+  }
+  // Clavier dans un 2e message pour qu’il s’affiche partout (certains clients ne montrent pas le clavier sur une photo)
+  await bot.sendMessage(chatId, 'Choisis une option :', START_KEYBOARD);
+});
+
+// Réponses aux boutons du menu
+bot.on('message', (msg) => {
+  const chatId = msg.chat.id;
+  const text = (msg.text || '').trim();
+  if (text === '🌱 Accès boutique') {
+    bot.sendMessage(chatId, `🛒 Ouvre le catalogue ici :\n${CATALOG_URL}`, { disable_web_page_preview: true });
+    return;
+  }
+  if (text === '📞 Contactez-nous') {
+    bot.sendMessage(chatId, '📞 Pour nous contacter, répondez à ce message ou envoyez-nous un message ici. Nous vous répondrons au plus vite !');
+    return;
+  }
+  if (text === 'ℹ️ Infos') {
+    bot.sendMessage(chatId, 'ℹ️ Alpine Connexion — Catalogue et commande via Telegram.\n\n• Ajoute des produits au panier sur le catalogue\n• Clique sur « Commander via Telegram » et envoie le message\n• Tu gagnes des points à chaque commande pour les échanger contre des avantages.');
+    return;
+  }
 });
 
 const ORDER_PREFIXES = ['🛒 Nouvelle Commande', '🛒 New Order', '🛒 Neue Bestellung'];
