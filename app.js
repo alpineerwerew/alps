@@ -21,7 +21,7 @@ const CURRENCY = "CHF";
 const POINTS_API_URL = "https://alpsbot.netlify.app/";  // ex: "https://alps-bot.onrender.com"
 
 // =============================================
-// 🌐 LANGUES / I18N
+// 🌐 LANGUES / I18Nvu
 // =============================================
 
 const SUPPORTED_LANGS = ['fr', 'en', 'de'];
@@ -48,7 +48,8 @@ const I18N = {
         redeem_btn: 'Échanger',
         redeem_success: 'Échangé ! On l\'appliquera à ta prochaine commande.',
         redeem_error: 'Pas assez de points.',
-        open_in_telegram: 'Ouvre depuis Telegram pour gagner des points'
+        open_in_telegram: 'Ouvre depuis Telegram pour gagner des points',
+        checkout_hint: 'Envoie le message dans Telegram pour confirmer ta commande.'
     },
     en: {
         filter_all: '📂 All categories',
@@ -70,7 +71,8 @@ const I18N = {
         redeem_btn: 'Redeem',
         redeem_success: 'Redeemed! We\'ll apply it to your next order.',
         redeem_error: 'Not enough points.',
-        open_in_telegram: 'Open from Telegram to earn points'
+        open_in_telegram: 'Open from Telegram to earn points',
+        checkout_hint: 'Send the message in Telegram to confirm your order.'
     },
     de: {
         filter_all: '📂 Alle Kategorien',
@@ -92,7 +94,8 @@ const I18N = {
         redeem_btn: 'Einlösen',
         redeem_success: 'Eingelöst! Wir wenden es bei deiner nächsten Bestellung an.',
         redeem_error: 'Nicht genug Punkte.',
-        open_in_telegram: 'Öffne über Telegram, um Punkte zu sammeln'
+        open_in_telegram: 'Öffne über Telegram, um Punkte zu sammeln',
+        checkout_hint: 'Sende die Nachricht in Telegram, um deine Bestellung zu bestätigen.'
     }
 };
 
@@ -995,6 +998,7 @@ function renderCart() {
             <span class="cart-total-label">${t('total_label')}</span>
             <span class="cart-total-amount">${total.toFixed(2)} ${CURRENCY}</span>
         </div>
+        <p class="checkout-hint">${t('checkout_hint')}</p>
         <button class="btn-checkout" onclick="checkout()">${t('btn_checkout')}</button>
     </div>`;
     c.innerHTML = h;
@@ -1036,7 +1040,7 @@ function checkout() {
     } else {
         window.open(url, '_blank');
     }
-    
+    showToast(t('checkout_hint'));
     cart = [];
     updateCartBadge();
     closeCart();

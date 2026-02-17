@@ -34,7 +34,11 @@ function loadPoints() {
 }
 
 function savePoints(obj) {
-  fs.writeFileSync(POINTS_FILE, JSON.stringify(obj, null, 2), 'utf8');
+  try {
+    fs.writeFileSync(POINTS_FILE, JSON.stringify(obj, null, 2), 'utf8');
+  } catch (err) {
+    console.error('❌ Could not save points.json:', err.message);
+  }
 }
 
 function addPoints(userId, pointsToAdd) {
@@ -88,10 +92,11 @@ const REWARDS = [
 
 // ---- Parse order total from message text ----
 function parseOrderTotal(text) {
-  // Match "Total : 123.45 CHF" or "Gesamt : 123.45" (FR/EN/DE)
-  const m = text.match(/(?:Total|Gesamt)\s*:\s*([\d.,]+)(?:\s*CHF)?/i);
+  // Match "Total : 123.45 CHF" or "💰 Total : 123.45" or "Gesamt : ..." (FR/EN/DE)
+  const m = text.match(/(?:Total|Gesamt)\s*:\s*([\d.,]+)(?:\s*CHF)?/i) ||
+    text.match(/([\d.,]+)\s*CHF\s*$/m);
   if (m && m[1]) {
-    const num = parseFloat(m[1].replace(/,/g, '.'));
+    const num = parseFloat(String(m[1]).replace(/,/g, '.').trim());
     if (!isNaN(num)) return num;
   }
   return 0;
@@ -112,7 +117,12 @@ bot.onText(/\/start/, (msg) => {
 
 const ORDER_PREFIXES = ['🛒 Nouvelle Commande', '🛒 New Order', '🛒 Neue Bestellung'];
 function looksLikeOrder(text) {
-  return text && ORDER_PREFIXES.some((p) => text.startsWith(p));
+  if (!text || text.length < 10) return false;
+  // Exact start (from catalog)
+  if (ORDER_PREFIXES.some((p) => text.startsWith(p))) return true;
+  // Fallback: message contains order total line (in case URL was truncated on mobile)
+  if (/(?:Total|Gesamt)\s*:\s*[\d.,]+(?:\s*CHF)?/i.test(text) || /[\d.,]+\s*CHF\s*$/m.test(text)) return true;
+  return false;
 }
 
 bot.on('message', async (msg) => {
@@ -122,10 +132,13 @@ bot.on('message', async (msg) => {
 
   const userId = msg.from?.id;
   const total = parseOrderTotal(text);
-  const pointsEarned = Math.floor(total / 10) * POINTS_PER_10_CURRENCY;
-  if (userId && pointsEarned > 0) {
+  const pointsFromTotal = Math.floor(total / 10) * POINTS_PER_10_CURRENCY;
+  const pointsEarned = Math.max(1, pointsFromTotal); // au moins 1 point par commande
+  if (userId) {
     const newTotal = addPoints(String(userId), pointsEarned);
-    console.log(`Points: user ${userId} +${pointsEarned} → ${newTotal}`);
+    console.log(`Points: user ${userId} total=${total} +${pointsEarned} → ${newTotal}`);
+  } else {
+    console.warn('Order received but msg.from.id missing, points not attributed');
   }
 
   const fromLabel = msg.chat.username ? `@${msg.chat.username}` : [msg.chat.first_name, msg.chat.last_name].filter(Boolean).join(' ') || `ID ${chatId}`;
@@ -140,7 +153,8 @@ bot.on('message', async (msg) => {
 
   let confirm = '✅ Merci, nous avons bien reçu ta commande.\n';
   if (userId && pointsEarned > 0) {
-    confirm += `⭐ Tu as gagné ${pointsEarned} point(s). Utilise le catalogue pour les échanger contre des avantages !\n\n`;
+    const balance = getPoints(String(userId));
+    confirm += `⭐ Tu as gagné ${pointsEarned} point(s). Solde : ${balance} pts. Ouvre le catalogue pour les échanger !\n\n`;
   }
   confirm += 'Nous te répondrons ici sur Telegram.';
   try {
