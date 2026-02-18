@@ -13,7 +13,7 @@ const TelegramBot = require('node-telegram-bot-api');
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const OWNER_CHAT_ID = process.env.OWNER_CHAT_ID;
-const CATALOG_URL = process.env.CATALOG_URL || 'https://alpine710.com'; // Lien vers ton catalogue (WebApp ou site)
+const CATALOG_URL = process.env.CATALOG_URL || 'https://138.249.138.17:3000'; // Lien vers ton catalogue (WebApp ou site)
 const PORT = process.env.PORT || 3000;
 const POINTS_PER_10_CURRENCY = Number(process.env.POINTS_PER_10_CURRENCY) || 1; // 1 point per 10 CHF
 
