@@ -34,7 +34,8 @@ const BOT_TOKEN = process.env.BOT_TOKEN;
 const OWNER_CHAT_ID = process.env.OWNER_CHAT_ID;
 const CATALOG_URL = (process.env.CATALOG_URL || 'https://alpine710.art').replace(/^http:\/\//i, 'https://'); // Doit être HTTPS pour le bouton Web App
 const PORT = process.env.PORT || 3000;
-const POINTS_PER_100_CURRENCY = Number(process.env.POINTS_PER_100_CURRENCY) || 1; // 1 point per 10 CHF
+// Points gagnés par tranche de 10 CHF dépensés
+const POINTS_PER_10_CURRENCY = Number(process.env.POINTS_PER_10_CURRENCY) || 1;
 const REFERRAL_BONUS = Number(process.env.REFERRAL_BONUS) || 15; // points when someone you referred places first order
 const IG_REVIEW_POINTS = Number(process.env.IG_REVIEW_POINTS) || 15; // points for sharing review on IG (after owner approval)
 const REVIEW_POINTS_TEXT = 2;  // points for approved text-only review
