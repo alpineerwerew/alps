@@ -265,7 +265,8 @@ const USER_KEYBOARD = {
       ['IG Referral']
     ],
     resize_keyboard: true,
-    one_time_keyboard: false
+    one_time_keyboard: false,
+    is_persistent: true
   }
 };
 
@@ -312,9 +313,9 @@ bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
   const welcomeText = 'Bienvenue ! Utilise les boutons ci-dessous.';
   try {
-    await bot.sendPhoto(chatId, WELCOME_IMAGE_URL, { caption: welcomeText });
+    await bot.sendPhoto(chatId, WELCOME_IMAGE_URL, { caption: welcomeText, ...USER_KEYBOARD });
   } catch (err) {
-    await bot.sendMessage(chatId, welcomeText);
+    await bot.sendMessage(chatId, welcomeText, USER_KEYBOARD);
   }
   await bot.sendMessage(chatId, 'Choisis :', USER_KEYBOARD);
 });
@@ -343,10 +344,16 @@ bot.on('message', async (msg) => {
   const textNorm = (text || '').toLowerCase().trim();
   if (textNorm === 'menu') {
     await bot.sendMessage(chatId, 'Menu :', MENU_INLINE);
+    await bot.sendMessage(chatId, 'Choisis :', USER_KEYBOARD);
+    return;
+  }
+  if ((text || '').trim() === CATALOG_URL || (text || '').trim() === CATALOG_URL + '/') {
+    await bot.sendMessage(chatId, 'Ouvre le catalogue avec le bouton ci-dessous (pas besoin de coller le lien ici).', MENU_INLINE);
+    await bot.sendMessage(chatId, 'Choisis :', USER_KEYBOARD);
     return;
   }
   if (textNorm === 'ig referral' || textNorm.includes('ig referral')) {
-    await bot.sendMessage(chatId, `IG Referral — Gagne ${IG_REVIEW_POINTS} pts (une seule fois)\n\n1. Poste un avis ou une story sur Instagram (Alpine Connexion)\n2. Copie le lien de ton post ou story\n3. Colle le lien ici\n\nOn vérifie et on te crédite ${IG_REVIEW_POINTS} pts.`);
+    await bot.sendMessage(chatId, `IG Referral — Gagne ${IG_REVIEW_POINTS} pts (une seule fois)\n\n1. Poste un avis ou une story sur Instagram (Alpine Connexion)\n2. Copie le lien de ton post ou story\n3. Colle le lien ici\n\nOn vérifie et on te crédite ${IG_REVIEW_POINTS} pts.`, USER_KEYBOARD);
     return;
   }
   if (String(chatId) === String(OWNER_CHAT_ID) && (textNorm === '/admin' || textNorm === 'admin')) {
