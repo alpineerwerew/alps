@@ -277,10 +277,9 @@ bot.getMe().then((me) => {
   if (BOT_USERNAME) console.log('✅ Bot username:', BOT_USERNAME);
 }).catch((e) => console.warn('getMe:', e?.message));
 
-// Aligné sur le clavier : uniquement Menu et IG Referral (pas de /start ni /help dans le menu)
+// Une seule commande affichée : /start. Tout le reste se fait via les boutons.
 const DEFAULT_COMMANDS = [
-  { command: 'menu', description: 'Menu (Catalogue, Contact, Infos)' },
-  { command: 'ig', description: 'IG Referral' }
+  { command: 'start', description: 'Ouvrir le menu' }
 ];
 
 const OWNER_COMMANDS = [
@@ -330,13 +329,13 @@ const MENU_INLINE = {
   }
 };
 
-// Au /start : un seul message avec 3 boutons inline (comme sur la capture)
+// Au /start : un seul message avec 4 boutons — tout est là, plus besoin de commandes
 const START_INLINE = {
   reply_markup: {
     inline_keyboard: [
       [{ text: '🌿 Accès boutique', web_app: { url: CATALOG_URL } }],
-      [{ text: '📞 Contactez-nous', callback_data: 'menu_contact' }],
-      [{ text: 'ℹ️ Infos', callback_data: 'menu_infos' }]
+      [{ text: '📞 Contactez-nous', callback_data: 'menu_contact' }, { text: 'ℹ️ Infos', callback_data: 'menu_infos' }],
+      [{ text: '📸 IG Referral', callback_data: 'menu_ig_referral' }]
     ]
   }
 };
@@ -382,7 +381,7 @@ bot.onText(/\/start(?:\s+(.+))?/, async (msg, match) => {
       }
     }
   }
-  const welcomeText = 'Bienvenue ! Découvre le catalogue et les infos en cliquant sur les boutons ci-dessous.';
+  const welcomeText = 'Bienvenue ! Tout se fait avec les boutons ci-dessous.';
   try {
     await bot.sendPhoto(chatId, WELCOME_IMAGE_URL, { caption: welcomeText, ...START_INLINE });
   } catch (err) {
@@ -652,6 +651,11 @@ bot.on('callback_query', async (query) => {
   if (data === 'menu_infos') {
     await bot.answerCallbackQuery(query.id);
     await bot.sendMessage(chatId, 'Alpine Connexion — Catalogue et commande via Telegram.\n\nAjoute des produits au panier sur le catalogue, valide : ta commande est envoyee automatiquement. Tu gagnes des points a chaque commande.');
+    return;
+  }
+  if (data === 'menu_ig_referral') {
+    await bot.answerCallbackQuery(query.id);
+    await bot.sendMessage(chatId, `IG Referral — Gagne ${IG_REVIEW_POINTS} pts (une seule fois)\n\n1. Poste un avis ou une story sur Instagram (Alpine Connexion)\n2. Copie le lien de ton post ou story\n3. Colle le lien ici\n\nOn vérifie et on te crédite ${IG_REVIEW_POINTS} pts.`);
     return;
   }
 
