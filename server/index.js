@@ -277,10 +277,10 @@ bot.getMe().then((me) => {
   if (BOT_USERNAME) console.log('✅ Bot username:', BOT_USERNAME);
 }).catch((e) => console.warn('getMe:', e?.message));
 
+// Aligné sur le clavier : uniquement Menu et IG Referral (pas de /start ni /help dans le menu)
 const DEFAULT_COMMANDS = [
-  { command: 'start', description: 'Démarrer le bot' },
   { command: 'menu', description: 'Menu (Catalogue, Contact, Infos)' },
-  { command: 'help', description: 'Voir toutes les commandes' }
+  { command: 'ig', description: 'IG Referral' }
 ];
 
 const OWNER_COMMANDS = [
@@ -320,11 +320,23 @@ const OPEN_CATALOG_INLINE = {
   }
 };
 
+// Menu inline (réutilisé pour "menu" et pour le style /start)
 const MENU_INLINE = {
   reply_markup: {
     inline_keyboard: [
       [{ text: 'Catalogue', web_app: { url: CATALOG_URL } }],
       [{ text: 'Contact', callback_data: 'menu_contact' }, { text: 'Infos', callback_data: 'menu_infos' }]
+    ]
+  }
+};
+
+// Au /start : un seul message avec 3 boutons inline (comme sur la capture)
+const START_INLINE = {
+  reply_markup: {
+    inline_keyboard: [
+      [{ text: '🌿 Accès boutique', web_app: { url: CATALOG_URL } }],
+      [{ text: '📞 Contactez-nous', callback_data: 'menu_contact' }],
+      [{ text: 'ℹ️ Infos', callback_data: 'menu_infos' }]
     ]
   }
 };
@@ -370,13 +382,12 @@ bot.onText(/\/start(?:\s+(.+))?/, async (msg, match) => {
       }
     }
   }
-  const welcomeText = 'Bienvenue ! Utilise les boutons ci-dessous.';
+  const welcomeText = 'Bienvenue ! Découvre le catalogue et les infos en cliquant sur les boutons ci-dessous.';
   try {
-    await bot.sendPhoto(chatId, WELCOME_IMAGE_URL, { caption: welcomeText, ...USER_KEYBOARD });
+    await bot.sendPhoto(chatId, WELCOME_IMAGE_URL, { caption: welcomeText, ...START_INLINE });
   } catch (err) {
-    await bot.sendMessage(chatId, welcomeText, USER_KEYBOARD);
+    await bot.sendMessage(chatId, welcomeText, START_INLINE);
   }
-  await bot.sendMessage(chatId, 'Choisis :', USER_KEYBOARD);
 });
 
 function buildHelpMessage(isOwner) {
@@ -397,7 +408,7 @@ function buildHelpMessage(isOwner) {
   return s;
 }
 
-const KNOWN_CMD_RE = /^\/(start|menu|admin|help|approve_ig|approve_review|approve_review_photo|reject_review|reject_review_photo)(\s|$)/i;
+const KNOWN_CMD_RE = /^\/(start|menu|ig|admin|help|approve_ig|approve_review|approve_review_photo|reject_review|reject_review_photo)(\s|$)/i;
 
 // Réponses aux boutons du menu (bouton Accès boutique ouvre le Web App directement)
 bot.on('message', async (msg) => {
@@ -438,7 +449,7 @@ bot.on('message', async (msg) => {
     await bot.sendMessage(chatId, 'Choisis :', USER_KEYBOARD);
     return;
   }
-  if (textNorm === 'ig referral' || textNorm.includes('ig referral')) {
+  if (textNorm === 'ig referral' || textNorm === 'ig' || textNorm === '/ig' || textNorm.includes('ig referral')) {
     await bot.sendMessage(chatId, `IG Referral — Gagne ${IG_REVIEW_POINTS} pts (une seule fois)\n\n1. Poste un avis ou une story sur Instagram (Alpine Connexion)\n2. Copie le lien de ton post ou story\n3. Colle le lien ici\n\nOn vérifie et on te crédite ${IG_REVIEW_POINTS} pts.`, USER_KEYBOARD);
     return;
   }
