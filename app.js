@@ -52,7 +52,7 @@ const I18N = {
         checkout_hint: 'Envoie le message dans Telegram pour confirmer ta commande.',
         referral_title: 'Parrainage',
         referral_link_title: 'Ton lien de parrainage',
-        referral_intro: 'Partage ton lien. Quand quelqu\'un passe sa première commande avec ton lien, tu reçois des points.',
+        referral_intro: 'Partage ce lien (il ouvre le bot Telegram). Quand quelqu\'un passe sa première commande après avoir cliqué, tu reçois des points.',
         referral_link_label: 'Ton lien',
         copy_link: 'Copier',
         copy_link_long: 'Copier le lien',
@@ -68,6 +68,7 @@ const I18N = {
         review_error_telegram: 'Ouvre le site depuis Telegram pour laisser un avis.',
         no_reviews_yet: 'Aucun avis pour le moment. Sois le premier !',
         review_form_title: 'Laisser un avis',
+        review_media_label: 'Photo ou vidéo (optionnel, 1 à 5)',
         order_sent: 'Commande envoyée ! On te répond sur Telegram.'
     },
     en: {
@@ -94,7 +95,7 @@ const I18N = {
         checkout_hint: 'Send the message in Telegram to confirm your order.',
         referral_title: 'Referral',
         referral_link_title: 'Your referral link',
-        referral_intro: 'Share your link. When someone places their first order with your link, you get points.',
+        referral_intro: 'Share this link (it opens the Telegram bot). When someone places their first order after clicking, you get points.',
         referral_link_label: 'Your link',
         copy_link: 'Copy',
         copy_link_long: 'Copy link',
@@ -110,6 +111,7 @@ const I18N = {
         review_error_telegram: 'Open the site from Telegram to leave a review.',
         no_reviews_yet: 'No reviews yet. Be the first!',
         review_form_title: 'Leave a review',
+        review_media_label: 'Photo or video (optional, 1 to 5)',
         order_sent: 'Order sent! We\'ll reply on Telegram.'
     },
     de: {
@@ -136,7 +138,7 @@ const I18N = {
         checkout_hint: 'Sende die Nachricht in Telegram, um deine Bestellung zu bestätigen.',
         referral_title: 'Empfehlung',
         referral_link_title: 'Dein Empfehlungslink',
-        referral_intro: 'Teile deinen Link. Wenn jemand mit deinem Link die erste Bestellung aufgibt, erhältst du Punkte.',
+        referral_intro: 'Teile diesen Link (er öffnet den Telegram-Bot). Wenn jemand nach dem Klick die erste Bestellung aufgibt, erhältst du Punkte.',
         referral_link_label: 'Dein Link',
         copy_link: 'Kopieren',
         copy_link_long: 'Link kopieren',
@@ -152,6 +154,7 @@ const I18N = {
         review_error_telegram: 'Öffne die Seite über Telegram, um eine Bewertung zu hinterlassen.',
         no_reviews_yet: 'Noch keine Bewertungen. Sei der Erste!',
         review_form_title: 'Bewertung schreiben',
+        review_media_label: 'Foto oder Video (optional, 1 bis 5)',
         order_sent: 'Bestellung gesendet! Wir antworten dir auf Telegram.'
     }
 };
@@ -739,7 +742,12 @@ function renderReviews() {
     listEl.innerHTML = reviewsData.map((r) => {
         const stars = r.rating != null ? '★'.repeat(r.rating) + '☆'.repeat(5 - r.rating) : '';
         const dateStr = r.createdAt ? new Date(r.createdAt).toLocaleDateString(currentLang === 'fr' ? 'fr-FR' : currentLang === 'de' ? 'de-DE' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
-        const mediaHtml = (r.media && r.media.length && r.media[0].url) ? r.media.map((m) => m.url ? `<img src="${escapeHtml(m.url)}" alt="" class="review-card-media" loading="lazy" />` : '').join('') : '';
+        const isVideo = (url) => /\.(mp4|webm|mov|ogg)(\?|$)/i.test(url || '');
+        const mediaHtml = (r.media && r.media.length) ? r.media.map((m) => {
+            if (!m.url) return '';
+            if (isVideo(m.url)) return `<video src="${escapeHtml(m.url)}" class="review-card-media review-card-video" controls playsinline preload="metadata"></video>`;
+            return `<img src="${escapeHtml(m.url)}" alt="" class="review-card-media" loading="lazy" />`;
+        }).join('') : '';
         return `<article class="review-card">
             <div class="review-card-header">
                 <span class="review-card-name">${escapeHtml(r.userName)}</span>
@@ -757,7 +765,25 @@ function initReviewsSection() {
     const btnSubmit = document.getElementById('btn-submit-review');
     const starsWrap = document.getElementById('review-stars');
     const hint = document.getElementById('review-form-hint');
+    const mediaLabel = document.getElementById('review-media-label');
+    const mediaInput = document.getElementById('review-media-input');
+    const mediaPreview = document.getElementById('review-media-preview');
+    if (mediaLabel) mediaLabel.textContent = t('review_media_label');
     if (hint) hint.textContent = getInitData() ? '' : t('review_error_telegram');
+    if (mediaInput && mediaPreview) {
+        mediaInput.addEventListener('change', function () {
+            const files = Array.from(this.files || []).slice(0, 5);
+            mediaPreview.innerHTML = '';
+            files.forEach((file) => {
+                const isV = file.type.startsWith('video/');
+                const el = isV ? document.createElement('video') : document.createElement('img');
+                el.className = 'review-preview-item';
+                el.src = URL.createObjectURL(file);
+                if (isV) { el.controls = true; el.playsInline = true; }
+                mediaPreview.appendChild(el);
+            });
+        });
+    }
     if (starsWrap) {
         starsWrap.querySelectorAll('.star').forEach((btn) => {
             btn.addEventListener('click', () => {
@@ -776,8 +802,11 @@ function initReviewsSection() {
 
 async function submitReview() {
     const reviewInput = document.getElementById('review-input');
+    const mediaInput = document.getElementById('review-media-input');
     const text = reviewInput && reviewInput.value ? reviewInput.value.trim() : '';
-    if (text.length < 2) {
+    const files = mediaInput && mediaInput.files ? Array.from(mediaInput.files).filter((f) => f.type.startsWith('image/') || f.type.startsWith('video/')).slice(0, 5) : [];
+    const hasMedia = files.length > 0;
+    if (!hasMedia && text.length < 2) {
         showToast(t('review_placeholder'));
         return;
     }
@@ -789,15 +818,28 @@ async function submitReview() {
     const btn = document.getElementById('btn-submit-review');
     if (btn) btn.disabled = true;
     try {
-        const res = await fetch(`${POINTS_API_URL}/api/reviews`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ initData: getInitData(), text, rating: selectedReviewRating || undefined })
-        });
+        let res;
+        if (hasMedia) {
+            const form = new FormData();
+            form.append('initData', getInitData());
+            form.append('text', text || '—');
+            if (selectedReviewRating != null) form.append('rating', String(selectedReviewRating));
+            files.forEach((f) => form.append('media', f));
+            res = await fetch(`${POINTS_API_URL}/api/reviews/upload`, { method: 'POST', body: form });
+        } else {
+            res = await fetch(`${POINTS_API_URL}/api/reviews`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ initData: getInitData(), text, rating: selectedReviewRating || undefined })
+            });
+        }
         const data = await res.json().catch(() => ({}));
         if (res.ok) {
             reviewInput.value = '';
             selectedReviewRating = null;
+            if (mediaInput) mediaInput.value = '';
+            const previewEl = document.getElementById('review-media-preview');
+            if (previewEl) previewEl.innerHTML = '';
             document.getElementById('review-stars')?.querySelectorAll('.star').forEach((b) => b.classList.remove('active'));
             if (data.pending) {
                 showToast(t('review_success'));

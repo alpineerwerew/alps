@@ -4,6 +4,7 @@ server/.env
 server/points.json
 server/refs.json
 server/reviews.json
+server/uploads/
 .DS_Store
 Thumbs.db
 

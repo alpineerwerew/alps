@@ -9,7 +9,26 @@ const crypto = require('crypto');
 const fs = require('fs');
 const express = require('express');
 const cors = require('cors');
+const multer = require('multer');
 const TelegramBot = require('node-telegram-bot-api');
+
+const UPLOADS_DIR = path.join(__dirname, 'uploads');
+const REVIEWS_UPLOADS = path.join(UPLOADS_DIR, 'reviews');
+try {
+  fs.mkdirSync(REVIEWS_UPLOADS, { recursive: true });
+} catch (e) {}
+
+const reviewUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, REVIEWS_UPLOADS),
+    filename: (_req, file, cb) => cb(null, Date.now() + '_' + Math.random().toString(36).slice(2, 9) + (path.extname(file.originalname) || '.jpg'))
+  }),
+  limits: { fileSize: 20 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const ok = file.mimetype.startsWith('image/') || file.mimetype.startsWith('video/');
+    cb(null, !!ok);
+  }
+});
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const OWNER_CHAT_ID = process.env.OWNER_CHAT_ID;
@@ -252,6 +271,31 @@ function parseOrderTotal(text) {
 // ---- Telegram Bot ----
 const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 
+let BOT_USERNAME = process.env.BOT_USERNAME || '';
+bot.getMe().then((me) => {
+  BOT_USERNAME = me.username || BOT_USERNAME;
+  if (BOT_USERNAME) console.log('✅ Bot username:', BOT_USERNAME);
+}).catch((e) => console.warn('getMe:', e?.message));
+
+const DEFAULT_COMMANDS = [
+  { command: 'start', description: 'Démarrer le bot' },
+  { command: 'menu', description: 'Menu (Catalogue, Contact, Infos)' },
+  { command: 'help', description: 'Voir toutes les commandes' }
+];
+
+const OWNER_COMMANDS = [
+  ...DEFAULT_COMMANDS,
+  { command: 'admin', description: 'Admin (produits, avis, IG)' }
+];
+
+bot.setMyCommands(DEFAULT_COMMANDS).then(() => console.log('✅ Commandes (défaut) enregistrées')).catch((e) => console.warn('setMyCommands default:', e?.message));
+if (OWNER_CHAT_ID) {
+  const ownerId = Number(OWNER_CHAT_ID) || OWNER_CHAT_ID;
+  bot.setMyCommands(OWNER_COMMANDS, { scope: { type: 'chat', chat_id: ownerId } })
+    .then(() => console.log('✅ Commandes (admin) enregistrées pour owner'))
+    .catch((e) => console.warn('setMyCommands owner:', e?.message));
+}
+
 console.log('✅ Bot started (long polling)');
 
 // Image de bienvenue (logo Alpine Connexion — tu peux remplacer par ton image dans .env WELCOME_IMAGE_URL)
@@ -309,8 +353,23 @@ function getOrderConfirmText(pointsEarned, balance) {
   return t;
 }
 
-bot.onText(/\/start/, async (msg) => {
+bot.onText(/\/start(?:\s+(.+))?/, async (msg, match) => {
   const chatId = msg.chat.id;
+  const payload = (match[1] || '').trim();
+  if (payload.startsWith('ref_')) {
+    const referrerId = payload.slice(4).replace(/\s.*$/, '');
+    if (referrerId && String(referrerId) !== String(chatId)) {
+      const set = setReferral(String(chatId), String(referrerId));
+      if (set) {
+        console.log('Referral:', chatId, 'referred by', referrerId);
+        try {
+          await bot.sendMessage(referrerId, `🎉 Quelqu'un a ouvert le bot avec ton lien de parrainage ! Tu recevras ${REFERRAL_BONUS} points quand cette personne passera sa première commande.`);
+        } catch (e) {
+          // referrer may have blocked the bot
+        }
+      }
+    }
+  }
   const welcomeText = 'Bienvenue ! Utilise les boutons ci-dessous.';
   try {
     await bot.sendPhoto(chatId, WELCOME_IMAGE_URL, { caption: welcomeText, ...USER_KEYBOARD });
@@ -320,12 +379,39 @@ bot.onText(/\/start/, async (msg) => {
   await bot.sendMessage(chatId, 'Choisis :', USER_KEYBOARD);
 });
 
+function buildHelpMessage(isOwner) {
+  let s = '📋 Commandes disponibles\n\n';
+  s += '/start — Démarrer le bot et afficher les boutons\n';
+  s += '/menu — Ouvrir le menu (Catalogue, Contact, Infos)\n';
+  s += '/help — Afficher cette liste\n\n';
+  s += 'Tu peux aussi utiliser les boutons MENU et IG Referral.';
+  if (isOwner) {
+    s += '\n\n——— Admin ———\n';
+    s += '/admin — Ouvrir l’admin (produits, avis, IG)\n';
+    s += '/approve_ig <user_id> — Valider un avis IG\n';
+    s += '/approve_review <user_id> — Valider avis texte\n';
+    s += '/approve_review_photo <user_id> — Valider avis photo\n';
+    s += '/reject_review <user_id> — Refuser avis texte\n';
+    s += '/reject_review_photo <user_id> — Refuser avis photo';
+  }
+  return s;
+}
+
+const KNOWN_CMD_RE = /^\/(start|menu|admin|help|approve_ig|approve_review|approve_review_photo|reject_review|reject_review_photo)(\s|$)/i;
+
 // Réponses aux boutons du menu (bouton Accès boutique ouvre le Web App directement)
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
   const text = (msg.text || '').trim();
   const userId = msg.from?.id;
   const userName = msg.from?.username ? `@${msg.from.username}` : [msg.from?.first_name, msg.from?.last_name].filter(Boolean).join(' ') || (userId ? `ID ${userId}` : 'Client');
+
+  // Afficher les commandes quand on tape / ou /help ou une commande inconnue
+  if (text === '/' || /^\/help\s*$/i.test(text) || (text.startsWith('/') && !KNOWN_CMD_RE.test(text))) {
+    const isOwner = String(chatId) === String(OWNER_CHAT_ID);
+    await bot.sendMessage(chatId, buildHelpMessage(isOwner), USER_KEYBOARD);
+    return;
+  }
 
   // Avis avec photo/vidéo (5 pts après validation)
   if ((msg.photo && msg.photo.length) || msg.video) {
@@ -342,7 +428,7 @@ bot.on('message', async (msg) => {
   }
 
   const textNorm = (text || '').toLowerCase().trim();
-  if (textNorm === 'menu') {
+  if (textNorm === 'menu' || textNorm === '/menu') {
     await bot.sendMessage(chatId, 'Menu :', MENU_INLINE);
     await bot.sendMessage(chatId, 'Choisis :', USER_KEYBOARD);
     return;
@@ -426,6 +512,7 @@ bot.onText(/\/approve_review_photo\s+(\d+)/, async (msg, match) => {
   const r = reviews.find((x) => x.id === pending.id);
   if (r && r.media && r.media.length) {
     for (let i = 0; i < r.media.length; i++) {
+      if (r.media[i].url) continue;
       try {
         const file = await bot.getFile(r.media[i].fileId);
         r.media[i].url = 'https://api.telegram.org/file/bot' + BOT_TOKEN + '/' + file.file_path;
@@ -596,6 +683,7 @@ bot.on('callback_query', async (query) => {
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.use('/uploads', express.static(UPLOADS_DIR));
 
 app.get('/api/rewards', (req, res) => {
   res.json(REWARDS);
@@ -655,8 +743,10 @@ app.get('/api/referral/me', (req, res) => {
     return res.status(401).json({ error: 'Invalid initData' });
   }
   const baseUrl = (req.get('x-forwarded-proto') === 'https' ? 'https' : req.protocol) + '://' + (req.get('host') || 'alpine710.art');
-  const referralLink = `${baseUrl}?ref=${userId}`;
-  res.json({ userId: String(userId), referralLink });
+  const referralLink = BOT_USERNAME
+    ? `https://t.me/${BOT_USERNAME}?start=ref_${userId}`
+    : `${baseUrl}?ref=${userId}`;
+  res.json({ userId: String(userId), referralLink, telegramRef: BOT_USERNAME ? `ref_${userId}` : null });
 });
 
 app.post('/api/referral/register', (req, res) => {
@@ -695,6 +785,29 @@ app.post('/api/reviews', (req, res) => {
   if (OWNER_CHAT_ID) {
     const label = user.username ? `@${user.username}` : userName;
     bot.sendMessage(OWNER_CHAT_ID, `📝 Avis (texte) en attente de ${label} (ID: ${user.id}). Pour valider et donner ${REVIEW_POINTS_TEXT} pts → /approve_review ${user.id}`).catch(() => {});
+  }
+  res.json({ ok: true, pending: true, message: 'Avis en attente de validation.' });
+});
+
+app.post('/api/reviews/upload', reviewUpload.array('media', 5), (req, res) => {
+  const initData = req.body?.initData;
+  const text = (req.body?.text || '').trim() || '—';
+  const rating = req.body?.rating != null ? Math.min(5, Math.max(1, Number(req.body.rating))) : null;
+  const user = getInitDataUser(initData);
+  if (!user || !user.id) {
+    return res.status(401).json({ error: 'Invalid initData' });
+  }
+  const files = req.files || [];
+  if (files.length === 0) {
+    return res.status(400).json({ error: 'Add at least one photo or video' });
+  }
+  const baseUrl = (req.get('x-forwarded-proto') === 'https' ? 'https' : req.protocol) + '://' + (req.get('host') || 'alpine710.art');
+  const media = files.map((f) => ({ url: baseUrl + '/uploads/reviews/' + f.filename }));
+  const userName = [user.first_name, user.last_name].filter(Boolean).join(' ') || user.username || 'Client';
+  addReview(user.id, userName, text, rating, media, REVIEW_POINTS_MEDIA, false);
+  if (OWNER_CHAT_ID) {
+    const label = user.username ? `@${user.username}` : userName;
+    bot.sendMessage(OWNER_CHAT_ID, `📷 Avis avec photo/vidéo (site) de ${label} (ID: ${user.id}). Pour valider et donner ${REVIEW_POINTS_MEDIA} pts → /approve_review_photo ${user.id}`).catch(() => {});
   }
   res.json({ ok: true, pending: true, message: 'Avis en attente de validation.' });
 });

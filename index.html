@@ -63,6 +63,11 @@
             <div class="review-form-wrap">
                 <h3 class="review-form-title" id="review-form-title">Laisser un avis</h3>
                 <textarea class="review-input" id="review-input" placeholder="" rows="4" maxlength="2000"></textarea>
+                <div class="review-media-upload">
+                    <label class="review-media-label" id="review-media-label">Photo ou vidéo (optionnel)</label>
+                    <input type="file" id="review-media-input" accept="image/*,video/*" multiple />
+                    <div class="review-media-preview" id="review-media-preview"></div>
+                </div>
                 <div class="review-form-actions">
                     <div class="review-stars" id="review-stars" aria-label="Note">
                         <button type="button" class="star" data-rating="1">★</button>
