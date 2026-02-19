@@ -243,6 +243,21 @@ const OPEN_CATALOG_INLINE = {
   }
 };
 
+const PAYMENT_KEYBOARD = {
+  reply_markup: {
+    inline_keyboard: [
+      [{ text: '💵 Cash', callback_data: 'pay_cash' }, { text: '🪙 Crypto', callback_data: 'pay_crypto' }]
+    ]
+  }
+};
+
+function getOrderConfirmText(pointsEarned, balance) {
+  let t = '✅ Merci, nous avons bien reçu ta commande.\n';
+  if (pointsEarned > 0) t += `⭐ Tu as gagné ${pointsEarned} point(s). Solde : ${balance} pts.\n\n`;
+  t += 'Comment souhaites-tu payer ?';
+  return t;
+}
+
 bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
   const welcomeText = '🌱 Bienvenue sur notre bot Alpine Connexion ! 🌿\n\nOuvre le catalogue en cliquant sur le bouton ci-dessous 👇✨';
@@ -360,16 +375,29 @@ bot.on('message', async (msg) => {
     }
   }
 
-  let confirm = '✅ Merci, nous avons bien reçu ta commande.\n';
-  if (userId && pointsEarned > 0) {
-    const balance = getPoints(String(userId));
-    confirm += `⭐ Tu as gagné ${pointsEarned} point(s). Solde : ${balance} pts. Ouvre le catalogue pour les échanger !\n\n`;
-  }
-  confirm += 'Nous te répondrons ici sur Telegram.';
+  const balance = userId ? getPoints(String(userId)) : 0;
+  const confirm = getOrderConfirmText(pointsEarned, balance);
   try {
-    await bot.sendMessage(chatId, confirm);
+    await bot.sendMessage(chatId, confirm, PAYMENT_KEYBOARD);
   } catch (err) {
     console.error('❌ Error sending confirmation:', err.message);
+  }
+});
+
+bot.on('callback_query', async (query) => {
+  const data = query.data;
+  const chatId = query.message?.chat?.id;
+  const userId = query.from?.id;
+  const userName = query.from?.username ? `@${query.from.username}` : [query.from?.first_name, query.from?.last_name].filter(Boolean).join(' ') || `ID ${userId}`;
+  if (data === 'pay_cash' || data === 'pay_crypto') {
+    const method = data === 'pay_cash' ? 'Cash' : 'Crypto';
+    try {
+      await bot.answerCallbackQuery(query.id);
+      await bot.sendMessage(chatId, `💵 Paiement par ${method} noté. Nous te recontactons ici pour finaliser.`);
+    } catch (e) {}
+    if (OWNER_CHAT_ID) {
+      bot.sendMessage(OWNER_CHAT_ID, `💰 Paiement choisi par ${userName} : ${method}`).catch(() => {});
+    }
   }
 });
 
@@ -508,8 +536,8 @@ app.post('/api/order', (req, res) => {
   }
 
   const balance = getPoints(String(userId));
-  const confirm = `✅ Merci, nous avons bien reçu ta commande.\n⭐ Tu as gagné ${pointsEarned} point(s). Solde : ${balance} pts. Ouvre le catalogue pour les échanger !\n\nNous te répondrons ici sur Telegram.`;
-  bot.sendMessage(userId, confirm).catch((err) => {
+  const confirm = getOrderConfirmText(pointsEarned, balance);
+  bot.sendMessage(userId, confirm, PAYMENT_KEYBOARD).catch((err) => {
     console.error('❌ Error sending confirmation to user:', err.message);
   });
 
