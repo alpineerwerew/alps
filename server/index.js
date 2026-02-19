@@ -203,12 +203,12 @@ function addReview(userId, userName, text, rating, media, pointsAwarded, approve
 
 function getPendingTextReviewByUser(userId) {
   const reviews = loadReviews();
-  return reviews.find((r) => r.userId === String(userId) && !r.approved && !(r.media && r.media.length));
+  return reviews.find((r) => r.userId === String(userId) && !r.approved && !r.rejected && !(r.media && r.media.length));
 }
 
 function getPendingPhotoReviewByUser(userId) {
   const reviews = loadReviews();
-  return reviews.find((r) => r.userId === String(userId) && !r.approved && r.media && r.media.length);
+  return reviews.find((r) => r.userId === String(userId) && !r.approved && !r.rejected && r.media && r.media.length);
 }
 
 function approveReview(reviewId) {
@@ -218,6 +218,15 @@ function approveReview(reviewId) {
   r.approved = true;
   saveReviews(reviews);
   addPoints(r.userId, r.pointsAwarded);
+  return r;
+}
+
+function rejectReview(reviewId) {
+  const reviews = loadReviews();
+  const r = reviews.find((x) => x.id === reviewId);
+  if (!r) return null;
+  r.rejected = true;
+  saveReviews(reviews);
   return r;
 }
 
@@ -301,7 +310,6 @@ function getOrderConfirmText(pointsEarned, balance) {
 
 bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
-  const isOwner = String(chatId) === String(OWNER_CHAT_ID);
   const welcomeText = 'Bienvenue ! Utilise les boutons ci-dessous.';
   try {
     await bot.sendPhoto(chatId, WELCOME_IMAGE_URL, { caption: welcomeText });
@@ -309,9 +317,6 @@ bot.onText(/\/start/, async (msg) => {
     await bot.sendMessage(chatId, welcomeText);
   }
   await bot.sendMessage(chatId, 'Choisis :', USER_KEYBOARD);
-  if (isOwner) {
-    await bot.sendMessage(chatId, 'Admin :', { reply_markup: { inline_keyboard: [[{ text: 'Ouvrir Admin', callback_data: 'admin_open' }]] } });
-  }
 });
 
 // Réponses aux boutons du menu (bouton Accès boutique ouvre le Web App directement)
@@ -345,7 +350,7 @@ bot.on('message', async (msg) => {
     return;
   }
   if (String(chatId) === String(OWNER_CHAT_ID) && (textNorm === '/admin' || textNorm === 'admin')) {
-    await bot.sendMessage(chatId, 'Admin — Gérer produits, avis, IG :', ADMIN_INLINE);
+    await bot.sendMessage(chatId, 'Admin — Gérer produits, avis, IG (commande /admin uniquement) :', ADMIN_INLINE);
     return;
   }
   // IG review claim: message contains Instagram link (and is not an order)
@@ -427,6 +432,34 @@ bot.onText(/\/approve_review_photo\s+(\d+)/, async (msg, match) => {
   try { await bot.sendMessage(userId, 'Ton avis avec photo a ete valide ! Tu as recu ' + REVIEW_POINTS_MEDIA + ' points. Merci !'); } catch (e) {}
 });
 
+bot.onText(/\/reject_review\s+(\d+)/, async (msg, match) => {
+  const chatId = msg.chat.id;
+  if (String(chatId) !== String(OWNER_CHAT_ID)) return;
+  const userId = match[1];
+  const pending = getPendingTextReviewByUser(userId);
+  if (!pending) {
+    await bot.sendMessage(chatId, 'Aucun avis texte en attente pour cet utilisateur.');
+    return;
+  }
+  rejectReview(pending.id);
+  await bot.sendMessage(chatId, 'Avis texte refuse.');
+  try { await bot.sendMessage(userId, "Ton avis n'a pas pu etre publie. Tu peux en envoyer un nouveau si tu veux."); } catch (e) {}
+});
+
+bot.onText(/\/reject_review_photo\s+(\d+)/, async (msg, match) => {
+  const chatId = msg.chat.id;
+  if (String(chatId) !== String(OWNER_CHAT_ID)) return;
+  const userId = match[1];
+  const pending = getPendingPhotoReviewByUser(userId);
+  if (!pending) {
+    await bot.sendMessage(chatId, 'Aucun avis photo en attente pour cet utilisateur.');
+    return;
+  }
+  rejectReview(pending.id);
+  await bot.sendMessage(chatId, 'Avis photo refuse.');
+  try { await bot.sendMessage(userId, "Ton avis avec photo n'a pas pu etre publie. Tu peux en envoyer un nouveau si tu veux."); } catch (e) {}
+});
+
 const ORDER_PREFIXES = ['🛒 Nouvelle Commande', '🛒 New Order', '🛒 Neue Bestellung'];
 function looksLikeOrder(text) {
   if (!text || text.length < 10) return false;
@@ -484,7 +517,7 @@ bot.on('message', async (msg) => {
 
 function getPendingReviews() {
   const reviews = loadReviews();
-  return reviews.filter((r) => r.approved === false);
+  return reviews.filter((r) => r.approved === false && !r.rejected);
 }
 
 bot.on('callback_query', async (query) => {
@@ -539,7 +572,8 @@ bot.on('callback_query', async (query) => {
     pending.forEach((r) => {
       const type = r.media && r.media.length ? 'photo' : 'texte';
       msg += '• ' + r.userName + ' (ID: ' + r.userId + ') — ' + type + ' — ' + (r.pointsAwarded || 0) + ' pts\n';
-      msg += '  Valider : ' + (r.media && r.media.length ? '/approve_review_photo ' + r.userId : '/approve_review ' + r.userId) + '\n\n';
+      msg += '  Valider : ' + (r.media && r.media.length ? '/approve_review_photo ' + r.userId : '/approve_review ' + r.userId) + '\n';
+      msg += '  Refuser : ' + (r.media && r.media.length ? '/reject_review_photo ' + r.userId : '/reject_review ' + r.userId) + '\n\n';
     });
     await bot.sendMessage(chatId, msg.slice(0, 4000));
     return;
