@@ -175,6 +175,7 @@ let userPoints = null;       // null = inconnu, number = solde
 let rewardsList = [];
 let reviewsData = [];
 let selectedReviewRating = null;
+let selectedReviewFiles = [];
 
 function t(key) {
     const currentPack = I18N[currentLang] || I18N[DEFAULT_LANG] || {};
@@ -760,6 +761,37 @@ function renderReviews() {
     }).join('');
 }
 
+function renderReviewPreview() {
+    const mediaPreview = document.getElementById('review-media-preview');
+    if (!mediaPreview) return;
+    mediaPreview.querySelectorAll('.review-preview-item-wrap').forEach((w) => {
+        const src = w.querySelector('.review-preview-item')?.src;
+        if (src && src.startsWith('blob:')) URL.revokeObjectURL(src);
+    });
+    mediaPreview.innerHTML = '';
+    selectedReviewFiles.forEach((file, index) => {
+        const isV = file.type.startsWith('video/');
+        const wrap = document.createElement('div');
+        wrap.className = 'review-preview-item-wrap';
+        const el = isV ? document.createElement('video') : document.createElement('img');
+        el.className = 'review-preview-item';
+        el.src = URL.createObjectURL(file);
+        if (isV) { el.controls = true; el.playsInline = true; }
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'review-preview-remove';
+        removeBtn.setAttribute('aria-label', 'Remove');
+        removeBtn.textContent = '×';
+        removeBtn.onclick = function () {
+            selectedReviewFiles.splice(index, 1);
+            renderReviewPreview();
+        };
+        wrap.appendChild(el);
+        wrap.appendChild(removeBtn);
+        mediaPreview.appendChild(wrap);
+    });
+}
+
 function initReviewsSection() {
     const reviewInput = document.getElementById('review-input');
     const btnSubmit = document.getElementById('btn-submit-review');
@@ -772,16 +804,10 @@ function initReviewsSection() {
     if (hint) hint.textContent = getInitData() ? '' : t('review_error_telegram');
     if (mediaInput && mediaPreview) {
         mediaInput.addEventListener('change', function () {
-            const files = Array.from(this.files || []).slice(0, 5);
-            mediaPreview.innerHTML = '';
-            files.forEach((file) => {
-                const isV = file.type.startsWith('video/');
-                const el = isV ? document.createElement('video') : document.createElement('img');
-                el.className = 'review-preview-item';
-                el.src = URL.createObjectURL(file);
-                if (isV) { el.controls = true; el.playsInline = true; }
-                mediaPreview.appendChild(el);
-            });
+            const files = Array.from(this.files || []).filter((f) => f.type.startsWith('image/') || f.type.startsWith('video/')).slice(0, 5);
+            selectedReviewFiles = selectedReviewFiles.concat(files).slice(0, 5);
+            this.value = '';
+            renderReviewPreview();
         });
     }
     if (starsWrap) {
@@ -802,9 +828,8 @@ function initReviewsSection() {
 
 async function submitReview() {
     const reviewInput = document.getElementById('review-input');
-    const mediaInput = document.getElementById('review-media-input');
     const text = reviewInput && reviewInput.value ? reviewInput.value.trim() : '';
-    const files = mediaInput && mediaInput.files ? Array.from(mediaInput.files).filter((f) => f.type.startsWith('image/') || f.type.startsWith('video/')).slice(0, 5) : [];
+    const files = selectedReviewFiles.slice(0, 5);
     const hasMedia = files.length > 0;
     if (!hasMedia && text.length < 2) {
         showToast(t('review_placeholder'));
@@ -837,9 +862,9 @@ async function submitReview() {
         if (res.ok) {
             reviewInput.value = '';
             selectedReviewRating = null;
-            if (mediaInput) mediaInput.value = '';
-            const previewEl = document.getElementById('review-media-preview');
-            if (previewEl) previewEl.innerHTML = '';
+            selectedReviewFiles = [];
+            renderReviewPreview();
+            document.getElementById('review-media-input').value = '';
             document.getElementById('review-stars')?.querySelectorAll('.star').forEach((b) => b.classList.remove('active'));
             if (data.pending) {
                 showToast(t('review_success'));
