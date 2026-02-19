@@ -51,16 +51,20 @@ const I18N = {
         open_in_telegram: 'Ouvre depuis Telegram pour gagner des points',
         checkout_hint: 'Envoie le message dans Telegram pour confirmer ta commande.',
         referral_title: 'Parrainage',
+        referral_link_title: 'Ton lien de parrainage',
         referral_intro: 'Partage ton lien. Quand quelqu\'un passe sa première commande avec ton lien, tu reçois des points.',
         referral_link_label: 'Ton lien',
         copy_link: 'Copier',
+        copy_link_long: 'Copier le lien',
+        points_progress_title: 'Tes points',
         nav_catalog: 'Catalogue',
         nav_reviews: 'Avis',
         reviews_title: 'Avis clients',
         reviews_intro: 'Découvrez ce que disent nos clients. Tu peux aussi laisser ton avis (depuis Telegram).',
         review_placeholder: 'Écris ton avis ici…',
         submit_review: 'Publier mon avis',
-        review_success: 'Merci ! Ton avis a été publié.',
+        review_success: 'Merci ! Ton avis a été envoyé. Il sera publié après validation.',
+        review_pending: 'Avis en attente de validation.',
         review_error_telegram: 'Ouvre le site depuis Telegram pour laisser un avis.',
         no_reviews_yet: 'Aucun avis pour le moment. Sois le premier !',
         review_form_title: 'Laisser un avis',
@@ -89,16 +93,20 @@ const I18N = {
         open_in_telegram: 'Open from Telegram to earn points',
         checkout_hint: 'Send the message in Telegram to confirm your order.',
         referral_title: 'Referral',
+        referral_link_title: 'Your referral link',
         referral_intro: 'Share your link. When someone places their first order with your link, you get points.',
         referral_link_label: 'Your link',
         copy_link: 'Copy',
+        copy_link_long: 'Copy link',
+        points_progress_title: 'Your points',
         nav_catalog: 'Catalog',
         nav_reviews: 'Reviews',
         reviews_title: 'Customer reviews',
         reviews_intro: 'See what our customers say. You can leave a review too (from Telegram).',
         review_placeholder: 'Write your review here…',
         submit_review: 'Submit my review',
-        review_success: 'Thank you! Your review has been published.',
+        review_success: 'Thank you! Your review has been sent. It will be published after approval.',
+        review_pending: 'Review pending approval.',
         review_error_telegram: 'Open the site from Telegram to leave a review.',
         no_reviews_yet: 'No reviews yet. Be the first!',
         review_form_title: 'Leave a review',
@@ -127,16 +135,20 @@ const I18N = {
         open_in_telegram: 'Öffne über Telegram, um Punkte zu sammeln',
         checkout_hint: 'Sende die Nachricht in Telegram, um deine Bestellung zu bestätigen.',
         referral_title: 'Empfehlung',
+        referral_link_title: 'Dein Empfehlungslink',
         referral_intro: 'Teile deinen Link. Wenn jemand mit deinem Link die erste Bestellung aufgibt, erhältst du Punkte.',
         referral_link_label: 'Dein Link',
         copy_link: 'Kopieren',
+        copy_link_long: 'Link kopieren',
+        points_progress_title: 'Deine Punkte',
         nav_catalog: 'Katalog',
         nav_reviews: 'Bewertungen',
         reviews_title: 'Kundenbewertungen',
         reviews_intro: 'Sieh, was unsere Kunden sagen. Du kannst auch eine Bewertung schreiben (über Telegram).',
         review_placeholder: 'Schreib hier deine Bewertung…',
         submit_review: 'Bewertung senden',
-        review_success: 'Danke! Deine Bewertung wurde veröffentlicht.',
+        review_success: 'Danke! Deine Bewertung wurde gesendet. Sie wird nach Prüfung veröffentlicht.',
+        review_pending: 'Bewertung wartet auf Freigabe.',
         review_error_telegram: 'Öffne die Seite über Telegram, um eine Bewertung zu hinterlassen.',
         no_reviews_yet: 'Noch keine Bewertungen. Sei der Erste!',
         review_form_title: 'Bewertung schreiben',
@@ -207,16 +219,32 @@ async function fetchRewards() {
     }
 }
 
+const POINTS_BAR_MAX = 200;
+
 function updatePointsUI() {
     const el = document.getElementById('points-badge');
-    if (!el) return;
-    if (userPoints === null) {
-        el.textContent = '⭐ —';
-        el.title = t('open_in_telegram');
-    } else {
-        el.textContent = `⭐ ${userPoints} ${t('points_label')}`;
-        el.title = t('rewards_title');
+    const wrap = document.getElementById('points-badge-wrap');
+    const miniFill = document.getElementById('points-bar-mini-fill');
+    if (el) {
+        if (userPoints === null) {
+            el.textContent = '⭐ —';
+            if (wrap) wrap.title = t('open_in_telegram');
+        } else {
+            el.textContent = `⭐ ${userPoints} ${t('points_label')}`;
+            if (wrap) wrap.title = t('rewards_title');
+        }
     }
+    if (miniFill) {
+        const pct = userPoints != null ? Math.min(100, (userPoints / POINTS_BAR_MAX) * 100) : 0;
+        miniFill.style.width = pct + '%';
+    }
+    const modalFill = document.getElementById('points-bar-fill');
+    const modalVal = document.getElementById('points-progress-value');
+    if (modalFill) {
+        const pct = userPoints != null ? Math.min(100, (userPoints / POINTS_BAR_MAX) * 100) : 0;
+        modalFill.style.width = pct + '%';
+    }
+    if (modalVal) modalVal.textContent = userPoints != null ? userPoints + ' ' + t('points_label') : '—';
 }
 
 function applyTranslations() {
@@ -711,12 +739,14 @@ function renderReviews() {
     listEl.innerHTML = reviewsData.map((r) => {
         const stars = r.rating != null ? '★'.repeat(r.rating) + '☆'.repeat(5 - r.rating) : '';
         const dateStr = r.createdAt ? new Date(r.createdAt).toLocaleDateString(currentLang === 'fr' ? 'fr-FR' : currentLang === 'de' ? 'de-DE' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+        const mediaHtml = (r.media && r.media.length && r.media[0].url) ? r.media.map((m) => m.url ? `<img src="${escapeHtml(m.url)}" alt="" class="review-card-media" loading="lazy" />` : '').join('') : '';
         return `<article class="review-card">
             <div class="review-card-header">
                 <span class="review-card-name">${escapeHtml(r.userName)}</span>
                 ${r.rating != null ? `<span class="review-card-stars" aria-label="${r.rating}/5">${stars}</span>` : ''}
             </div>
-            <p class="review-card-text">${escapeHtml(r.text)}</p>
+            ${mediaHtml ? `<div class="review-card-media-wrap">${mediaHtml}</div>` : ''}
+            ${r.text && r.text !== '—' ? `<p class="review-card-text">${escapeHtml(r.text)}</p>` : ''}
             ${dateStr ? `<time class="review-card-date">${escapeHtml(dateStr)}</time>` : ''}
         </article>`;
     }).join('');
@@ -765,13 +795,19 @@ async function submitReview() {
             body: JSON.stringify({ initData: getInitData(), text, rating: selectedReviewRating || undefined })
         });
         const data = await res.json().catch(() => ({}));
-        if (res.ok && data.review) {
+        if (res.ok) {
             reviewInput.value = '';
             selectedReviewRating = null;
             document.getElementById('review-stars')?.querySelectorAll('.star').forEach((b) => b.classList.remove('active'));
-            reviewsData.unshift(data.review);
-            renderReviews();
-            showToast(t('review_success'));
+            if (data.pending) {
+                showToast(t('review_success'));
+            } else if (data.review) {
+                reviewsData.unshift(data.review);
+                renderReviews();
+                showToast(t('review_success'));
+            } else {
+                showToast(t('review_success'));
+            }
         } else {
             showToast(data.error || 'Error');
         }
@@ -794,9 +830,20 @@ async function openRewardsModal() {
     const refInput = document.getElementById('referral-link-input');
     const refCopyBtn = document.getElementById('referral-copy-btn');
     const refBlock = document.getElementById('referral-block');
-    if (refTitle) refTitle.textContent = t('referral_title');
+    if (refTitle) refTitle.textContent = t('referral_link_title');
     if (refIntro) refIntro.textContent = t('referral_intro');
-    if (refCopyBtn) refCopyBtn.textContent = t('copy_link');
+    if (refCopyBtn) refCopyBtn.textContent = t('copy_link_long');
+    const progressLabel = document.getElementById('points-progress-label');
+    if (progressLabel) progressLabel.textContent = t('points_progress_title');
+    const paliersEl = document.getElementById('points-paliers');
+    if (paliersEl && rewardsList.length) {
+        const labelKey = currentLang === 'en' ? 'label_en' : currentLang === 'de' ? 'label_de' : 'label_fr';
+        paliersEl.innerHTML = rewardsList.map((r) => {
+            const label = r[labelKey] || r.label_fr || r.label_en || r.id;
+            return `<span class="palier-item">${r.points} ${t('points_label')} = ${escapeHtml(label)}</span>`;
+        }).join('');
+    }
+    updatePointsUI();
     referralLinkValue = '';
     if (POINTS_API_URL && getInitData()) {
         try {

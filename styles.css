@@ -145,6 +145,18 @@ body {
     color: var(--text-muted);
     margin-top: 0.5rem;
 }
+.review-card-media-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+.review-card-media {
+    max-width: 120px;
+    max-height: 120px;
+    object-fit: cover;
+    border-radius: 8px;
+}
 .reviews-empty {
     color: var(--text-muted);
     font-size: 0.9rem;
@@ -284,6 +296,30 @@ body {
 
 .points-badge:hover {
     background: rgba(212, 175, 55, 0.25);
+}
+
+.points-badge-wrap {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    padding: 0.25rem 0.5rem;
+    border-radius: 8px;
+    background: rgba(212, 175, 55, 0.1);
+    border: 1px solid rgba(212, 175, 55, 0.3);
+}
+.points-bar-mini {
+    width: 48px;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 3px;
+    overflow: hidden;
+}
+.points-bar-mini-fill {
+    height: 100%;
+    background: var(--gold);
+    border-radius: 3px;
+    transition: width 0.3s ease;
 }
 
 .lang-select {
@@ -517,12 +553,62 @@ body {
     margin-bottom: 1.25rem;
 }
 
+.points-progress-wrap {
+    margin-bottom: 1.25rem;
+}
+.points-progress-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+.points-progress-label { font-weight: 600; }
+.points-progress-value { color: var(--gold); font-weight: 600; }
+.points-bar-track {
+    height: 10px;
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 5px;
+    overflow: hidden;
+    margin-bottom: 0.75rem;
+}
+.points-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--gold-dim), var(--gold));
+    border-radius: 5px;
+    transition: width 0.4s ease;
+}
+.points-paliers {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+.palier-item { white-space: nowrap; }
+
 .referral-block {
     margin-bottom: 1.25rem;
     padding: 1rem;
     background: var(--surface);
     border-radius: 12px;
     border: 1px solid var(--border);
+}
+.referral-block-prominent {
+    padding: 1.25rem;
+    background: rgba(232, 198, 116, 0.08);
+    border-color: var(--gold-border);
+}
+.referral-block-prominent .referral-title {
+    font-size: 1.1rem;
+    margin-bottom: 0.5rem;
+}
+.referral-link-input-large {
+    font-size: 1rem;
+    padding: 0.65rem 0.85rem;
+}
+.btn-copy-link-large {
+    padding: 0.65rem 1.25rem;
+    font-size: 1rem;
 }
 .referral-title {
     font-size: 1rem;

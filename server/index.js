@@ -17,7 +17,9 @@ const CATALOG_URL = (process.env.CATALOG_URL || 'https://alpine710.art').replace
 const PORT = process.env.PORT || 3000;
 const POINTS_PER_10_CURRENCY = Number(process.env.POINTS_PER_10_CURRENCY) || 1; // 1 point per 10 CHF
 const REFERRAL_BONUS = Number(process.env.REFERRAL_BONUS) || 15; // points when someone you referred places first order
-const IG_REVIEW_POINTS = Number(process.env.IG_REVIEW_POINTS) || 50; // points for sharing review on IG (after owner approval)
+const IG_REVIEW_POINTS = Number(process.env.IG_REVIEW_POINTS) || 15; // points for sharing review on IG (after owner approval)
+const REVIEW_POINTS_TEXT = 2;  // points for approved text-only review
+const REVIEW_POINTS_MEDIA = 5; // points for approved review with photo/video
 
 if (!BOT_TOKEN) {
   console.error('❌ BOT_TOKEN is missing. Set it in server/.env');
@@ -181,7 +183,7 @@ function saveReviews(arr) {
   }
 }
 
-function addReview(userId, userName, text, rating) {
+function addReview(userId, userName, text, rating, media, pointsAwarded, approved) {
   const reviews = loadReviews();
   const id = String(Date.now()) + '_' + Math.random().toString(36).slice(2, 9);
   reviews.unshift({
@@ -190,10 +192,33 @@ function addReview(userId, userName, text, rating) {
     userName: (userName || 'Client').trim().slice(0, 80),
     text: (text || '').trim().slice(0, 2000),
     rating: rating != null ? Math.min(5, Math.max(1, Number(rating))) : null,
+    media: media || [],
+    pointsAwarded: pointsAwarded ?? REVIEW_POINTS_TEXT,
+    approved: approved !== false,
     createdAt: new Date().toISOString()
   });
   saveReviews(reviews);
   return reviews[0];
+}
+
+function getPendingTextReviewByUser(userId) {
+  const reviews = loadReviews();
+  return reviews.find((r) => r.userId === String(userId) && !r.approved && !(r.media && r.media.length));
+}
+
+function getPendingPhotoReviewByUser(userId) {
+  const reviews = loadReviews();
+  return reviews.find((r) => r.userId === String(userId) && !r.approved && r.media && r.media.length);
+}
+
+function approveReview(reviewId) {
+  const reviews = loadReviews();
+  const r = reviews.find((x) => x.id === reviewId);
+  if (!r || r.approved) return null;
+  r.approved = true;
+  saveReviews(reviews);
+  addPoints(r.userId, r.pointsAwarded);
+  return r;
 }
 
 // ---- Rewards (prizes) ----
@@ -223,14 +248,12 @@ console.log('✅ Bot started (long polling)');
 // Image de bienvenue (logo Alpine Connexion — tu peux remplacer par ton image dans .env WELCOME_IMAGE_URL)
 const WELCOME_IMAGE_URL = process.env.WELCOME_IMAGE_URL || 'https://res.cloudinary.com/divcybeds/image/upload/v1771239856/Alpine_Connection_Wonka_LETTERING-V01_Logo_2022_o7rhyc.png';
 
-// Bouton "Accès boutique" ouvre le catalogue en Web App (pas d'URL envoyée)
-const START_KEYBOARD = {
+// Clavier utilisateur : 2 boutons uniquement (pas de /start nécessaire)
+const USER_KEYBOARD = {
   reply_markup: {
     keyboard: [
-      [{ text: '🌱 Accès boutique', web_app: { url: CATALOG_URL } }],
-      ['📞 Contactez-nous'],
-      ['📸 Partager avis IG'],
-      ['ℹ️ Infos']
+      ['MENU'],
+      ['IG Referral']
     ],
     resize_keyboard: true,
     one_time_keyboard: false
@@ -239,7 +262,25 @@ const START_KEYBOARD = {
 
 const OPEN_CATALOG_INLINE = {
   reply_markup: {
-    inline_keyboard: [[{ text: '🛒 Ouvrir le catalogue', web_app: { url: CATALOG_URL } }]]
+    inline_keyboard: [[{ text: 'Ouvrir le catalogue', web_app: { url: CATALOG_URL } }]]
+  }
+};
+
+const MENU_INLINE = {
+  reply_markup: {
+    inline_keyboard: [
+      [{ text: 'Catalogue', web_app: { url: CATALOG_URL } }],
+      [{ text: 'Contact', callback_data: 'menu_contact' }, { text: 'Infos', callback_data: 'menu_infos' }]
+    ]
+  }
+};
+
+const ADMIN_INLINE = {
+  reply_markup: {
+    inline_keyboard: [
+      [{ text: 'Produits', callback_data: 'admin_products' }, { text: 'Avis', callback_data: 'admin_reviews' }],
+      [{ text: 'IG Referral', callback_data: 'admin_ig' }]
+    ]
   }
 };
 
@@ -260,34 +301,51 @@ function getOrderConfirmText(pointsEarned, balance) {
 
 bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
-  const welcomeText = '🌱 Bienvenue sur notre bot Alpine Connexion ! 🌿\n\nOuvre le catalogue en cliquant sur le bouton ci-dessous 👇✨';
+  const isOwner = String(chatId) === String(OWNER_CHAT_ID);
+  const welcomeText = 'Bienvenue ! Utilise les boutons ci-dessous.';
   try {
     await bot.sendPhoto(chatId, WELCOME_IMAGE_URL, { caption: welcomeText });
   } catch (err) {
     await bot.sendMessage(chatId, welcomeText);
   }
-  await bot.sendMessage(chatId, 'Choisis une option :', START_KEYBOARD);
-  await bot.sendMessage(chatId, 'Ou ouvre le catalogue ici :', OPEN_CATALOG_INLINE);
+  await bot.sendMessage(chatId, 'Choisis :', USER_KEYBOARD);
+  if (isOwner) {
+    await bot.sendMessage(chatId, 'Admin :', { reply_markup: { inline_keyboard: [[{ text: 'Ouvrir Admin', callback_data: 'admin_open' }]] } });
+  }
 });
 
 // Réponses aux boutons du menu (bouton Accès boutique ouvre le Web App directement)
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
   const text = (msg.text || '').trim();
-  if (text === '🌱 Accès boutique') {
-    await bot.sendMessage(chatId, '🛒 Ouvre le catalogue :', OPEN_CATALOG_INLINE);
+  const userId = msg.from?.id;
+  const userName = msg.from?.username ? `@${msg.from.username}` : [msg.from?.first_name, msg.from?.last_name].filter(Boolean).join(' ') || (userId ? `ID ${userId}` : 'Client');
+
+  // Avis avec photo/vidéo (5 pts après validation)
+  if ((msg.photo && msg.photo.length) || msg.video) {
+    const fileIds = [];
+    if (msg.photo && msg.photo.length) fileIds.push({ fileId: msg.photo[msg.photo.length - 1].file_id });
+    if (msg.video) fileIds.push({ fileId: msg.video.file_id });
+    const caption = (msg.caption || '').trim().slice(0, 2000);
+    addReview(userId, userName, caption || '—', null, fileIds, REVIEW_POINTS_MEDIA, false);
+    if (OWNER_CHAT_ID) {
+      await bot.sendMessage(OWNER_CHAT_ID, `Photo/video avis de ${userName} (ID: ${userId}). Pour valider et donner ${REVIEW_POINTS_MEDIA} pts → /approve_review_photo ${userId}`);
+    }
+    await bot.sendMessage(chatId, 'Avis avec photo/video recu ! On verifie et on te credite ' + REVIEW_POINTS_MEDIA + ' pts des que c est valide.');
     return;
   }
-  if (text === '📞 Contactez-nous') {
-    bot.sendMessage(chatId, '📞 Pour nous contacter, répondez à ce message ou envoyez-nous un message ici. Nous vous répondrons au plus vite !');
+
+  const textNorm = (text || '').toLowerCase().trim();
+  if (textNorm === 'menu') {
+    await bot.sendMessage(chatId, 'Menu :', MENU_INLINE);
     return;
   }
-  if (text === '📸 Partager avis IG') {
-    bot.sendMessage(chatId, `📸 Gagne ${IG_REVIEW_POINTS} points !\n\n1) Poste un avis / une review sur Instagram (story ou post)\n2) Envoie-nous le lien de ton post ici.\n\nOn vérifiera et te créditera les points. Une seule fois par personne.`);
+  if (textNorm === 'ig referral' || textNorm.includes('ig referral')) {
+    await bot.sendMessage(chatId, `IG Referral — Gagne ${IG_REVIEW_POINTS} pts (une seule fois)\n\n1. Poste un avis ou une story sur Instagram (Alpine Connexion)\n2. Copie le lien de ton post ou story\n3. Colle le lien ici\n\nOn vérifie et on te crédite ${IG_REVIEW_POINTS} pts.`);
     return;
   }
-  if (text === 'ℹ️ Infos') {
-    bot.sendMessage(chatId, 'ℹ️ Alpine Connexion — Catalogue et commande via Telegram.\n\n• Ajoute des produits au panier sur le catalogue\n• Clique sur « Commander via Telegram » et envoie le message\n• Tu gagnes des points à chaque commande pour les échanger contre des avantages.');
+  if (String(chatId) === String(OWNER_CHAT_ID) && (textNorm === '/admin' || textNorm === 'admin')) {
+    await bot.sendMessage(chatId, 'Admin — Gérer produits, avis, IG :', ADMIN_INLINE);
     return;
   }
   // IG review claim: message contains Instagram link (and is not an order)
@@ -295,17 +353,17 @@ bot.on('message', async (msg) => {
     const userId = msg.from?.id;
     const username = msg.from?.username ? `@${msg.from.username}` : (msg.from?.first_name || '') + ' ' + (msg.from?.last_name || '');
     if (hasClaimedIg(userId)) {
-      bot.sendMessage(chatId, `Tu as déjà reçu les points pour un avis IG. Merci ! 🙏`);
+      await bot.sendMessage(chatId, 'Tu as déjà reçu les points pour un avis IG. Merci ! 🙏');
       return;
     }
     if (OWNER_CHAT_ID) {
       try {
-        await bot.sendMessage(OWNER_CHAT_ID, `📸 Réclamation avis IG\n\nDe: ${username} (ID: ${userId})\nLien: ${text}\n\nPour approuver et créditer ${IG_REVIEW_POINTS} pts: /approve_ig ${userId}`);
+        await bot.sendMessage(OWNER_CHAT_ID, `📸 Avis Instagram à valider\n\nDe: ${username} (ID: ${userId})\nLien: ${text}\n\nPour valider et donner ${IG_REVIEW_POINTS} pts → /approve_ig ${userId}`);
       } catch (err) {
         console.error('Error forwarding IG claim to owner:', err.message);
       }
     }
-    bot.sendMessage(chatId, '✅ On a bien reçu ton lien. On vérifie et on te crédite les points dès que c’est validé !');
+    await bot.sendMessage(chatId, '✅ Lien reçu ! On vérifie et on te crédite les points dès que c’est validé.');
     return;
   }
 });
@@ -327,6 +385,46 @@ bot.onText(/\/approve_ig\s+(\d+)/, async (msg, match) => {
   } catch (e) {
     await bot.sendMessage(chatId, '(Impossible d’envoyer la confirmation à l’utilisateur.)');
   }
+});
+
+bot.onText(/\/approve_review\s+(\d+)/, async (msg, match) => {
+  const chatId = msg.chat.id;
+  if (String(chatId) !== String(OWNER_CHAT_ID)) return;
+  const userId = match[1];
+  const pending = getPendingTextReviewByUser(userId);
+  if (!pending) {
+    await bot.sendMessage(chatId, 'Aucun avis texte en attente pour cet utilisateur.');
+    return;
+  }
+  approveReview(pending.id);
+  await bot.sendMessage(chatId, 'Avis publie. ' + REVIEW_POINTS_TEXT + ' pts credites.');
+  try { await bot.sendMessage(userId, 'Ton avis a ete valide et publie ! Tu as recu ' + REVIEW_POINTS_TEXT + ' points. Merci !'); } catch (e) {}
+});
+
+bot.onText(/\/approve_review_photo\s+(\d+)/, async (msg, match) => {
+  const chatId = msg.chat.id;
+  if (String(chatId) !== String(OWNER_CHAT_ID)) return;
+  const userId = match[1];
+  const pending = getPendingPhotoReviewByUser(userId);
+  if (!pending) {
+    await bot.sendMessage(chatId, 'Aucun avis photo en attente pour cet utilisateur.');
+    return;
+  }
+  const reviews = loadReviews();
+  const r = reviews.find((x) => x.id === pending.id);
+  if (r && r.media && r.media.length) {
+    for (let i = 0; i < r.media.length; i++) {
+      try {
+        const file = await bot.getFile(r.media[i].fileId);
+        r.media[i].url = 'https://api.telegram.org/file/bot' + BOT_TOKEN + '/' + file.file_path;
+      } catch (e) {}
+    }
+  }
+  r.approved = true;
+  saveReviews(reviews);
+  addPoints(r.userId, REVIEW_POINTS_MEDIA);
+  await bot.sendMessage(chatId, 'Avis photo publie. ' + REVIEW_POINTS_MEDIA + ' pts credites.');
+  try { await bot.sendMessage(userId, 'Ton avis avec photo a ete valide ! Tu as recu ' + REVIEW_POINTS_MEDIA + ' points. Merci !'); } catch (e) {}
 });
 
 const ORDER_PREFIXES = ['🛒 Nouvelle Commande', '🛒 New Order', '🛒 Neue Bestellung'];
@@ -384,20 +482,72 @@ bot.on('message', async (msg) => {
   }
 });
 
+function getPendingReviews() {
+  const reviews = loadReviews();
+  return reviews.filter((r) => r.approved === false);
+}
+
 bot.on('callback_query', async (query) => {
   const data = query.data;
   const chatId = query.message?.chat?.id;
   const userId = query.from?.id;
   const userName = query.from?.username ? `@${query.from.username}` : [query.from?.first_name, query.from?.last_name].filter(Boolean).join(' ') || `ID ${userId}`;
+  const isOwner = String(chatId) === String(OWNER_CHAT_ID);
+
   if (data === 'pay_cash' || data === 'pay_crypto') {
     const method = data === 'pay_cash' ? 'Cash' : 'Crypto';
     try {
       await bot.answerCallbackQuery(query.id);
-      await bot.sendMessage(chatId, `💵 Paiement par ${method} noté. Nous te recontactons ici pour finaliser.`);
+      await bot.sendMessage(chatId, 'Paiement par ' + method + ' note. On te recontacte pour finaliser.');
     } catch (e) {}
     if (OWNER_CHAT_ID) {
-      bot.sendMessage(OWNER_CHAT_ID, `💰 Paiement choisi par ${userName} : ${method}`).catch(() => {});
+      bot.sendMessage(OWNER_CHAT_ID, 'Paiement choisi par ' + userName + ' : ' + method).catch(() => {});
     }
+    return;
+  }
+
+  if (data === 'menu_contact') {
+    await bot.answerCallbackQuery(query.id);
+    await bot.sendMessage(chatId, 'Pour nous contacter, envoie un message ici. Nous te repondrons au plus vite !');
+    return;
+  }
+  if (data === 'menu_infos') {
+    await bot.answerCallbackQuery(query.id);
+    await bot.sendMessage(chatId, 'Alpine Connexion — Catalogue et commande via Telegram.\n\nAjoute des produits au panier sur le catalogue, valide : ta commande est envoyee automatiquement. Tu gagnes des points a chaque commande.');
+    return;
+  }
+
+  if (!isOwner) return;
+  if (data === 'admin_open') {
+    await bot.answerCallbackQuery(query.id);
+    await bot.sendMessage(chatId, 'Admin — Gerer :', ADMIN_INLINE);
+    return;
+  }
+  if (data === 'admin_products') {
+    await bot.answerCallbackQuery(query.id);
+    await bot.sendMessage(chatId, 'Produits : les articles sont dans le code du site (fichier app.js, section produits). Pour les modifier : edite le depot puis redéploie sur le VPS. Une interface admin Web pourra etre ajoutee plus tard.');
+    return;
+  }
+  if (data === 'admin_reviews') {
+    await bot.answerCallbackQuery(query.id);
+    const pending = getPendingReviews();
+    if (!pending.length) {
+      await bot.sendMessage(chatId, 'Aucun avis en attente.');
+      return;
+    }
+    let msg = 'Avis en attente (' + pending.length + ') :\n\n';
+    pending.forEach((r) => {
+      const type = r.media && r.media.length ? 'photo' : 'texte';
+      msg += '• ' + r.userName + ' (ID: ' + r.userId + ') — ' + type + ' — ' + (r.pointsAwarded || 0) + ' pts\n';
+      msg += '  Valider : ' + (r.media && r.media.length ? '/approve_review_photo ' + r.userId : '/approve_review ' + r.userId) + '\n\n';
+    });
+    await bot.sendMessage(chatId, msg.slice(0, 4000));
+    return;
+  }
+  if (data === 'admin_ig') {
+    await bot.answerCallbackQuery(query.id);
+    await bot.sendMessage(chatId, 'IG Referral : quand un client envoie un lien Instagram ici, tu recois un message. Pour valider et donner ' + IG_REVIEW_POINTS + ' pts, reponds : /approve_ig USER_ID\n\nExemple : /approve_ig 123456789');
+    return;
   }
 });
 
@@ -484,7 +634,7 @@ app.post('/api/referral/register', (req, res) => {
 
 // ---- Reviews API ----
 app.get('/api/reviews', (req, res) => {
-  const reviews = loadReviews();
+  const reviews = loadReviews().filter((r) => r.approved !== false);
   res.json(reviews);
 });
 
@@ -500,8 +650,12 @@ app.post('/api/reviews', (req, res) => {
     return res.status(400).json({ error: 'Text too short' });
   }
   const userName = [user.first_name, user.last_name].filter(Boolean).join(' ') || user.username || 'Client';
-  const review = addReview(user.id, userName, text, rating);
-  res.json({ ok: true, review });
+  addReview(user.id, userName, text, rating, [], REVIEW_POINTS_TEXT, false);
+  if (OWNER_CHAT_ID) {
+    const label = user.username ? `@${user.username}` : userName;
+    bot.sendMessage(OWNER_CHAT_ID, `📝 Avis (texte) en attente de ${label} (ID: ${user.id}). Pour valider et donner ${REVIEW_POINTS_TEXT} pts → /approve_review ${user.id}`).catch(() => {});
+  }
+  res.json({ ok: true, pending: true, message: 'Avis en attente de validation.' });
 });
 
 // ---- Order via API (envoi direct par le bot, sans ouvrir t.me) ----
