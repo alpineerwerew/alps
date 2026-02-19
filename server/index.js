@@ -111,10 +111,11 @@ console.log('✅ Bot started (long polling)');
 // Image de bienvenue (logo Alpine Connexion — tu peux remplacer par ton image dans .env WELCOME_IMAGE_URL)
 const WELCOME_IMAGE_URL = process.env.WELCOME_IMAGE_URL || 'https://res.cloudinary.com/divcybeds/image/upload/v1771239856/Alpine_Connection_Wonka_LETTERING-V01_Logo_2022_o7rhyc.png';
 
+// Bouton "Accès boutique" ouvre le catalogue en Web App (pas d'URL envoyée)
 const START_KEYBOARD = {
   reply_markup: {
     keyboard: [
-      ['🌱 Accès boutique'],
+      [{ text: '🌱 Accès boutique', web_app: { url: CATALOG_URL } }],
       ['📞 Contactez-nous'],
       ['ℹ️ Infos']
     ],
@@ -125,7 +126,7 @@ const START_KEYBOARD = {
 
 bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
-  const welcomeText = '🌱 Bienvenue sur notre bot Alpine Connexion ! 🌿\n\nDécouvrez nos produits en cliquant sur le lien ci-dessous ! 👇✨';
+  const welcomeText = '🌱 Bienvenue sur notre bot Alpine Connexion ! 🌿\n\nOuvre le catalogue en cliquant sur le bouton ci-dessous 👇✨';
   try {
     await bot.sendPhoto(chatId, WELCOME_IMAGE_URL, { caption: welcomeText });
   } catch (err) {
@@ -135,12 +136,12 @@ bot.onText(/\/start/, async (msg) => {
   await bot.sendMessage(chatId, 'Choisis une option :', START_KEYBOARD);
 });
 
-// Réponses aux boutons du menu
+// Réponses aux boutons du menu (bouton Accès boutique ouvre le Web App directement)
 bot.on('message', (msg) => {
   const chatId = msg.chat.id;
   const text = (msg.text || '').trim();
   if (text === '🌱 Accès boutique') {
-    bot.sendMessage(chatId, `🛒 Ouvre le catalogue ici :\n${CATALOG_URL}`, { disable_web_page_preview: true });
+    bot.sendMessage(chatId, '🛒 Clique sur le bouton « 🌱 Accès boutique » au-dessus pour ouvrir le catalogue.', { reply_markup: START_KEYBOARD.reply_markup });
     return;
   }
   if (text === '📞 Contactez-nous') {

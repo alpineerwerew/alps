@@ -586,9 +586,10 @@ function init() {
     } catch(e) {}
 }
 
-function openRewardsModal() {
+async function openRewardsModal() {
     const modal = document.getElementById('rewards-modal');
     if (!modal) return;
+    if (POINTS_API_URL && getInitData()) await fetchPoints();
     document.getElementById('rewards-title').textContent = t('rewards_title');
     document.getElementById('rewards-intro').textContent = t('rewards_intro');
     const listEl = document.getElementById('rewards-list');
@@ -1054,4 +1055,11 @@ function showToast(text) {
 }
 
 document.addEventListener('DOMContentLoaded', init);
+
+// Rafraîchir les points quand l'utilisateur revient sur l'onglet (ex. après avoir envoyé la commande dans Telegram)
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && POINTS_API_URL && getInitData()) {
+        fetchPoints();
+    }
+});
 
