@@ -381,11 +381,11 @@ bot.onText(/\/start(?:\s+(.+))?/, async (msg, match) => {
       }
     }
   }
-  const welcomeText = 'Bienvenue ! Tout se fait avec les boutons ci-dessous.';
+  const welcomeText = 'Bienvenue ! Utilise les boutons ci-dessous.';
   try {
-    await bot.sendPhoto(chatId, WELCOME_IMAGE_URL, { caption: welcomeText, ...START_INLINE });
+    await bot.sendPhoto(chatId, WELCOME_IMAGE_URL, { caption: welcomeText, ...USER_KEYBOARD });
   } catch (err) {
-    await bot.sendMessage(chatId, welcomeText, START_INLINE);
+    await bot.sendMessage(chatId, welcomeText, USER_KEYBOARD);
   }
 });
 
