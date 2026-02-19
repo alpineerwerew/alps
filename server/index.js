@@ -16,6 +16,8 @@ const OWNER_CHAT_ID = process.env.OWNER_CHAT_ID;
 const CATALOG_URL = process.env.CATALOG_URL || 'https://alpine710.art'; // Lien vers ton catalogue (WebApp ou site)
 const PORT = process.env.PORT || 3000;
 const POINTS_PER_10_CURRENCY = Number(process.env.POINTS_PER_10_CURRENCY) || 1; // 1 point per 10 CHF
+const REFERRAL_BONUS = Number(process.env.REFERRAL_BONUS) || 15; // points when someone you referred places first order
+const IG_REVIEW_POINTS = Number(process.env.IG_REVIEW_POINTS) || 50; // points for sharing review on IG (after owner approval)
 
 if (!BOT_TOKEN) {
   console.error('❌ BOT_TOKEN is missing. Set it in server/.env');
@@ -24,6 +26,7 @@ if (!BOT_TOKEN) {
 
 // ---- Points store (JSON file) ----
 const POINTS_FILE = path.join(__dirname, 'points.json');
+const REFS_FILE = path.join(__dirname, 'refs.json');
 
 function loadPoints() {
   try {
@@ -62,6 +65,60 @@ function setPoints(userId, newPoints) {
   return points[userId];
 }
 
+// ---- Referrals & IG claims (refs.json) ----
+function loadRefs() {
+  try {
+    const data = fs.readFileSync(REFS_FILE, 'utf8');
+    return JSON.parse(data);
+  } catch (e) {
+    return { referredBy: {}, igClaimed: {} };
+  }
+}
+
+function saveRefs(obj) {
+  try {
+    fs.writeFileSync(REFS_FILE, JSON.stringify(obj, null, 2), 'utf8');
+  } catch (err) {
+    console.error('❌ Could not save refs.json:', err.message);
+  }
+}
+
+function getReferrer(referredUserId) {
+  const refs = loadRefs();
+  return refs.referredBy && refs.referredBy[String(referredUserId)] || null;
+}
+
+function setReferral(referredUserId, referrerUserId) {
+  const refs = loadRefs();
+  if (!refs.referredBy) refs.referredBy = {};
+  if (refs.referredBy[String(referredUserId)]) return false; // already referred
+  refs.referredBy[String(referredUserId)] = String(referrerUserId);
+  saveRefs(refs);
+  return true;
+}
+
+function claimReferralBonus(referredUserId) {
+  const refs = loadRefs();
+  if (refs.referredBy && refs.referredBy[String(referredUserId)]) {
+    delete refs.referredBy[String(referredUserId)];
+    saveRefs(refs);
+    return true;
+  }
+  return false;
+}
+
+function hasClaimedIg(userId) {
+  const refs = loadRefs();
+  return !!(refs.igClaimed && refs.igClaimed[String(userId)]);
+}
+
+function setIgClaimed(userId) {
+  const refs = loadRefs();
+  if (!refs.igClaimed) refs.igClaimed = {};
+  refs.igClaimed[String(userId)] = true;
+  saveRefs(refs);
+}
+
 // ---- Validate Telegram WebApp initData ----
 function validateInitData(initData) {
   if (!initData || !BOT_TOKEN) return null;
@@ -82,6 +139,61 @@ function validateInitData(initData) {
   } catch (e) {
     return null;
   }
+}
+
+function getInitDataUser(initData) {
+  if (!initData || !BOT_TOKEN) return null;
+  const params = new URLSearchParams(initData);
+  const hash = params.get('hash');
+  if (!hash) return null;
+  params.delete('hash');
+  const sorted = [...params.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  const dataCheckString = sorted.map(([k, v]) => `${k}=${v}`).join('\n');
+  const secretKey = crypto.createHmac('sha256', 'WebAppData').update(BOT_TOKEN).digest();
+  const computedHash = crypto.createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
+  if (computedHash !== hash) return null;
+  const userStr = params.get('user');
+  if (!userStr) return null;
+  try {
+    return JSON.parse(decodeURIComponent(userStr));
+  } catch (e) {
+    return null;
+  }
+}
+
+// ---- Reviews (reviews.json) ----
+const REVIEWS_FILE = path.join(__dirname, 'reviews.json');
+
+function loadReviews() {
+  try {
+    const data = fs.readFileSync(REVIEWS_FILE, 'utf8');
+    return JSON.parse(data);
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveReviews(arr) {
+  try {
+    fs.writeFileSync(REVIEWS_FILE, JSON.stringify(arr, null, 2), 'utf8');
+  } catch (err) {
+    console.error('❌ Could not save reviews.json:', err.message);
+  }
+}
+
+function addReview(userId, userName, text, rating) {
+  const reviews = loadReviews();
+  const id = String(Date.now()) + '_' + Math.random().toString(36).slice(2, 9);
+  reviews.unshift({
+    id,
+    userId: String(userId),
+    userName: (userName || 'Client').trim().slice(0, 80),
+    text: (text || '').trim().slice(0, 2000),
+    rating: rating != null ? Math.min(5, Math.max(1, Number(rating))) : null,
+    createdAt: new Date().toISOString()
+  });
+  saveReviews(reviews);
+  return reviews[0];
 }
 
 // ---- Rewards (prizes) ----
@@ -117,6 +229,7 @@ const START_KEYBOARD = {
     keyboard: [
       [{ text: '🌱 Accès boutique', web_app: { url: CATALOG_URL } }],
       ['📞 Contactez-nous'],
+      ['📸 Partager avis IG'],
       ['ℹ️ Infos']
     ],
     resize_keyboard: true,
@@ -137,7 +250,7 @@ bot.onText(/\/start/, async (msg) => {
 });
 
 // Réponses aux boutons du menu (bouton Accès boutique ouvre le Web App directement)
-bot.on('message', (msg) => {
+bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
   const text = (msg.text || '').trim();
   if (text === '🌱 Accès boutique') {
@@ -148,9 +261,50 @@ bot.on('message', (msg) => {
     bot.sendMessage(chatId, '📞 Pour nous contacter, répondez à ce message ou envoyez-nous un message ici. Nous vous répondrons au plus vite !');
     return;
   }
+  if (text === '📸 Partager avis IG') {
+    bot.sendMessage(chatId, `📸 Gagne ${IG_REVIEW_POINTS} points !\n\n1) Poste un avis / une review sur Instagram (story ou post)\n2) Envoie-nous le lien de ton post ici.\n\nOn vérifiera et te créditera les points. Une seule fois par personne.`);
+    return;
+  }
   if (text === 'ℹ️ Infos') {
     bot.sendMessage(chatId, 'ℹ️ Alpine Connexion — Catalogue et commande via Telegram.\n\n• Ajoute des produits au panier sur le catalogue\n• Clique sur « Commander via Telegram » et envoie le message\n• Tu gagnes des points à chaque commande pour les échanger contre des avantages.');
     return;
+  }
+  // IG review claim: message contains Instagram link (and is not an order)
+  if (text.includes('instagram.com') && !looksLikeOrder(text)) {
+    const userId = msg.from?.id;
+    const username = msg.from?.username ? `@${msg.from.username}` : (msg.from?.first_name || '') + ' ' + (msg.from?.last_name || '');
+    if (hasClaimedIg(userId)) {
+      bot.sendMessage(chatId, `Tu as déjà reçu les points pour un avis IG. Merci ! 🙏`);
+      return;
+    }
+    if (OWNER_CHAT_ID) {
+      try {
+        await bot.sendMessage(OWNER_CHAT_ID, `📸 Réclamation avis IG\n\nDe: ${username} (ID: ${userId})\nLien: ${text}\n\nPour approuver et créditer ${IG_REVIEW_POINTS} pts: /approve_ig ${userId}`);
+      } catch (err) {
+        console.error('Error forwarding IG claim to owner:', err.message);
+      }
+    }
+    bot.sendMessage(chatId, '✅ On a bien reçu ton lien. On vérifie et on te crédite les points dès que c’est validé !');
+    return;
+  }
+});
+
+// Owner only: approve IG review and credit points
+bot.onText(/\/approve_ig\s+(\d+)/, async (msg, match) => {
+  const chatId = msg.chat.id;
+  if (String(chatId) !== String(OWNER_CHAT_ID)) return;
+  const targetUserId = match[1];
+  if (hasClaimedIg(targetUserId)) {
+    await bot.sendMessage(chatId, 'Cet utilisateur a déjà reçu les points IG.');
+    return;
+  }
+  addPoints(targetUserId, IG_REVIEW_POINTS);
+  setIgClaimed(targetUserId);
+  await bot.sendMessage(chatId, `✅ ${IG_REVIEW_POINTS} points crédités à l'utilisateur ${targetUserId}.`);
+  try {
+    await bot.sendMessage(targetUserId, `✅ Ton avis IG a été validé ! Tu as reçu ${IG_REVIEW_POINTS} points. Merci ! 🙏`);
+  } catch (e) {
+    await bot.sendMessage(chatId, '(Impossible d’envoyer la confirmation à l’utilisateur.)');
   }
 });
 
@@ -176,6 +330,16 @@ bot.on('message', async (msg) => {
   if (userId) {
     const newTotal = addPoints(String(userId), pointsEarned);
     console.log(`Points: user ${userId} total=${total} +${pointsEarned} → ${newTotal}`);
+    // Referral bonus: if this user was referred, credit the referrer once
+    const referrerId = getReferrer(String(userId));
+    if (referrerId) {
+      addPoints(referrerId, REFERRAL_BONUS);
+      claimReferralBonus(String(userId));
+      console.log(`Referral: credited ${REFERRAL_BONUS} pts to referrer ${referrerId}`);
+      try {
+        await bot.sendMessage(referrerId, `🎉 Quelqu’un a passé commande avec ton lien de parrainage ! Tu reçois ${REFERRAL_BONUS} points.`);
+      } catch (e) { /* user may have blocked bot */ }
+    }
   } else {
     console.warn('Order received but msg.from.id missing, points not attributed');
   }
@@ -256,6 +420,54 @@ app.post('/api/redeem', (req, res) => {
     points: newPoints,
     message: `Redeemed: ${reward.label_en}. We will apply it to your next order.`
   });
+});
+
+// ---- Referral API ----
+app.get('/api/referral/me', (req, res) => {
+  const initData = req.query.initData || req.body?.initData;
+  const userId = validateInitData(initData);
+  if (!userId) {
+    return res.status(401).json({ error: 'Invalid initData' });
+  }
+  const baseUrl = (req.get('x-forwarded-proto') === 'https' ? 'https' : req.protocol) + '://' + (req.get('host') || 'alpine710.art');
+  const referralLink = `${baseUrl}?ref=${userId}`;
+  res.json({ userId: String(userId), referralLink });
+});
+
+app.post('/api/referral/register', (req, res) => {
+  const initData = req.body?.initData;
+  const referrerId = req.body?.referrerId;
+  const userId = validateInitData(initData);
+  if (!userId) {
+    return res.status(401).json({ error: 'Invalid initData' });
+  }
+  if (!referrerId || String(referrerId) === String(userId)) {
+    return res.status(400).json({ error: 'Invalid referrer' });
+  }
+  const set = setReferral(String(userId), String(referrerId));
+  res.json({ ok: set, message: set ? 'Referral registered' : 'Already referred' });
+});
+
+// ---- Reviews API ----
+app.get('/api/reviews', (req, res) => {
+  const reviews = loadReviews();
+  res.json(reviews);
+});
+
+app.post('/api/reviews', (req, res) => {
+  const initData = req.body?.initData;
+  const text = req.body?.text;
+  const rating = req.body?.rating;
+  const user = getInitDataUser(initData);
+  if (!user || !user.id) {
+    return res.status(401).json({ error: 'Invalid initData' });
+  }
+  if (!text || String(text).trim().length < 2) {
+    return res.status(400).json({ error: 'Text too short' });
+  }
+  const userName = [user.first_name, user.last_name].filter(Boolean).join(' ') || user.username || 'Client';
+  const review = addReview(user.id, userName, text, rating);
+  res.json({ ok: true, review });
 });
 
 app.listen(PORT, () => {

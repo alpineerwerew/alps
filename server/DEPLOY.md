@@ -69,7 +69,7 @@ echo 'BOT_TOKEN=ton_token_botfather' > .env
 echo 'OWNER_CHAT_ID=ton_chat_id_telegram' >> .env
 ```
 
-Optionnel : `CATALOG_URL=https://alpine710.art` (lien du bouton « Accès boutique »), `WELCOME_IMAGE_URL=https://https://res.cloudinary.com/divcybeds/image/upload/v1771239856/Alpine_Connection_Wonka_LETTERING-V01_Logo_2022_o7rhyc.png` (image personnalisée au /start).
+Optionnel : `CATALOG_URL=https://alpine710.art`, `REFERRAL_BONUS=15` (points pour un filleul qui commande), `IG_REVIEW_POINTS=50` (points pour un avis IG validé) (lien du bouton « Accès boutique »), `WELCOME_IMAGE_URL=https://https://res.cloudinary.com/divcybeds/image/upload/v1771239856/Alpine_Connection_Wonka_LETTERING-V01_Logo_2022_o7rhyc.png` (image personnalisée au /start).
 
 Ou avec un éditeur si installé : `nano .env` ou `vi .env`.
 

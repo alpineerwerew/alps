@@ -45,6 +45,178 @@ body {
 #app {
     max-width: 640px;
     margin: 0 auto;
+    padding-bottom: 72px;
+}
+
+.view-panel.hidden {
+    display: none !important;
+}
+
+/* === BOTTOM NAV === */
+.bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    max-width: 640px;
+    margin: 0 auto;
+    display: flex;
+    background: var(--bg-elevated);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    z-index: 100;
+    padding: 0.5rem 0;
+    padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+}
+.bottom-nav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.5rem;
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-family: inherit;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: color 0.2s, background 0.2s;
+}
+.bottom-nav-item:hover,
+.bottom-nav-item.active {
+    color: var(--gold);
+}
+.bottom-nav-icon {
+    font-size: 1.25rem;
+}
+
+/* === REVIEWS PAGE === */
+.reviews-page {
+    padding: 1rem 1.25rem 1.5rem;
+}
+.reviews-page-title {
+    font-family: var(--font-display);
+    font-size: 1.35rem;
+    margin-bottom: 0.5rem;
+}
+.reviews-page-intro {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    margin-bottom: 1.25rem;
+}
+.reviews-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+.review-card {
+    background: var(--bg-card);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: var(--radius-sm);
+    padding: 1rem;
+}
+.review-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+.review-card-name {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+.review-card-stars {
+    color: var(--gold);
+    font-size: 0.9rem;
+}
+.review-card-text {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+.review-card-date {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 0.5rem;
+}
+.reviews-empty {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    text-align: center;
+    padding: 2rem 1rem;
+}
+.review-form-wrap {
+    padding: 1rem 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+.review-form-title {
+    font-size: 1rem;
+    margin-bottom: 0.75rem;
+}
+.review-input {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: var(--radius-sm);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 0.9rem;
+    resize: vertical;
+    margin-bottom: 0.75rem;
+}
+.review-input::placeholder {
+    color: var(--text-muted);
+}
+.review-form-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+}
+.review-stars {
+    display: flex;
+    gap: 0.25rem;
+}
+.review-stars .star {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+    transition: color 0.2s;
+}
+.review-stars .star:hover,
+.review-stars .star.active {
+    color: var(--gold);
+}
+.btn-submit-review {
+    padding: 0.5rem 1.25rem;
+    border-radius: var(--radius-sm);
+    border: none;
+    background: var(--gold);
+    color: #000;
+    font-weight: 600;
+    font-family: inherit;
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+.btn-submit-review:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+.review-form-hint {
+    font-size: 0.8rem;
+    color: var(--text-muted);
 }
 
 /* === BANNER === */
@@ -344,6 +516,47 @@ body {
     font-size: 0.9rem;
     margin-bottom: 1.25rem;
 }
+
+.referral-block {
+    margin-bottom: 1.25rem;
+    padding: 1rem;
+    background: var(--surface);
+    border-radius: 12px;
+    border: 1px solid var(--border);
+}
+.referral-title {
+    font-size: 1rem;
+    margin: 0 0 0.5rem 0;
+}
+.referral-intro {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    margin: 0 0 0.75rem 0;
+}
+.referral-link-wrap {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+.referral-link-input {
+    flex: 1;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 0.85rem;
+    background: var(--bg);
+}
+.btn-copy-link {
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    border: none;
+    background: var(--accent);
+    color: var(--bg);
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
 .rewards-list {
     display: flex;
     flex-direction: column;

@@ -30,26 +30,63 @@
     </header>
     <!-- #endregion -->
 
-    <!-- #region Filtres + Langue + Points -->
-    <nav class="filter-bar" aria-label="Filtres">
-        <div class="filter-bar-left">
-            <span class="points-badge" id="points-badge" onclick="openRewardsModal()" title="">⭐ —</span>
-            <select class="lang-select" id="lang-switch" onchange="setLang(this.value)">
-                <option value="fr">FR</option>
-                <option value="en">EN</option>
-                <option value="de">DE</option>
+    <!-- #region Vue Catalogue -->
+    <div class="view-panel" id="view-catalog">
+        <nav class="filter-bar" aria-label="Filtres">
+            <div class="filter-bar-left">
+                <span class="points-badge" id="points-badge" onclick="openRewardsModal()" title="">⭐ —</span>
+                <select class="lang-select" id="lang-switch" onchange="setLang(this.value)">
+                    <option value="fr">FR</option>
+                    <option value="en">EN</option>
+                    <option value="de">DE</option>
+                </select>
+            </div>
+            <select class="filter-select" id="filter-category">
+                <option value="" id="filter-all-option">📂 Toutes les catégories</option>
             </select>
-        </div>
-        <select class="filter-select" id="filter-category">
-            <option value="" id="filter-all-option">📂 Toutes les catégories</option>
-        </select>
-    </nav>
+        </nav>
+        <main class="products-wrap">
+            <div class="products-grid" id="products-grid"></div>
+        </main>
+    </div>
     <!-- #endregion -->
 
-    <!-- #region Produits -->
-    <main class="products-wrap">
-        <div class="products-grid" id="products-grid"></div>
-    </main>
+    <!-- #region Vue Avis -->
+    <div class="view-panel hidden" id="view-reviews">
+        <div class="reviews-page">
+            <h2 class="reviews-page-title" id="reviews-page-title">Avis clients</h2>
+            <p class="reviews-page-intro" id="reviews-page-intro"></p>
+            <div class="reviews-list" id="reviews-list"></div>
+            <div class="review-form-wrap">
+                <h3 class="review-form-title" id="review-form-title">Laisser un avis</h3>
+                <textarea class="review-input" id="review-input" placeholder="" rows="4" maxlength="2000"></textarea>
+                <div class="review-form-actions">
+                    <div class="review-stars" id="review-stars" aria-label="Note">
+                        <button type="button" class="star" data-rating="1">★</button>
+                        <button type="button" class="star" data-rating="2">★</button>
+                        <button type="button" class="star" data-rating="3">★</button>
+                        <button type="button" class="star" data-rating="4">★</button>
+                        <button type="button" class="star" data-rating="5">★</button>
+                    </div>
+                    <button type="button" class="btn-submit-review" id="btn-submit-review">Publier</button>
+                </div>
+                <p class="review-form-hint" id="review-form-hint"></p>
+            </div>
+        </div>
+    </div>
+    <!-- #endregion -->
+
+    <!-- #region Bottom navigation -->
+    <nav class="bottom-nav" aria-label="Navigation principale">
+        <button type="button" class="bottom-nav-item active" id="nav-catalog" onclick="showView('catalog')" aria-current="page">
+            <span class="bottom-nav-icon">🛒</span>
+            <span class="bottom-nav-label" id="nav-catalog-label">Catalogue</span>
+        </button>
+        <button type="button" class="bottom-nav-item" id="nav-reviews" onclick="showView('reviews')">
+            <span class="bottom-nav-icon">⭐</span>
+            <span class="bottom-nav-label" id="nav-reviews-label">Avis</span>
+        </button>
+    </nav>
     <!-- #endregion -->
 </div>
 <!-- #endregion -->
@@ -82,6 +119,14 @@
         <button class="modal-close" onclick="closeRewardsModal()">✕</button>
         <h2 class="rewards-title" id="rewards-title">Récompenses</h2>
         <p class="rewards-intro" id="rewards-intro"></p>
+        <div class="referral-block" id="referral-block">
+            <h3 class="referral-title" id="referral-title">Parrainage</h3>
+            <p class="referral-intro" id="referral-intro"></p>
+            <div class="referral-link-wrap">
+                <input type="text" class="referral-link-input" id="referral-link-input" readonly />
+                <button type="button" class="btn-copy-link" id="referral-copy-btn">Copier</button>
+            </div>
+        </div>
         <div class="rewards-list" id="rewards-list"></div>
     </div>
 </div>
