@@ -13,7 +13,7 @@ const TelegramBot = require('node-telegram-bot-api');
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const OWNER_CHAT_ID = process.env.OWNER_CHAT_ID;
-const CATALOG_URL = process.env.CATALOG_URL || 'https://alpine710.art'; // Lien vers ton catalogue (WebApp ou site)
+const CATALOG_URL = (process.env.CATALOG_URL || 'https://alpine710.art').replace(/^http:\/\//i, 'https://'); // Doit être HTTPS pour le bouton Web App
 const PORT = process.env.PORT || 3000;
 const POINTS_PER_10_CURRENCY = Number(process.env.POINTS_PER_10_CURRENCY) || 1; // 1 point per 10 CHF
 const REFERRAL_BONUS = Number(process.env.REFERRAL_BONUS) || 15; // points when someone you referred places first order
@@ -237,6 +237,12 @@ const START_KEYBOARD = {
   }
 };
 
+const OPEN_CATALOG_INLINE = {
+  reply_markup: {
+    inline_keyboard: [[{ text: '🛒 Ouvrir le catalogue', web_app: { url: CATALOG_URL } }]]
+  }
+};
+
 bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
   const welcomeText = '🌱 Bienvenue sur notre bot Alpine Connexion ! 🌿\n\nOuvre le catalogue en cliquant sur le bouton ci-dessous 👇✨';
@@ -245,8 +251,8 @@ bot.onText(/\/start/, async (msg) => {
   } catch (err) {
     await bot.sendMessage(chatId, welcomeText);
   }
-  // Clavier dans un 2e message pour qu’il s’affiche partout (certains clients ne montrent pas le clavier sur une photo)
   await bot.sendMessage(chatId, 'Choisis une option :', START_KEYBOARD);
+  await bot.sendMessage(chatId, 'Ou ouvre le catalogue ici :', OPEN_CATALOG_INLINE);
 });
 
 // Réponses aux boutons du menu (bouton Accès boutique ouvre le Web App directement)
@@ -254,7 +260,7 @@ bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
   const text = (msg.text || '').trim();
   if (text === '🌱 Accès boutique') {
-    bot.sendMessage(chatId, '🛒 Clique sur le bouton « 🌱 Accès boutique » au-dessus pour ouvrir le catalogue.', { reply_markup: START_KEYBOARD.reply_markup });
+    await bot.sendMessage(chatId, '🛒 Ouvre le catalogue :', OPEN_CATALOG_INLINE);
     return;
   }
   if (text === '📞 Contactez-nous') {
@@ -468,6 +474,46 @@ app.post('/api/reviews', (req, res) => {
   const userName = [user.first_name, user.last_name].filter(Boolean).join(' ') || user.username || 'Client';
   const review = addReview(user.id, userName, text, rating);
   res.json({ ok: true, review });
+});
+
+// ---- Order via API (envoi direct par le bot, sans ouvrir t.me) ----
+app.post('/api/order', (req, res) => {
+  const initData = req.body?.initData;
+  const orderText = req.body?.orderText;
+  const user = getInitDataUser(initData);
+  if (!user || !user.id) {
+    return res.status(401).json({ error: 'Invalid initData' });
+  }
+  if (!orderText || !looksLikeOrder(orderText)) {
+    return res.status(400).json({ error: 'Invalid order' });
+  }
+  const userId = user.id;
+  const fromLabel = user.username ? `@${user.username}` : [user.first_name, user.last_name].filter(Boolean).join(' ') || `ID ${userId}`;
+
+  const total = parseOrderTotal(orderText);
+  const pointsFromTotal = Math.floor(total / 10) * POINTS_PER_10_CURRENCY;
+  const pointsEarned = Math.max(1, pointsFromTotal);
+  addPoints(String(userId), pointsEarned);
+  const referrerId = getReferrer(String(userId));
+  if (referrerId) {
+    addPoints(referrerId, REFERRAL_BONUS);
+    claimReferralBonus(String(userId));
+    bot.sendMessage(referrerId, `🎉 Quelqu'un a passé commande avec ton lien de parrainage ! Tu reçois ${REFERRAL_BONUS} points.`).catch(() => {});
+  }
+
+  if (OWNER_CHAT_ID) {
+    bot.sendMessage(OWNER_CHAT_ID, `📥 Nouvelle commande reçue :\n\n${orderText}\n\n👤 Client : ${fromLabel}`).catch((err) => {
+      console.error('❌ Error sending order to owner:', err.message);
+    });
+  }
+
+  const balance = getPoints(String(userId));
+  const confirm = `✅ Merci, nous avons bien reçu ta commande.\n⭐ Tu as gagné ${pointsEarned} point(s). Solde : ${balance} pts. Ouvre le catalogue pour les échanger !\n\nNous te répondrons ici sur Telegram.`;
+  bot.sendMessage(userId, confirm).catch((err) => {
+    console.error('❌ Error sending confirmation to user:', err.message);
+  });
+
+  res.json({ ok: true });
 });
 
 app.listen(PORT, () => {

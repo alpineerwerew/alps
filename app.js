@@ -63,7 +63,8 @@ const I18N = {
         review_success: 'Merci ! Ton avis a été publié.',
         review_error_telegram: 'Ouvre le site depuis Telegram pour laisser un avis.',
         no_reviews_yet: 'Aucun avis pour le moment. Sois le premier !',
-        review_form_title: 'Laisser un avis'
+        review_form_title: 'Laisser un avis',
+        order_sent: 'Commande envoyée ! On te répond sur Telegram.'
     },
     en: {
         filter_all: '📂 All categories',
@@ -100,7 +101,8 @@ const I18N = {
         review_success: 'Thank you! Your review has been published.',
         review_error_telegram: 'Open the site from Telegram to leave a review.',
         no_reviews_yet: 'No reviews yet. Be the first!',
-        review_form_title: 'Leave a review'
+        review_form_title: 'Leave a review',
+        order_sent: 'Order sent! We\'ll reply on Telegram.'
     },
     de: {
         filter_all: '📂 Alle Kategorien',
@@ -137,7 +139,8 @@ const I18N = {
         review_success: 'Danke! Deine Bewertung wurde veröffentlicht.',
         review_error_telegram: 'Öffne die Seite über Telegram, um eine Bewertung zu hinterlassen.',
         no_reviews_yet: 'Noch keine Bewertungen. Sei der Erste!',
-        review_form_title: 'Bewertung schreiben'
+        review_form_title: 'Bewertung schreiben',
+        order_sent: 'Bestellung gesendet! Wir antworten dir auf Telegram.'
     }
 };
 
@@ -1236,8 +1239,7 @@ function removeFromCart(i) {
     renderCart();
 }
 
-function checkout() {
-    if (!cart.length) return;
+function buildOrderText() {
     let total = 0;
     let msg = `${t('order_header')}\n\n`;
     cart.forEach((item, i) => {
@@ -1250,17 +1252,39 @@ function checkout() {
         total += item.price;
     });
     msg += `${t('order_total')} : ${total.toFixed(2)} ${CURRENCY}`;
+    return msg;
+}
 
-    // Choisir entre bot ou username selon la configuration
+async function checkout() {
+    if (!cart.length) return;
+    const orderText = buildOrderText();
+
+    if (POINTS_API_URL && getInitData()) {
+        try {
+            const res = await fetch(`${POINTS_API_URL}/api/order`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ initData: getInitData(), orderText })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (res.ok && data.ok) {
+                cart = [];
+                updateCartBadge();
+                closeCart();
+                showToast(t('order_sent'));
+                if (window.Telegram?.WebApp) window.Telegram.WebApp.close();
+                return;
+            }
+        } catch (e) {}
+    }
+
     const destination = getTelegramDestination();
-    const url = `https://t.me/${destination}?text=${encodeURIComponent(msg)}`;
-
-    // Si on est dans un WebApp Telegram, utiliser l'API officielle
+    const url = `https://t.me/${destination}?text=${encodeURIComponent(orderText)}`;
     const tg = window.Telegram?.WebApp;
     if (tg) {
         try {
             tg.openTelegramLink(url);
-        } catch(e) {
+        } catch (e) {
             window.open(url, '_blank');
         }
     } else {
