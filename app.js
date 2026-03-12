@@ -48,7 +48,7 @@ const I18N = {
         checkout_hint: 'Envoie le message dans Telegram pour confirmer ta commande.',
         nav_catalog: 'Catalogue',
         order_sent: 'Commande envoyée ! On te répond sur Telegram.',
-        or_contact_signal_threema: 'Ou envoie ta commande sur :',
+        or_contact_signal_threema: 'Envoie ta commande sur :',
         copy_paste_order: 'Copie la commande ci-dessous et colle-la dans le chat.',
         open_signal: 'Signal',
         open_threema: 'Threema'
@@ -71,7 +71,7 @@ const I18N = {
         checkout_hint: 'Send the message in Telegram to confirm your order.',
         nav_catalog: 'Catalog',
         order_sent: 'Order sent! We\'ll reply on Telegram.',
-        or_contact_signal_threema: 'Or send your order on:',
+        or_contact_signal_threema: 'Send your order via:',
         copy_paste_order: 'Copy the order below and paste it in the chat.',
         open_signal: 'Signal',
         open_threema: 'Threema'
@@ -94,7 +94,7 @@ const I18N = {
         checkout_hint: 'Sende die Nachricht in Telegram, um deine Bestellung zu bestätigen.',
         nav_catalog: 'Katalog',
         order_sent: 'Bestellung gesendet! Wir antworten dir auf Telegram.',
-        or_contact_signal_threema: 'Oder sende deine Bestellung per:',
+        or_contact_signal_threema: 'Sende deine Bestellung per:',
         copy_paste_order: 'Kopiere die Bestellung unten und füge sie im Chat ein.',
         open_signal: 'Signal',
         open_threema: 'Threema'
@@ -958,8 +958,6 @@ function renderCart() {
             <span class="cart-total-label">${t('total_label')}</span>
             <span class="cart-total-amount">${total.toFixed(2)} ${CURRENCY}</span>
         </div>
-        <p class="checkout-hint">${t('checkout_hint')}</p>
-        <button class="btn-checkout" onclick="checkout()">${t('btn_checkout')}</button>
         <p class="cart-copy-hint">${t('copy_paste_order')}</p>
         <pre class="cart-order-copy" onclick="copyOrderToClipboard()" title="Cliquer pour copier">${escapeHtml(buildOrderText())}</pre>`;
     if (contactUrls.signalUrl || contactUrls.threemaUrl) {
