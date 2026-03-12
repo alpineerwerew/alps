@@ -33,6 +33,19 @@
     <div id="login-msg" class="msg hidden"></div>
     <div id="content" class="hidden">
         <p><a href="index.html">← Retour au catalogue</a></p>
+
+        <h2>Catégories</h2>
+        <form id="category-form">
+            <input type="hidden" id="cat-edit-id" value="">
+            <label>Nom de la catégorie</label>
+            <input type="text" id="cat-name" placeholder="ex: Flower 🌸">
+            <div class="form-actions">
+                <button type="submit" class="btn primary" id="cat-submit-btn">Ajouter</button>
+            </div>
+        </form>
+        <div id="categories-list"></div>
+
+        <h2>Produits</h2>
         <button type="button" class="btn primary" id="btn-add">+ Ajouter un produit</button>
 
         <form id="product-form" class="hidden">
@@ -45,6 +58,8 @@
             <select id="p-category"></select>
             <label>Prix (ex: 7:160, 28:600 ou un seul 15)</label>
             <input type="text" id="p-pricing" placeholder="7:160, 28:600">
+            <label>Variants (une par ligne ou séparés par des virgules)</label>
+            <textarea id="p-variants" placeholder="Lemon up, Untruly OG"></textarea>
             <label>Image URL (optionnel)</label>
             <input type="url" id="p-image_url" placeholder="https://...">
             <div class="form-actions">
@@ -81,9 +96,15 @@
         const pDescription = document.getElementById('p-description');
         const pCategory = document.getElementById('p-category');
         const pPricing = document.getElementById('p-pricing');
+        const pVariants = document.getElementById('p-variants');
         const pImageUrl = document.getElementById('p-image_url');
         const productsList = document.getElementById('products-list');
+        const categoriesList = document.getElementById('categories-list');
         const importJson = document.getElementById('import-json');
+        const categoryForm = document.getElementById('category-form');
+        const catEditId = document.getElementById('cat-edit-id');
+        const catName = document.getElementById('cat-name');
+        const catSubmitBtn = document.getElementById('cat-submit-btn');
         let categories = [];
         let products = [];
 
@@ -127,8 +148,64 @@
             return out.length ? out : [{ qty: 1, price: 0 }];
         }
 
+        function parseVariants(str) {
+            const s = (str || '').trim();
+            if (!s) return [];
+            return s.split(/[\n,;]+/).map(x => x.trim()).filter(Boolean);
+        }
+
         function fillCategoriesSelect() {
             pCategory.innerHTML = categories.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+        }
+
+        function renderCategoriesList() {
+            if (!categories.length) {
+                categoriesList.innerHTML = '<p>Aucune catégorie. Ajoute-en une ci-dessus.</p>';
+                return;
+            }
+            categoriesList.innerHTML = `
+                <table>
+                    <thead><tr><th>Nom</th><th></th></thead>
+                    <tbody>
+                        ${categories.map(c => `<tr>
+                            <td>${escapeHtml(c.name)}</td>
+                            <td>
+                                <button type="button" class="btn" data-cat-edit="${c.id}">Modifier</button>
+                                <button type="button" class="btn danger" data-cat-delete="${c.id}">Supprimer</button>
+                            </td>
+                        </tr>`).join('')}
+                    </tbody>
+                </table>`;
+            categoriesList.querySelectorAll('[data-cat-edit]').forEach(btn => {
+                btn.addEventListener('click', () => editCategory(Number(btn.getAttribute('data-cat-edit'))));
+            });
+            categoriesList.querySelectorAll('[data-cat-delete]').forEach(btn => {
+                btn.addEventListener('click', () => deleteCategory(Number(btn.getAttribute('data-cat-delete'))));
+            });
+        }
+
+        function editCategory(id) {
+            const c = categories.find(x => Number(x.id) === id);
+            if (!c) return;
+            catEditId.value = id;
+            catName.value = c.name;
+            catSubmitBtn.textContent = 'Enregistrer';
+        }
+
+        async function deleteCategory(id) {
+            if (!confirm('Supprimer cette catégorie ? Les produits concernés passeront en catégorie 1.')) return;
+            try {
+                const r = await fetch(API_URL + '/api/categories/' + id, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(getAuthBody())
+                });
+                if (r.ok) { load(); return; }
+                const d = await r.json();
+                alert(d.error || 'Erreur');
+            } catch (e) {
+                alert('Erreur réseau');
+            }
         }
 
         async function load() {
@@ -138,6 +215,7 @@
                 categories = d.categories || [];
                 products = d.products || [];
                 fillCategoriesSelect();
+                renderCategoriesList();
                 renderList();
             } catch (e) {
                 productsList.innerHTML = '<p class="msg err">Impossible de charger les produits.</p>';
@@ -188,6 +266,7 @@
             pDescription.value = p.description || '';
             pCategory.value = p.category_id || 1;
             pPricing.value = (p.pricing && p.pricing.length) ? p.pricing.map(x => x.qty + ':' + x.price).join(', ') : '';
+            pVariants.value = (p.variants && p.variants.length) ? p.variants.join(', ') : '';
             pImageUrl.value = p.image_url || '';
             productForm.classList.remove('hidden');
         }
@@ -208,11 +287,44 @@
             }
         }
 
+        categoryForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const name = catName.value.trim();
+            if (!name) return;
+            const id = catEditId.value ? Number(catEditId.value) : null;
+            try {
+                if (id) {
+                    const r = await fetch(API_URL + '/api/categories/' + id, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ ...getAuthBody(), category: { name } })
+                    });
+                    const d = await r.json();
+                    if (!r.ok) { alert(d.error || 'Erreur'); return; }
+                } else {
+                    const r = await fetch(API_URL + '/api/categories', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ ...getAuthBody(), category: { name } })
+                    });
+                    const d = await r.json();
+                    if (!r.ok) { alert(d.error || 'Erreur'); return; }
+                }
+                catEditId.value = '';
+                catName.value = '';
+                catSubmitBtn.textContent = 'Ajouter';
+                load();
+            } catch (e) {
+                alert('Erreur réseau');
+            }
+        });
+
         document.getElementById('btn-add').addEventListener('click', () => {
             editId.value = '';
             productForm.reset();
             productForm.classList.remove('hidden');
             fillCategoriesSelect();
+            pVariants.value = '';
         });
         document.getElementById('btn-cancel').addEventListener('click', () => productForm.classList.add('hidden'));
 
@@ -224,13 +336,13 @@
                 description: pDescription.value.trim(),
                 category_id: Number(pCategory.value) || 1,
                 pricing: parsePricing(pPricing.value),
+                variants: parseVariants(pVariants.value),
                 image_url: pImageUrl.value.trim() || null,
                 video_url: null,
                 media_type: 'image',
                 media: [],
                 gallery_link: null,
-                unit_type: 'gram',
-                variants: []
+                unit_type: 'gram'
             };
             if (payload.image_url) {
                 payload.media = [{ type: 'image', url: payload.image_url, alt: payload.name }];

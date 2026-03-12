@@ -525,7 +525,7 @@ async function loadCatalog() {
         return;
     }
     try {
-        const r = await fetch(POINTS_API_URL + '/api/products');
+        const r = await fetch(POINTS_API_URL + '/api/products?t=' + Date.now(), { cache: 'no-store' });
         const d = await r.json();
         if (d.products && d.products.length > 0) {
             catalogProducts = d.products;
@@ -549,6 +549,9 @@ function init() {
             if (tg) { tg.expand(); tg.ready(); }
         } catch (e) {}
     })();
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') refreshCatalog();
+    });
 }
 
 function showView(viewName) {
@@ -572,6 +575,25 @@ function buildFilters() {
         selectedCategory = e.target.value ? parseInt(e.target.value) : null;
         renderProducts();
     });
+}
+
+function refreshCategoryFilter() {
+    const sel = document.getElementById('filter-category');
+    if (!sel) return;
+    while (sel.options.length > 1) sel.remove(1);
+    const list = catalogCategories.length ? catalogCategories : CATEGORIES;
+    list.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.id;
+        opt.textContent = c.name;
+        sel.appendChild(opt);
+    });
+}
+
+async function refreshCatalog() {
+    await loadCatalog();
+    refreshCategoryFilter();
+    renderProducts();
 }
 
 function getPrimaryMedia(product) {

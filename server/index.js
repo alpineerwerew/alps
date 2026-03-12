@@ -488,6 +488,56 @@ app.post('/api/products/import', (req, res) => {
   res.json({ ok: true, count: (data.products || []).length });
 });
 
+// ---- Categories API (owner only) ----
+app.post('/api/categories', (req, res) => {
+  if (!ensureOwner(req, res)) return;
+  const cat = req.body?.category;
+  if (!cat || !String(cat.name || '').trim()) {
+    return res.status(400).json({ error: 'Category name required' });
+  }
+  const data = loadProductsData();
+  const categories = data.categories || [];
+  const maxId = categories.length ? Math.max(...categories.map((c) => Number(c.id) || 0)) : 0;
+  const newCat = { id: maxId + 1, name: String(cat.name).trim() };
+  categories.push(newCat);
+  data.categories = categories;
+  saveProductsData(data);
+  res.json({ ok: true, category: newCat });
+});
+
+app.put('/api/categories/:id', (req, res) => {
+  if (!ensureOwner(req, res)) return;
+  const id = Number(req.params.id);
+  const cat = req.body?.category;
+  if (!cat || !String(cat.name || '').trim()) {
+    return res.status(400).json({ error: 'Category name required' });
+  }
+  const data = loadProductsData();
+  const categories = data.categories || [];
+  const idx = categories.findIndex((c) => Number(c.id) === id);
+  if (idx === -1) return res.status(404).json({ error: 'Category not found' });
+  categories[idx] = { ...categories[idx], name: String(cat.name).trim() };
+  data.categories = categories;
+  saveProductsData(data);
+  res.json({ ok: true, category: categories[idx] });
+});
+
+app.delete('/api/categories/:id', (req, res) => {
+  if (!ensureOwner(req, res)) return;
+  const id = Number(req.params.id);
+  const data = loadProductsData();
+  const categories = (data.categories || []).filter((c) => Number(c.id) !== id);
+  if (categories.length === (data.categories || []).length) return res.status(404).json({ error: 'Category not found' });
+  data.categories = categories;
+  const products = (data.products || []).map((p) => {
+    if (Number(p.category_id) === id) return { ...p, category_id: 1 };
+    return p;
+  });
+  data.products = products;
+  saveProductsData(data);
+  res.json({ ok: true });
+});
+
 app.get('/api/admin/check', (req, res) => {
   const initData = req.query.initData || req.body?.initData;
   const userId = validateInitData(initData);
