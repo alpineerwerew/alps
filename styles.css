@@ -1228,6 +1228,31 @@ body {
     filter: brightness(0.96);
 }
 
+.cart-how-to-send {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text);
+    margin-top: 1rem;
+    margin-bottom: 0.75rem;
+}
+.cart-step-label {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+}
+.btn-copy-order {
+    width: 100%;
+    min-height: 48px;
+    margin-bottom: 0.75rem;
+    font-family: var(--font-body);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: transform 0.15s ease, box-shadow 0.2s ease;
+}
+.btn-copy-order:active {
+    transform: scale(0.98);
+}
 .cart-contact-alt {
     font-size: 0.85rem;
     color: var(--text-secondary);

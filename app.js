@@ -50,6 +50,10 @@ const I18N = {
         order_sent: 'Commande envoyée ! On te répond sur Telegram.',
         or_contact_signal_threema: 'Envoie ta commande sur :',
         copy_paste_order: 'Copie la commande ci-dessous et colle-la dans le chat.',
+        cart_how_to_send: 'Pour envoyer ta commande :',
+        cart_step1: '1. Copie ta commande',
+        cart_btn_copy: 'Copier la commande',
+        cart_step2: '2. Ouvre Signal ou Threema et colle dans le chat',
         open_signal: 'Signal',
         open_threema: 'Threema'
     },
@@ -73,6 +77,10 @@ const I18N = {
         order_sent: 'Order sent! We\'ll reply on Telegram.',
         or_contact_signal_threema: 'Send your order via:',
         copy_paste_order: 'Copy the order below and paste it in the chat.',
+        cart_how_to_send: 'To send your order:',
+        cart_step1: '1. Copy your order',
+        cart_btn_copy: 'Copy order',
+        cart_step2: '2. Open Signal or Threema and paste in the chat',
         open_signal: 'Signal',
         open_threema: 'Threema'
     },
@@ -96,6 +104,10 @@ const I18N = {
         order_sent: 'Bestellung gesendet! Wir antworten dir auf Telegram.',
         or_contact_signal_threema: 'Sende deine Bestellung per:',
         copy_paste_order: 'Kopiere die Bestellung unten und füge sie im Chat ein.',
+        cart_how_to_send: 'So sendest du deine Bestellung:',
+        cart_step1: '1. Bestellung kopieren',
+        cart_btn_copy: 'Bestellung kopieren',
+        cart_step2: '2. Signal oder Threema öffnen und einfügen',
         open_signal: 'Signal',
         open_threema: 'Threema'
     }
@@ -953,17 +965,19 @@ function renderCart() {
         </div>`;
     });
 
+    const btnStyle = 'background:linear-gradient(135deg,#1a1a1a 0%,#2d2d2d 100%);color:#fff;border:none;border-radius:10px;padding:14px 20px;font-weight:700;font-size:0.95rem;letter-spacing:0.5px;box-shadow:0 4px 14px rgba(0,0,0,0.35);min-height:48px;';
     h += `<div class="cart-footer">
         <div class="cart-total-row">
             <span class="cart-total-label">${t('total_label')}</span>
             <span class="cart-total-amount">${total.toFixed(2)} ${CURRENCY}</span>
         </div>
-        <p class="cart-copy-hint">${t('copy_paste_order')}</p>
-        <pre class="cart-order-copy" onclick="copyOrderToClipboard()" title="Cliquer pour copier">${escapeHtml(buildOrderText())}</pre>`;
+        <p class="cart-how-to-send">${t('cart_how_to_send')}</p>
+        <p class="cart-step-label">${t('cart_step1')}</p>
+        <button type="button" class="btn-copy-order" style="${btnStyle}" onclick="copyOrderToClipboard()">${t('cart_btn_copy')}</button>
+        <pre class="cart-order-copy" onclick="copyOrderToClipboard()" title="">${escapeHtml(buildOrderText())}</pre>
+        <p class="cart-step-label">${t('cart_step2')}</p>`;
     if (contactUrls.signalUrl || contactUrls.threemaUrl) {
-        const btnStyle = 'background:linear-gradient(135deg,#1a1a1a 0%,#2d2d2d 100%);color:#fff;border:none;border-radius:10px;padding:14px 20px;font-weight:700;font-size:0.95rem;letter-spacing:0.5px;box-shadow:0 4px 14px rgba(0,0,0,0.35);min-height:48px;';
-        h += `<p class="cart-contact-alt">${t('or_contact_signal_threema')}</p>
-        <div class="cart-contact-btns">`;
+        h += `<div class="cart-contact-btns">`;
         if (contactUrls.signalUrl) h += `<button type="button" class="btn-contact-alt" style="${btnStyle}" data-contact-url="${escapeHtml(contactUrls.signalUrl)}" onclick="openContactUrl(this)">${t('open_signal')}</button>`;
         if (contactUrls.threemaUrl) h += `<button type="button" class="btn-contact-alt" style="${btnStyle}" data-contact-url="${escapeHtml(contactUrls.threemaUrl)}" onclick="openContactUrl(this)">${t('open_threema')}</button>`;
         h += `</div>`;
