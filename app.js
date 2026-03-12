@@ -963,8 +963,8 @@ function renderCart() {
     if (contactUrls.signalUrl || contactUrls.threemaUrl) {
         h += `<p class="cart-contact-alt">${t('or_contact_signal_threema')}</p>
         <div class="cart-contact-btns">`;
-        if (contactUrls.signalUrl) h += `<a class="btn-contact-alt" href="${escapeHtml(contactUrls.signalUrl)}" target="_blank" rel="noopener">${t('open_signal')}</a>`;
-        if (contactUrls.threemaUrl) h += `<a class="btn-contact-alt" href="${escapeHtml(contactUrls.threemaUrl)}" target="_blank" rel="noopener">${t('open_threema')}</a>`;
+        if (contactUrls.signalUrl) h += `<button type="button" class="btn-contact-alt" data-contact-url="${escapeHtml(contactUrls.signalUrl)}" onclick="openContactUrl(this)">${t('open_signal')}</button>`;
+        if (contactUrls.threemaUrl) h += `<button type="button" class="btn-contact-alt" data-contact-url="${escapeHtml(contactUrls.threemaUrl)}" onclick="openContactUrl(this)">${t('open_threema')}</button>`;
         h += `</div>`;
     }
     h += `</div>`;
@@ -975,6 +975,11 @@ function removeFromCart(i) {
     cart.splice(i, 1);
     updateCartBadge();
     renderCart();
+}
+
+function openContactUrl(btn) {
+    const url = btn && btn.getAttribute && btn.getAttribute('data-contact-url');
+    if (url) window.open(url, '_blank', 'noopener,noreferrer');
 }
 
 function copyOrderToClipboard() {

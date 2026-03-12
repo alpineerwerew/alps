@@ -1258,7 +1258,7 @@ body {
     flex-wrap: wrap;
     margin-top: 0.5rem;
 }
-.cart-contact-btns a.btn-contact-alt {
+.cart-contact-btns .btn-contact-alt {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1269,8 +1269,7 @@ body {
     background: linear-gradient(135deg, #2c2c2c 0%, #3a3a3a 100%);
     border: none;
     border-radius: 8px;
-    color: #ffffff !important;
-    text-decoration: none !important;
+    color: #ffffff;
     font-family: var(--font-body);
     font-weight: 700;
     font-size: 1rem;
@@ -1281,12 +1280,11 @@ body {
     -webkit-tap-highlight-color: transparent;
     cursor: pointer;
 }
-.cart-contact-btns a.btn-contact-alt:hover,
-.cart-contact-btns a.btn-contact-alt:focus {
-    color: #ffffff !important;
-    text-decoration: none !important;
+.cart-contact-btns .btn-contact-alt:hover,
+.cart-contact-btns .btn-contact-alt:focus {
+    color: #ffffff;
 }
-.cart-contact-btns a.btn-contact-alt:active {
+.cart-contact-btns .btn-contact-alt:active {
     transform: scale(0.97);
     filter: brightness(0.96);
 }
