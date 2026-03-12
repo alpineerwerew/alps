@@ -424,7 +424,8 @@ app.post('/api/upload', uploadMw.single('file'), (req, res) => {
   if (!req.file || !req.file.filename) {
     return res.status(400).json({ error: 'No file uploaded' });
   }
-  const baseUrl = (req.protocol && req.get('host')) ? `${req.protocol}://${req.get('host')}` : CATALOG_URL;
+  // Always use CATALOG_URL (https) to avoid mixed-content issues in Telegram WebApp
+  const baseUrl = (CATALOG_URL || '').replace(/\/+$/, '');
   const url = `${baseUrl}/uploads/${req.file.filename}`;
   res.json({ ok: true, url });
 });
