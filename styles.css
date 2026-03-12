@@ -1228,6 +1228,52 @@ body {
     filter: brightness(0.96);
 }
 
+.cart-contact-alt {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-top: 1rem;
+    margin-bottom: 0.25rem;
+}
+.cart-copy-hint {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-bottom: 0.5rem;
+}
+.cart-order-copy {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.75rem;
+    font-size: 0.8rem;
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin-bottom: 0.75rem;
+    cursor: pointer;
+    user-select: all;
+    -webkit-user-select: all;
+}
+.cart-contact-btns {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+.btn-contact-alt {
+    flex: 1;
+    min-width: 120px;
+    padding: 0.6rem 1rem;
+    text-align: center;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    text-decoration: none;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+.btn-contact-alt:active {
+    filter: brightness(0.95);
+}
+
 .cart-empty-msg {
     text-align: center;
     padding: 3rem 1rem;

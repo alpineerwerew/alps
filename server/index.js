@@ -468,6 +468,14 @@ app.post('/api/upload', uploadMw.single('file'), (req, res) => {
   res.json({ ok: true, url });
 });
 
+// ---- Public config (Signal / Threema links for catalog) ----
+app.get('/api/config', (req, res) => {
+  res.json({
+    signalUrl: process.env.SIGNAL_CONTACT_URL || null,
+    threemaUrl: process.env.THREEMA_CONTACT_URL || null
+  });
+});
+
 // ---- Products API (public read) ----
 app.get('/api/products', (req, res) => {
   const data = loadProductsData();

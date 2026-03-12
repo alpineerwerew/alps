@@ -47,7 +47,11 @@ const I18N = {
         open_in_telegram: 'Ouvre depuis Telegram',
         checkout_hint: 'Envoie le message dans Telegram pour confirmer ta commande.',
         nav_catalog: 'Catalogue',
-        order_sent: 'Commande envoyée ! On te répond sur Telegram.'
+        order_sent: 'Commande envoyée ! On te répond sur Telegram.',
+        or_contact_signal_threema: 'Ou envoie ta commande sur :',
+        copy_paste_order: 'Copie la commande ci-dessous et colle-la dans le chat.',
+        open_signal: 'Signal',
+        open_threema: 'Threema'
     },
     en: {
         filter_all: '📂 All categories',
@@ -66,7 +70,11 @@ const I18N = {
         open_in_telegram: 'Open from Telegram',
         checkout_hint: 'Send the message in Telegram to confirm your order.',
         nav_catalog: 'Catalog',
-        order_sent: 'Order sent! We\'ll reply on Telegram.'
+        order_sent: 'Order sent! We\'ll reply on Telegram.',
+        or_contact_signal_threema: 'Or send your order on:',
+        copy_paste_order: 'Copy the order below and paste it in the chat.',
+        open_signal: 'Signal',
+        open_threema: 'Threema'
     },
     de: {
         filter_all: '📂 Alle Kategorien',
@@ -85,7 +93,11 @@ const I18N = {
         open_in_telegram: 'Öffne über Telegram',
         checkout_hint: 'Sende die Nachricht in Telegram, um deine Bestellung zu bestätigen.',
         nav_catalog: 'Katalog',
-        order_sent: 'Bestellung gesendet! Wir antworten dir auf Telegram.'
+        order_sent: 'Bestellung gesendet! Wir antworten dir auf Telegram.',
+        or_contact_signal_threema: 'Oder sende deine Bestellung per:',
+        copy_paste_order: 'Kopiere die Bestellung unten und füge sie im Chat ein.',
+        open_signal: 'Signal',
+        open_threema: 'Threema'
     }
 };
 
@@ -512,6 +524,7 @@ let selectedPricingIdx = null;
 let selectedVariantIdx = null;
 let currentProduct = null;
 let selectedCategory = null;
+let contactUrls = { signalUrl: null, threemaUrl: null };
 
 function escapeHtml(s) {
     if (!s) return '';
@@ -537,10 +550,20 @@ async function loadCatalog() {
     catalogCategories = CATEGORIES;
 }
 
+async function loadContactUrls() {
+    if (!POINTS_API_URL) return;
+    try {
+        const r = await fetch(POINTS_API_URL + '/api/config', { cache: 'no-store' });
+        const d = await r.json();
+        if (d && (d.signalUrl || d.threemaUrl)) contactUrls = { signalUrl: d.signalUrl || null, threemaUrl: d.threemaUrl || null };
+    } catch (e) {}
+}
+
 function init() {
     document.title = "Alpine Connexion";
     (async () => {
         await loadCatalog();
+        await loadContactUrls();
         buildFilters();
         applyTranslations();
         renderProducts();
@@ -936,8 +959,18 @@ function renderCart() {
             <span class="cart-total-amount">${total.toFixed(2)} ${CURRENCY}</span>
         </div>
         <p class="checkout-hint">${t('checkout_hint')}</p>
-        <button class="btn-checkout" onclick="checkout()">${t('btn_checkout')}</button>
-    </div>`;
+        <button class="btn-checkout" onclick="checkout()">${t('btn_checkout')}</button>`;
+    const orderText = buildOrderText();
+    if (contactUrls.signalUrl || contactUrls.threemaUrl) {
+        h += `<p class="cart-contact-alt">${t('or_contact_signal_threema')}</p>
+        <p class="cart-copy-hint">${t('copy_paste_order')}</p>
+        <pre class="cart-order-copy" onclick="copyOrderToClipboard()" title="Cliquer pour copier">${escapeHtml(orderText)}</pre>
+        <div class="cart-contact-btns">`;
+        if (contactUrls.signalUrl) h += `<a class="btn-contact-alt" href="${escapeHtml(contactUrls.signalUrl)}" target="_blank" rel="noopener">${t('open_signal')}</a>`;
+        if (contactUrls.threemaUrl) h += `<a class="btn-contact-alt" href="${escapeHtml(contactUrls.threemaUrl)}" target="_blank" rel="noopener">${t('open_threema')}</a>`;
+        h += `</div>`;
+    }
+    h += `</div>`;
     c.innerHTML = h;
 }
 
@@ -945,6 +978,21 @@ function removeFromCart(i) {
     cart.splice(i, 1);
     updateCartBadge();
     renderCart();
+}
+
+function copyOrderToClipboard() {
+    const text = buildOrderText();
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => showToast('✓ Copié')).catch(() => {});
+    } else {
+        const el = document.createElement('textarea');
+        el.value = text;
+        document.body.appendChild(el);
+        el.select();
+        document.execCommand('copy');
+        document.body.removeChild(el);
+        showToast('✓ Copié');
+    }
 }
 
 function buildOrderText() {
