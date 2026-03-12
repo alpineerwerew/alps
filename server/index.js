@@ -154,29 +154,10 @@ const USER_KEYBOARD = {
   }
 };
 
+// Un seul bouton : ouvre le catalogue directement (Web App) — utilisé pour /start et menu
 const OPEN_CATALOG_INLINE = {
   reply_markup: {
-    inline_keyboard: [[{ text: 'Ouvrir le catalogue', web_app: { url: CATALOG_URL } }]]
-  }
-};
-
-// Menu inline (réutilisé pour "menu" et pour le style /start)
-const MENU_INLINE = {
-  reply_markup: {
-    inline_keyboard: [
-      [{ text: 'Catalogue', web_app: { url: CATALOG_URL } }],
-      [{ text: 'Contact', callback_data: 'menu_contact' }, { text: 'Infos', callback_data: 'menu_infos' }]
-    ]
-  }
-};
-
-// Au /start : un seul message avec 4 boutons — tout est là, plus besoin de commandes
-const START_INLINE = {
-  reply_markup: {
-    inline_keyboard: [
-      [{ text: '🌿 Accès boutique', web_app: { url: CATALOG_URL } }],
-      [{ text: '📞 Contactez-nous', callback_data: 'menu_contact' }, { text: 'ℹ️ Infos', callback_data: 'menu_infos' }]
-    ]
+    inline_keyboard: [[{ text: '🌿 Ouvrir le catalogue', web_app: { url: CATALOG_URL } }]]
   }
 };
 
@@ -204,20 +185,21 @@ const contactState = {};
 bot.onText(/\/start(?:\s+(.+))?/, async (msg) => {
   const chatId = msg.chat.id;
   addBotUser(chatId);
-  const welcomeText = 'Bienvenue ! Utilise le bouton MENU pour ouvrir le catalogue.';
+  const welcomeText = 'Bienvenue ! Clique ci-dessous pour ouvrir le catalogue.';
   try {
-    await bot.sendPhoto(chatId, WELCOME_IMAGE_URL, { caption: welcomeText, ...USER_KEYBOARD });
+    await bot.sendPhoto(chatId, WELCOME_IMAGE_URL, { caption: welcomeText, ...OPEN_CATALOG_INLINE });
   } catch (err) {
-    await bot.sendMessage(chatId, welcomeText, USER_KEYBOARD);
+    await bot.sendMessage(chatId, welcomeText, OPEN_CATALOG_INLINE);
   }
+  await bot.sendMessage(chatId, 'Ou utilise le bouton MENU pour revenir ici.', USER_KEYBOARD);
 });
 
 function buildHelpMessage(isOwner) {
   let s = '📋 Commandes disponibles\n\n';
   s += '/start — Démarrer le bot\n';
-  s += '/menu — Ouvrir le menu (Catalogue, Contact, Infos)\n';
+  s += '/menu — Ouvrir le catalogue\n';
   s += '/help — Afficher cette liste\n\n';
-  s += 'Utilise le bouton MENU pour accéder au catalogue.';
+  s += 'Utilise le bouton MENU pour ouvrir le catalogue.';
   if (isOwner) {
     s += '\n\n——— Admin ———\n';
     s += '/admin — Ouvrir l’admin (produits)\n';
@@ -302,13 +284,11 @@ bot.on('message', async (msg) => {
 
   const textNorm = (text || '').toLowerCase().trim();
   if (textNorm === 'menu' || textNorm === '/menu') {
-    await bot.sendMessage(chatId, 'Menu :', MENU_INLINE);
-    await bot.sendMessage(chatId, 'Choisis :', USER_KEYBOARD);
+    await bot.sendMessage(chatId, 'Clique pour ouvrir le catalogue :', OPEN_CATALOG_INLINE);
     return;
   }
   if ((text || '').trim() === CATALOG_URL || (text || '').trim() === CATALOG_URL + '/') {
-    await bot.sendMessage(chatId, 'Ouvre le catalogue avec le bouton ci-dessous (pas besoin de coller le lien ici).', MENU_INLINE);
-    await bot.sendMessage(chatId, 'Choisis :', USER_KEYBOARD);
+    await bot.sendMessage(chatId, 'Clique pour ouvrir le catalogue :', OPEN_CATALOG_INLINE);
     return;
   }
   if (String(chatId) === String(OWNER_CHAT_ID) && (textNorm === '/admin' || textNorm === 'admin')) {
