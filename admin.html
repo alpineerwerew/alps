@@ -26,6 +26,12 @@
         .hidden { display: none; }
         .import-wrap { margin-top: 1.5rem; }
         .import-wrap textarea { min-height: 120px; font-size: 12px; }
+        .upload-row { margin-top: 0.5rem; display: flex; align-items: center; gap: 0.5rem; }
+        .file-input { width: auto; padding: 0.25rem; }
+        .upload-status { font-size: 0.85rem; color: #666; }
+        .upload-status.uploading { color: #07c; }
+        .upload-status.done { color: #080; }
+        .upload-status.err { color: #c00; }
     </style>
 </head>
 <body>
@@ -60,8 +66,18 @@
             <input type="text" id="p-pricing" placeholder="7:160, 28:600">
             <label>Variants (une par ligne ou séparés par des virgules)</label>
             <textarea id="p-variants" placeholder="Lemon up, Untruly OG"></textarea>
-            <label>Image URL (optionnel)</label>
-            <input type="url" id="p-image_url" placeholder="https://...">
+            <label>Image (URL ou envoi)</label>
+            <input type="url" id="p-image_url" placeholder="https://... ou envoie une photo ci-dessous">
+            <div class="upload-row">
+                <input type="file" id="p-upload-image" accept="image/*" class="file-input">
+                <span id="upload-image-status" class="upload-status"></span>
+            </div>
+            <label>Vidéo (URL ou envoi, optionnel)</label>
+            <input type="url" id="p-video_url" placeholder="https://... ou envoie une vidéo ci-dessous">
+            <div class="upload-row">
+                <input type="file" id="p-upload-video" accept="video/*" class="file-input">
+                <span id="upload-video-status" class="upload-status"></span>
+            </div>
             <div class="form-actions">
                 <button type="submit" class="btn primary">Enregistrer</button>
                 <button type="button" class="btn" id="btn-cancel">Annuler</button>
@@ -98,6 +114,11 @@
         const pPricing = document.getElementById('p-pricing');
         const pVariants = document.getElementById('p-variants');
         const pImageUrl = document.getElementById('p-image_url');
+        const pVideoUrl = document.getElementById('p-video_url');
+        const pUploadImage = document.getElementById('p-upload-image');
+        const pUploadVideo = document.getElementById('p-upload-video');
+        const uploadImageStatus = document.getElementById('upload-image-status');
+        const uploadVideoStatus = document.getElementById('upload-video-status');
         const productsList = document.getElementById('products-list');
         const categoriesList = document.getElementById('categories-list');
         const importJson = document.getElementById('import-json');
@@ -152,6 +173,26 @@
             const s = (str || '').trim();
             if (!s) return [];
             return s.split(/[\n,;]+/).map(x => x.trim()).filter(Boolean);
+        }
+
+        async function uploadFile(file, statusEl, setUrlInput) {
+            if (!file) return;
+            statusEl.textContent = 'Envoi…';
+            statusEl.className = 'upload-status uploading';
+            const fd = new FormData();
+            fd.append('initData', getInitData());
+            fd.append('file', file);
+            try {
+                const r = await fetch(API_URL + '/api/upload', { method: 'POST', body: fd });
+                const d = await r.json();
+                if (!r.ok) { statusEl.textContent = d.error || 'Erreur'; statusEl.className = 'upload-status err'; return; }
+                setUrlInput(d.url);
+                statusEl.textContent = '✓ Envoyé';
+                statusEl.className = 'upload-status done';
+            } catch (e) {
+                statusEl.textContent = 'Erreur réseau';
+                statusEl.className = 'upload-status err';
+            }
         }
 
         function fillCategoriesSelect() {
@@ -268,6 +309,9 @@
             pPricing.value = (p.pricing && p.pricing.length) ? p.pricing.map(x => x.qty + ':' + x.price).join(', ') : '';
             pVariants.value = (p.variants && p.variants.length) ? p.variants.join(', ') : '';
             pImageUrl.value = p.image_url || '';
+            pVideoUrl.value = p.video_url || '';
+            if (uploadImageStatus) uploadImageStatus.textContent = '';
+            if (uploadVideoStatus) uploadVideoStatus.textContent = '';
             productForm.classList.remove('hidden');
         }
 
@@ -319,34 +363,51 @@
             }
         });
 
+        pUploadImage.addEventListener('change', (e) => {
+            const file = e.target.files && e.target.files[0];
+            if (file) uploadFile(file, uploadImageStatus, (url) => { pImageUrl.value = url; });
+            e.target.value = '';
+        });
+        pUploadVideo.addEventListener('change', (e) => {
+            const file = e.target.files && e.target.files[0];
+            if (file) uploadFile(file, uploadVideoStatus, (url) => { pVideoUrl.value = url; });
+            e.target.value = '';
+        });
+
         document.getElementById('btn-add').addEventListener('click', () => {
             editId.value = '';
             productForm.reset();
             productForm.classList.remove('hidden');
             fillCategoriesSelect();
             pVariants.value = '';
+            pVideoUrl.value = '';
+            uploadImageStatus.textContent = '';
+            uploadVideoStatus.textContent = '';
         });
         document.getElementById('btn-cancel').addEventListener('click', () => productForm.classList.add('hidden'));
 
         productForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const id = editId.value ? Number(editId.value) : null;
+            const imageUrl = pImageUrl.value.trim() || null;
+            const videoUrl = pVideoUrl.value.trim() || null;
+            const media = [];
+            const productName = pName.value.trim();
+            if (imageUrl) media.push({ type: 'image', url: imageUrl, alt: productName });
+            if (videoUrl) media.push({ type: 'video', url: videoUrl, alt: '' });
             const payload = {
-                name: pName.value.trim(),
+                name: productName,
                 description: pDescription.value.trim(),
                 category_id: Number(pCategory.value) || 1,
                 pricing: parsePricing(pPricing.value),
                 variants: parseVariants(pVariants.value),
-                image_url: pImageUrl.value.trim() || null,
-                video_url: null,
-                media_type: 'image',
-                media: [],
+                image_url: imageUrl,
+                video_url: videoUrl,
+                media_type: videoUrl ? 'video' : 'image',
+                media: media.length ? media : (imageUrl ? [{ type: 'image', url: imageUrl, alt: productName }] : []),
                 gallery_link: null,
                 unit_type: 'gram'
             };
-            if (payload.image_url) {
-                payload.media = [{ type: 'image', url: payload.image_url, alt: payload.name }];
-            }
             try {
                 if (id) {
                     const r = await fetch(API_URL + '/api/products/' + id, {

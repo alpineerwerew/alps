@@ -8,6 +8,7 @@ const crypto = require('crypto');
 const fs = require('fs');
 const express = require('express');
 const cors = require('cors');
+const multer = require('multer');
 const TelegramBot = require('node-telegram-bot-api');
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
@@ -394,10 +395,39 @@ function ensureOwner(req, res) {
   return userId;
 }
 
+// ---- Uploads (photos / vidéos admin) ----
+const UPLOAD_DIR = path.join(__dirname, 'uploads');
+try {
+  fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+} catch (e) {}
+
+const storage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, UPLOAD_DIR),
+  filename: (_req, file, cb) => {
+    const ext = (file.originalname && path.extname(file.originalname)) || (file.mimetype && file.mimetype.startsWith('video/') ? '.mp4' : '.jpg');
+    cb(null, `upload_${Date.now()}_${Math.random().toString(36).slice(2)}${ext}`);
+  }
+});
+const uploadMw = multer({ storage, limits: { fileSize: 50 * 1024 * 1024 } }); // 50 MB
+
 // ---- Express API ----
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// Fichiers uploadés accessibles en /uploads/...
+app.use('/uploads', express.static(UPLOAD_DIR));
+
+// ---- Upload API (owner only) ----
+app.post('/api/upload', uploadMw.single('file'), (req, res) => {
+  if (!ensureOwner(req, res)) return;
+  if (!req.file || !req.file.filename) {
+    return res.status(400).json({ error: 'No file uploaded' });
+  }
+  const baseUrl = (req.protocol && req.get('host')) ? `${req.protocol}://${req.get('host')}` : CATALOG_URL;
+  const url = `${baseUrl}/uploads/${req.file.filename}`;
+  res.json({ ok: true, url });
+});
 
 // ---- Products API (public read) ----
 app.get('/api/products', (req, res) => {
