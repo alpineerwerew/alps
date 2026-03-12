@@ -78,6 +78,8 @@
                 <input type="file" id="p-upload-video" accept="video/*" class="file-input">
                 <span id="upload-video-status" class="upload-status"></span>
             </div>
+            <label>Autres médias (un URL par ligne)</label>
+            <textarea id="p-media-extra" placeholder="https://... (image ou vidéo)&#10;https://..."></textarea>
             <div class="form-actions">
                 <button type="submit" class="btn primary">Enregistrer</button>
                 <button type="button" class="btn" id="btn-cancel">Annuler</button>
@@ -114,6 +116,7 @@
         const pPricing = document.getElementById('p-pricing');
         const pVariants = document.getElementById('p-variants');
         const pImageUrl = document.getElementById('p-image_url');
+        const pMediaExtra = document.getElementById('p-media-extra');
         const pVideoUrl = document.getElementById('p-video_url');
         const pUploadImage = document.getElementById('p-upload-image');
         const pUploadVideo = document.getElementById('p-upload-video');
@@ -173,6 +176,17 @@
             const s = (str || '').trim();
             if (!s) return [];
             return s.split(/[\n,;]+/).map(x => x.trim()).filter(Boolean);
+        }
+
+        function parseMediaExtra(str) {
+            const s = (str || '').trim();
+            if (!s) return [];
+            const urls = s.split(/\n+/).map(x => x.trim()).filter(Boolean);
+            return urls.map(url => {
+                const lower = url.toLowerCase();
+                const isVideo = lower.includes('.mp4') || lower.includes('.mov') || lower.includes('.webm') || lower.includes('video/');
+                return { type: isVideo ? 'video' : 'image', url, alt: '' };
+            });
         }
 
         async function uploadFile(file, statusEl, setUrlInput) {
@@ -310,6 +324,12 @@
             pVariants.value = (p.variants && p.variants.length) ? p.variants.join(', ') : '';
             pImageUrl.value = p.image_url || '';
             pVideoUrl.value = p.video_url || '';
+            const extraMedia = Array.isArray(p.media)
+                ? p.media.filter(m => m && m.url && m.url !== p.image_url && m.url !== p.video_url)
+                : [];
+            if (pMediaExtra) {
+                pMediaExtra.value = extraMedia.map(m => m.url).join('\n');
+            }
             if (uploadImageStatus) uploadImageStatus.textContent = '';
             if (uploadVideoStatus) uploadVideoStatus.textContent = '';
             productForm.classList.remove('hidden');
@@ -381,6 +401,7 @@
             fillCategoriesSelect();
             pVariants.value = '';
             pVideoUrl.value = '';
+            if (pMediaExtra) pMediaExtra.value = '';
             uploadImageStatus.textContent = '';
             uploadVideoStatus.textContent = '';
         });
@@ -391,10 +412,20 @@
             const id = editId.value ? Number(editId.value) : null;
             const imageUrl = pImageUrl.value.trim() || null;
             const videoUrl = pVideoUrl.value.trim() || null;
-            const media = [];
+            let media = [];
             const productName = pName.value.trim();
             if (imageUrl) media.push({ type: 'image', url: imageUrl, alt: productName });
             if (videoUrl) media.push({ type: 'video', url: videoUrl, alt: '' });
+            const extra = parseMediaExtra(pMediaExtra?.value || '');
+            if (extra.length) {
+                const seen = new Set(media.map(m => m.url));
+                extra.forEach(m => {
+                    if (!seen.has(m.url)) {
+                        media.push(m);
+                        seen.add(m.url);
+                    }
+                });
+            }
             const payload = {
                 name: productName,
                 description: pDescription.value.trim(),
