@@ -961,10 +961,11 @@ function renderCart() {
         <p class="cart-copy-hint">${t('copy_paste_order')}</p>
         <pre class="cart-order-copy" onclick="copyOrderToClipboard()" title="Cliquer pour copier">${escapeHtml(buildOrderText())}</pre>`;
     if (contactUrls.signalUrl || contactUrls.threemaUrl) {
+        const btnStyle = 'background:linear-gradient(135deg,#1a1a1a 0%,#2d2d2d 100%);color:#fff;border:none;border-radius:10px;padding:14px 20px;font-weight:700;font-size:0.95rem;letter-spacing:0.5px;box-shadow:0 4px 14px rgba(0,0,0,0.35);min-height:48px;';
         h += `<p class="cart-contact-alt">${t('or_contact_signal_threema')}</p>
         <div class="cart-contact-btns">`;
-        if (contactUrls.signalUrl) h += `<button type="button" class="btn-contact-alt" data-contact-url="${escapeHtml(contactUrls.signalUrl)}" onclick="openContactUrl(this)">${t('open_signal')}</button>`;
-        if (contactUrls.threemaUrl) h += `<button type="button" class="btn-contact-alt" data-contact-url="${escapeHtml(contactUrls.threemaUrl)}" onclick="openContactUrl(this)">${t('open_threema')}</button>`;
+        if (contactUrls.signalUrl) h += `<button type="button" class="btn-contact-alt" style="${btnStyle}" data-contact-url="${escapeHtml(contactUrls.signalUrl)}" onclick="openContactUrl(this)">${t('open_signal')}</button>`;
+        if (contactUrls.threemaUrl) h += `<button type="button" class="btn-contact-alt" style="${btnStyle}" data-contact-url="${escapeHtml(contactUrls.threemaUrl)}" onclick="openContactUrl(this)">${t('open_threema')}</button>`;
         h += `</div>`;
     }
     h += `</div>`;

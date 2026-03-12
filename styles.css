@@ -1256,37 +1256,41 @@ body {
     display: flex;
     gap: 0.75rem;
     flex-wrap: wrap;
-    margin-top: 0.5rem;
+    margin-top: 0.75rem;
 }
 .cart-contact-btns .btn-contact-alt {
     display: flex;
     align-items: center;
     justify-content: center;
     flex: 1;
-    min-width: 120px;
-    padding: 1rem 1.25rem;
+    min-width: 130px;
+    min-height: 48px;
+    padding: 14px 20px;
     text-align: center;
-    background: linear-gradient(135deg, #2c2c2c 0%, #3a3a3a 100%);
+    background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
     border: none;
-    border-radius: 8px;
+    border-radius: 10px;
     color: #ffffff;
     font-family: var(--font-body);
     font-weight: 700;
-    font-size: 1rem;
+    font-size: 0.95rem;
+    letter-spacing: 0.5px;
     text-transform: uppercase;
-    letter-spacing: 1px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-    transition: transform 0.2s ease-out, filter 0.2s ease-out;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+    transition: transform 0.15s ease, box-shadow 0.2s ease, filter 0.15s ease;
     -webkit-tap-highlight-color: transparent;
     cursor: pointer;
+    outline: none;
 }
 .cart-contact-btns .btn-contact-alt:hover,
 .cart-contact-btns .btn-contact-alt:focus {
     color: #ffffff;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
 }
 .cart-contact-btns .btn-contact-alt:active {
     transform: scale(0.97);
-    filter: brightness(0.96);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    filter: brightness(0.95);
 }
 
 .cart-empty-msg {
