@@ -959,12 +959,11 @@ function renderCart() {
             <span class="cart-total-amount">${total.toFixed(2)} ${CURRENCY}</span>
         </div>
         <p class="checkout-hint">${t('checkout_hint')}</p>
-        <button class="btn-checkout" onclick="checkout()">${t('btn_checkout')}</button>`;
-    const orderText = buildOrderText();
+        <button class="btn-checkout" onclick="checkout()">${t('btn_checkout')}</button>
+        <p class="cart-copy-hint">${t('copy_paste_order')}</p>
+        <pre class="cart-order-copy" onclick="copyOrderToClipboard()" title="Cliquer pour copier">${escapeHtml(buildOrderText())}</pre>`;
     if (contactUrls.signalUrl || contactUrls.threemaUrl) {
         h += `<p class="cart-contact-alt">${t('or_contact_signal_threema')}</p>
-        <p class="cart-copy-hint">${t('copy_paste_order')}</p>
-        <pre class="cart-order-copy" onclick="copyOrderToClipboard()" title="Cliquer pour copier">${escapeHtml(orderText)}</pre>
         <div class="cart-contact-btns">`;
         if (contactUrls.signalUrl) h += `<a class="btn-contact-alt" href="${escapeHtml(contactUrls.signalUrl)}" target="_blank" rel="noopener">${t('open_signal')}</a>`;
         if (contactUrls.threemaUrl) h += `<a class="btn-contact-alt" href="${escapeHtml(contactUrls.threemaUrl)}" target="_blank" rel="noopener">${t('open_threema')}</a>`;
