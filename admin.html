@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Admin — Produits</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: system-ui, sans-serif; margin: 0; padding: 1rem; max-width: 640px; margin-left: auto; margin-right: auto; }
+        h1 { font-size: 1.25rem; }
+        .msg { padding: 1rem; background: #f0f0f0; border-radius: 8px; margin-bottom: 1rem; }
+        .msg.err { background: #fee; }
+        .msg.ok { background: #efe; }
+        table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+        th, td { text-align: left; padding: 0.5rem; border-bottom: 1px solid #ddd; }
+        th { font-weight: 600; }
+        .btn { padding: 0.4rem 0.8rem; border: 1px solid #333; background: #fff; border-radius: 6px; cursor: pointer; margin-right: 0.25rem; }
+        .btn.primary { background: #333; color: #fff; }
+        .btn.danger { border-color: #c00; color: #c00; }
+        form { margin: 1rem 0; padding: 1rem; border: 1px solid #ddd; border-radius: 8px; }
+        label { display: block; margin-top: 0.5rem; font-weight: 500; }
+        input, select, textarea { width: 100%; padding: 0.5rem; margin-top: 0.25rem; }
+        textarea { min-height: 80px; font-family: inherit; }
+        .form-actions { margin-top: 1rem; }
+        .hidden { display: none; }
+        .import-wrap { margin-top: 1.5rem; }
+        .import-wrap textarea { min-height: 120px; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <h1>🛠 Admin — Produits</h1>
+    <div id="login-msg" class="msg hidden"></div>
+    <div id="content" class="hidden">
+        <p><a href="index.html">← Retour au catalogue</a></p>
+        <button type="button" class="btn primary" id="btn-add">+ Ajouter un produit</button>
+
+        <form id="product-form" class="hidden">
+            <input type="hidden" id="edit-id" value="">
+            <label>Nom *</label>
+            <input type="text" id="p-name" required>
+            <label>Description</label>
+            <textarea id="p-description"></textarea>
+            <label>Catégorie</label>
+            <select id="p-category"></select>
+            <label>Prix (ex: 7:160, 28:600 ou un seul 15)</label>
+            <input type="text" id="p-pricing" placeholder="7:160, 28:600">
+            <label>Image URL (optionnel)</label>
+            <input type="url" id="p-image_url" placeholder="https://...">
+            <div class="form-actions">
+                <button type="submit" class="btn primary">Enregistrer</button>
+                <button type="button" class="btn" id="btn-cancel">Annuler</button>
+            </div>
+        </form>
+
+        <div id="products-list"></div>
+
+        <div class="import-wrap">
+            <h2>Importer (JSON)</h2>
+            <p>Colle ici le JSON des produits (ex: depuis la console du catalogue : <code>copy(JSON.stringify(PRODUCTS))</code>).</p>
+            <textarea id="import-json" placeholder='{"products": [...], "categories": [...]}'></textarea>
+            <button type="button" class="btn primary" id="btn-import">Importer</button>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = (typeof window !== 'undefined' && window.location.origin) ? window.location.origin : 'https://alpine710.art';
+        function getInitData() {
+            const tg = window.Telegram?.WebApp;
+            return (tg && tg.initData) ? tg.initData : '';
+        }
+        function getAuthBody() {
+            return { initData: getInitData() };
+        }
+
+        const loginMsg = document.getElementById('login-msg');
+        const content = document.getElementById('content');
+        const productForm = document.getElementById('product-form');
+        const editId = document.getElementById('edit-id');
+        const pName = document.getElementById('p-name');
+        const pDescription = document.getElementById('p-description');
+        const pCategory = document.getElementById('p-category');
+        const pPricing = document.getElementById('p-pricing');
+        const pImageUrl = document.getElementById('p-image_url');
+        const productsList = document.getElementById('products-list');
+        const importJson = document.getElementById('import-json');
+        let categories = [];
+        let products = [];
+
+        async function checkAdmin() {
+            const init = getInitData();
+            if (!init) {
+                loginMsg.textContent = 'Ouvre cette page depuis le bot Telegram (menu Admin → lien admin) pour te connecter.';
+                loginMsg.classList.add('err');
+                loginMsg.classList.remove('hidden');
+                return false;
+            }
+            try {
+                const r = await fetch(API_URL + '/api/admin/check?initData=' + encodeURIComponent(init));
+                const d = await r.json();
+                if (!d.ok) {
+                    loginMsg.textContent = 'Accès réservé au propriétaire du bot.';
+                    loginMsg.classList.add('err');
+                    loginMsg.classList.remove('hidden');
+                    return false;
+                }
+            } catch (e) {
+                loginMsg.textContent = 'Erreur réseau. Vérifie que l\'API est accessible.';
+                loginMsg.classList.add('err');
+                loginMsg.classList.remove('hidden');
+                return false;
+            }
+            loginMsg.classList.add('hidden');
+            content.classList.remove('hidden');
+            return true;
+        }
+
+        function parsePricing(str) {
+            const s = (str || '').trim();
+            if (!s) return [{ qty: 1, price: 0 }];
+            const parts = s.split(/[,;]/).map(x => x.trim());
+            const out = [];
+            for (const p of parts) {
+                const [qty, price] = p.split(/[:\s]+/).map(Number);
+                if (!isNaN(qty) && !isNaN(price)) out.push({ qty, price });
+            }
+            return out.length ? out : [{ qty: 1, price: 0 }];
+        }
+
+        function fillCategoriesSelect() {
+            pCategory.innerHTML = categories.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+        }
+
+        async function load() {
+            try {
+                const r = await fetch(API_URL + '/api/products');
+                const d = await r.json();
+                categories = d.categories || [];
+                products = d.products || [];
+                fillCategoriesSelect();
+                renderList();
+            } catch (e) {
+                productsList.innerHTML = '<p class="msg err">Impossible de charger les produits.</p>';
+            }
+        }
+
+        function escapeHtml(s) {
+            const div = document.createElement('div');
+            div.textContent = s;
+            return div.innerHTML;
+        }
+
+        function renderList() {
+            if (!products.length) {
+                productsList.innerHTML = '<p>Aucun produit. Clique sur "Ajouter un produit" ou importe un JSON.</p>';
+                return;
+            }
+            productsList.innerHTML = `
+                <table>
+                    <thead><tr><th>Nom</th><th>Prix</th><th></th></tr></thead>
+                    <tbody>
+                        ${products.map(p => {
+                            const priceStr = (p.pricing && p.pricing.length) ? p.pricing.map(x => x.qty + '→' + x.price + ' CHF').join(', ') : '—';
+                            return `<tr>
+                                <td>${escapeHtml(p.name)}</td>
+                                <td>${escapeHtml(priceStr)}</td>
+                                <td>
+                                    <button type="button" class="btn" data-edit="${p.id}">Modifier</button>
+                                    <button type="button" class="btn danger" data-delete="${p.id}">Supprimer</button>
+                                </td>
+                            </tr>`;
+                        }).join('')}
+                    </tbody>
+                </table>`;
+            productsList.querySelectorAll('[data-edit]').forEach(btn => {
+                btn.addEventListener('click', () => editProduct(Number(btn.getAttribute('data-edit'))));
+            });
+            productsList.querySelectorAll('[data-delete]').forEach(btn => {
+                btn.addEventListener('click', () => deleteProduct(Number(btn.getAttribute('data-delete'))));
+            });
+        }
+
+        function editProduct(id) {
+            const p = products.find(x => Number(x.id) === id);
+            if (!p) return;
+            editId.value = id;
+            pName.value = p.name;
+            pDescription.value = p.description || '';
+            pCategory.value = p.category_id || 1;
+            pPricing.value = (p.pricing && p.pricing.length) ? p.pricing.map(x => x.qty + ':' + x.price).join(', ') : '';
+            pImageUrl.value = p.image_url || '';
+            productForm.classList.remove('hidden');
+        }
+
+        async function deleteProduct(id) {
+            if (!confirm('Supprimer ce produit ?')) return;
+            try {
+                const r = await fetch(API_URL + '/api/products/' + id, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(getAuthBody())
+                });
+                const d = await r.json();
+                if (r.ok) { load(); return; }
+                alert(d.error || 'Erreur');
+            } catch (e) {
+                alert('Erreur réseau');
+            }
+        }
+
+        document.getElementById('btn-add').addEventListener('click', () => {
+            editId.value = '';
+            productForm.reset();
+            productForm.classList.remove('hidden');
+            fillCategoriesSelect();
+        });
+        document.getElementById('btn-cancel').addEventListener('click', () => productForm.classList.add('hidden'));
+
+        productForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const id = editId.value ? Number(editId.value) : null;
+            const payload = {
+                name: pName.value.trim(),
+                description: pDescription.value.trim(),
+                category_id: Number(pCategory.value) || 1,
+                pricing: parsePricing(pPricing.value),
+                image_url: pImageUrl.value.trim() || null,
+                video_url: null,
+                media_type: 'image',
+                media: [],
+                gallery_link: null,
+                unit_type: 'gram',
+                variants: []
+            };
+            if (payload.image_url) {
+                payload.media = [{ type: 'image', url: payload.image_url, alt: payload.name }];
+            }
+            try {
+                if (id) {
+                    const r = await fetch(API_URL + '/api/products/' + id, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ ...getAuthBody(), product: payload })
+                    });
+                    const d = await r.json();
+                    if (!r.ok) { alert(d.error || 'Erreur'); return; }
+                } else {
+                    const r = await fetch(API_URL + '/api/products', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ ...getAuthBody(), product: payload })
+                    });
+                    const d = await r.json();
+                    if (!r.ok) { alert(d.error || 'Erreur'); return; }
+                }
+                productForm.classList.add('hidden');
+                load();
+            } catch (e) {
+                alert('Erreur réseau');
+            }
+        });
+
+        document.getElementById('btn-import').addEventListener('click', async () => {
+            let data;
+            try {
+                data = JSON.parse(importJson.value.trim());
+            } catch (e) {
+                alert('JSON invalide.');
+                return;
+            }
+            const prods = data.products || data;
+            const cats = data.categories;
+            if (!Array.isArray(prods) && !Array.isArray(cats)) {
+                alert('Le JSON doit contenir "products" (tableau) et optionnellement "categories".');
+                return;
+            }
+            try {
+                const r = await fetch(API_URL + '/api/products/import', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        ...getAuthBody(),
+                        products: Array.isArray(prods) ? prods : [],
+                        categories: Array.isArray(cats) ? cats : undefined
+                    })
+                });
+                const d = await r.json();
+                if (!r.ok) { alert(d.error || 'Erreur'); return; }
+                importJson.value = '';
+                load();
+                alert('Import réussi. ' + (d.count || 0) + ' produit(s).');
+            } catch (e) {
+                alert('Erreur réseau');
+            }
+        });
+
+        (async () => {
+            if (window.Telegram?.WebApp) Telegram.WebApp.ready();
+            if (await checkAdmin()) load();
+        })();
+    </script>
+</body>
+</html>
