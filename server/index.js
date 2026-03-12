@@ -62,6 +62,39 @@ function getInitDataUser(initData) {
   }
 }
 
+// ---- Bot users (for broadcast) ----
+const BOT_USERS_FILE = path.join(__dirname, 'bot_users.json');
+
+function loadBotUsers() {
+  try {
+    const data = fs.readFileSync(BOT_USERS_FILE, 'utf8');
+    const arr = JSON.parse(data);
+    return Array.isArray(arr) ? arr : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveBotUsers(chatIds) {
+  const uniq = [...new Set(chatIds)].filter((id) => id && String(id) !== String(OWNER_CHAT_ID));
+  try {
+    fs.writeFileSync(BOT_USERS_FILE, JSON.stringify(uniq, null, 2), 'utf8');
+  } catch (err) {
+    console.error('❌ Could not save bot_users.json:', err.message);
+  }
+  return uniq;
+}
+
+function addBotUser(chatId) {
+  if (!chatId || String(chatId) === String(OWNER_CHAT_ID)) return;
+  const list = loadBotUsers();
+  if (list.includes(Number(chatId)) || list.includes(String(chatId))) return;
+  list.push(Number(chatId));
+  saveBotUsers(list);
+}
+
+let broadcastPending = false;
+
 // ---- Parse order total from message text ----
 function parseOrderTotal(text) {
   // Match "Total : 123.45 CHF" or "💰 Total : 123.45" or "Gesamt : ..." (FR/EN/DE)
@@ -84,7 +117,8 @@ const DEFAULT_COMMANDS = [
 
 const OWNER_COMMANDS = [
   ...DEFAULT_COMMANDS,
-  { command: 'admin', description: 'Admin (produits)' }
+  { command: 'admin', description: 'Admin (produits)' },
+  { command: 'broadcast', description: 'Message à tous' }
 ];
 
 bot.setMyCommands(DEFAULT_COMMANDS).then(() => console.log('✅ Commandes (défaut) enregistrées')).catch((e) => console.warn('setMyCommands default:', e?.message));
@@ -156,6 +190,7 @@ function getOrderConfirmText() {
 
 bot.onText(/\/start(?:\s+(.+))?/, async (msg) => {
   const chatId = msg.chat.id;
+  addBotUser(chatId);
   const welcomeText = 'Bienvenue ! Utilise le bouton MENU pour ouvrir le catalogue.';
   try {
     await bot.sendPhoto(chatId, WELCOME_IMAGE_URL, { caption: welcomeText, ...USER_KEYBOARD });
@@ -173,11 +208,12 @@ function buildHelpMessage(isOwner) {
   if (isOwner) {
     s += '\n\n——— Admin ———\n';
     s += '/admin — Ouvrir l’admin (produits)\n';
+    s += '\n/broadcast — Envoyer un message à tous';
   }
   return s;
 }
 
-const KNOWN_CMD_RE = /^\/(start|menu|admin|help)(\s|$)/i;
+const KNOWN_CMD_RE = /^\/(start|menu|admin|help|broadcast|cancel)(\s|$)/i;
 
 // Réponses aux boutons du menu (bouton Accès boutique ouvre le Web App directement)
 bot.on('message', async (msg) => {
@@ -185,6 +221,46 @@ bot.on('message', async (msg) => {
   const text = (msg.text || '').trim();
   const userId = msg.from?.id;
   const userName = msg.from?.username ? `@${msg.from.username}` : [msg.from?.first_name, msg.from?.last_name].filter(Boolean).join(' ') || (userId ? `ID ${userId}` : 'Client');
+  const isOwner = String(chatId) === String(OWNER_CHAT_ID);
+
+  // Owner: /broadcast — demande le message à diffuser
+  if (isOwner && /^\/broadcast\s*$/i.test(text)) {
+    broadcastPending = true;
+    await bot.sendMessage(chatId, '📢 Envoie le message à diffuser à tous les utilisateurs (texte ou photo avec légende).\nAnnule avec /cancel.');
+    return;
+  }
+  if (isOwner && /^\/cancel\s*$/i.test(text)) {
+    broadcastPending = false;
+    await bot.sendMessage(chatId, 'Annulé.');
+    return;
+  }
+  // Owner en mode broadcast : le message (texte ou photo) est envoyé à tous
+  if (isOwner && broadcastPending) {
+    broadcastPending = false;
+    const users = loadBotUsers();
+    if (!users.length) {
+      await bot.sendMessage(chatId, 'Aucun utilisateur enregistré (personne n’a encore fait /start ou commandé).');
+      return;
+    }
+    let sent = 0;
+    let failed = 0;
+    for (const id of users) {
+      try {
+        if (msg.photo && msg.photo.length) {
+          await bot.sendPhoto(id, msg.photo[msg.photo.length - 1].file_id, { caption: msg.caption || '' });
+        } else if (msg.text) {
+          await bot.sendMessage(id, msg.text);
+        } else {
+          continue;
+        }
+        sent++;
+      } catch (e) {
+        failed++;
+      }
+    }
+    await bot.sendMessage(chatId, `✅ Diffusion terminée : ${sent} envoyé(s), ${failed} échec(s) (${users.length} destinataires).`);
+    return;
+  }
 
   // Afficher les commandes quand on tape / ou /help ou une commande inconnue
   if (text === '/' || /^\/help\s*$/i.test(text) || (text.startsWith('/') && !KNOWN_CMD_RE.test(text))) {
@@ -233,6 +309,7 @@ bot.on('message', async (msg) => {
       console.error('❌ Error sending to owner:', err.message);
     }
   }
+  addBotUser(chatId);
   const confirm = getOrderConfirmText();
   try {
     await bot.sendMessage(chatId, confirm, PAYMENT_KEYBOARD);

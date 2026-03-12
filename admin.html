@@ -270,8 +270,8 @@
             }
             const prods = data.products || data;
             const cats = data.categories;
-            if (!Array.isArray(prods) && !Array.isArray(cats)) {
-                alert('Le JSON doit contenir "products" (tableau) et optionnellement "categories".');
+            if (!Array.isArray(prods)) {
+                alert('Le JSON doit contenir "products" (tableau). Optionnellement "categories" (tableau).');
                 return;
             }
             try {
