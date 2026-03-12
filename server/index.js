@@ -189,6 +189,9 @@ function getOrderConfirmText() {
   return '✅ Merci, nous avons bien reçu ta commande.\n\nComment souhaites-tu payer ?';
 }
 
+// Suivi du canal de contact après choix du paiement
+const contactState = {};
+
 bot.onText(/\/start(?:\s+(.+))?/, async (msg) => {
   const chatId = msg.chat.id;
   addBotUser(chatId);
@@ -223,6 +226,24 @@ bot.on('message', async (msg) => {
   const userId = msg.from?.id;
   const userName = msg.from?.username ? `@${msg.from.username}` : [msg.from?.first_name, msg.from?.last_name].filter(Boolean).join(' ') || (userId ? `ID ${userId}` : 'Client');
   const isOwner = String(chatId) === String(OWNER_CHAT_ID);
+
+  // Si on attend les coordonnées de contact après choix du paiement
+  if (contactState[chatId] && contactState[chatId].channel && text && !text.startsWith('/')) {
+    const st = contactState[chatId];
+    delete contactState[chatId];
+    await bot.sendMessage(chatId, `Merci, nous te recontacterons sur ${st.channel} avec ces coordonnées.`);
+    if (OWNER_CHAT_ID) {
+      const lines = [];
+      lines.push('📇 Coordonnées client pour commande :');
+      lines.push('');
+      lines.push(`👤 Client : ${userName}`);
+      if (st.method) lines.push(`💰 Paiement : ${st.method}`);
+      lines.push(`📲 Canal : ${st.channel}`);
+      lines.push(`📩 Coordonnées : ${text}`);
+      bot.sendMessage(OWNER_CHAT_ID, lines.join('\n')).catch(() => {});
+    }
+    return;
+  }
 
   // Owner: /broadcast — demande le message à diffuser
   if (isOwner && /^\/broadcast\s*$/i.test(text)) {
@@ -288,6 +309,7 @@ bot.on('message', async (msg) => {
 });
 
 const ORDER_PREFIXES = ['🛒 Nouvelle Commande', '🛒 New Order', '🛒 Neue Bestellung'];
+const lastOrderByChat = {};
 function looksLikeOrder(text) {
   if (!text || text.length < 10) return false;
   // Exact start (from catalog)
@@ -301,6 +323,8 @@ bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
   const text = msg.text || '';
   if (!looksLikeOrder(text)) return;
+
+  lastOrderByChat[chatId] = text;
 
   const fromLabel = msg.chat.username ? `@${msg.chat.username}` : [msg.chat.first_name, msg.chat.last_name].filter(Boolean).join(' ') || `ID ${chatId}`;
   if (OWNER_CHAT_ID) {
@@ -330,7 +354,21 @@ bot.on('callback_query', async (query) => {
     const method = data === 'pay_cash' ? 'Cash' : 'Crypto';
     try {
       await bot.answerCallbackQuery(query.id);
-      await bot.sendMessage(chatId, 'Paiement par ' + method + ' note. On te recontacte pour finaliser.');
+      const orderText = lastOrderByChat[chatId];
+      let extra = '';
+      if (orderText) {
+        extra = '\n\nVoici ta commande, tu peux la copier/coller dans Signal ou Threema :\n\n' + orderText;
+      }
+      await bot.sendMessage(chatId, 'Paiement par ' + method + ' noté.\n\nOù souhaites-tu poursuivre la discussion ?' + extra, {
+        reply_markup: {
+          inline_keyboard: [
+            [
+              { text: 'Signal', url: process.env.SIGNAL_CONTACT_URL || 'https://signal.me/#p=TON_NUMERO' },
+              { text: 'Threema', url: process.env.THREEMA_CONTACT_URL || 'https://threema.id/TONID' }
+            ]
+          ]
+        }
+      });
     } catch (e) {}
     if (OWNER_CHAT_ID) {
       bot.sendMessage(OWNER_CHAT_ID, 'Paiement choisi par ' + userName + ' : ' + method).catch(() => {});
