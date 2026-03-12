@@ -130,6 +130,15 @@ if (OWNER_CHAT_ID) {
     .catch((e) => console.warn('setMyCommands owner:', e?.message));
 }
 
+// Ne pas crasher sur une erreur de polling (réseau, etc.)
+bot.on('polling_error', (err) => {
+  console.error('❌ Telegram polling_error:', err.message);
+});
+
+process.on('unhandledRejection', (reason, p) => {
+  console.error('❌ Unhandled Rejection:', reason);
+});
+
 console.log('✅ Bot started (long polling)');
 
 // Image de bienvenue (logo Alpine Connexion — tu peux remplacer par ton image dans .env WELCOME_IMAGE_URL)
