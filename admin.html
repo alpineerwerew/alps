@@ -300,12 +300,17 @@
                     usersList.innerHTML = '<p>Aucun utilisateur enregistré pour le moment.</p>';
                     return;
                 }
+                const rows = list.map((u, i) => {
+                    const chatId = u && typeof u === 'object' ? u.chat_id : u;
+                    const username = (u && u.username) ? escapeHtml(u.username) : '—';
+                    const name = [u && u.first_name, u && u.last_name].filter(Boolean).join(' ') || '—';
+                    const lastSeen = (u && u.last_seen) ? new Date(u.last_seen).toLocaleString() : '—';
+                    return `<tr><td>${i+1}</td><td>${chatId}</td><td>${username}</td><td>${escapeHtml(name)}</td><td>${lastSeen}</td></tr>`;
+                });
                 usersList.innerHTML = `
                     <table>
-                        <thead><tr><th>#</th><th>chat_id</th></tr></thead>
-                        <tbody>
-                            ${list.map((id, i) => `<tr><td>${i+1}</td><td>${id}</td></tr>`).join('')}
-                        </tbody>
+                        <thead><tr><th>#</th><th>chat_id</th><th>Username</th><th>Nom</th><th>Dernier passage</th></tr></thead>
+                        <tbody>${rows.join('')}</tbody>
                     </table>
                 `;
             } catch (e) {

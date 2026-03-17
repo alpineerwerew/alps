@@ -63,34 +63,55 @@ function getInitDataUser(initData) {
   }
 }
 
-// ---- Bot users (for broadcast) ----
+// ---- Bot users (for broadcast + admin list) ----
 const BOT_USERS_FILE = path.join(__dirname, 'bot_users.json');
 
 function loadBotUsers() {
   try {
     const data = fs.readFileSync(BOT_USERS_FILE, 'utf8');
     const arr = JSON.parse(data);
-    return Array.isArray(arr) ? arr : [];
+    if (!Array.isArray(arr)) return [];
+    return arr.map((u) => {
+      if (u && typeof u === 'object' && u.chat_id != null) return u;
+      const id = Number(u) || u;
+      return { chat_id: id, username: null, first_name: null, last_name: null, first_seen: null, last_seen: null };
+    });
   } catch (e) {
     return [];
   }
 }
 
-function saveBotUsers(chatIds) {
-  const uniq = [...new Set(chatIds)].filter((id) => id && String(id) !== String(OWNER_CHAT_ID));
+function saveBotUsers(users) {
+  const list = users.filter((u) => u && String(u.chat_id) !== String(OWNER_CHAT_ID));
   try {
-    fs.writeFileSync(BOT_USERS_FILE, JSON.stringify(uniq, null, 2), 'utf8');
+    fs.writeFileSync(BOT_USERS_FILE, JSON.stringify(list, null, 2), 'utf8');
   } catch (err) {
     console.error('❌ Could not save bot_users.json:', err.message);
   }
-  return uniq;
+  return list;
 }
 
-function addBotUser(chatId) {
+function addBotUserFromMsg(msg) {
+  if (!msg || !msg.chat) return;
+  const chatId = msg.chat.id;
   if (!chatId || String(chatId) === String(OWNER_CHAT_ID)) return;
+  const from = msg.from || {};
+  const username = from.username ? '@' + from.username : null;
+  const first_name = from.first_name || null;
+  const last_name = from.last_name || null;
+  const now = new Date().toISOString();
+
   const list = loadBotUsers();
-  if (list.includes(Number(chatId)) || list.includes(String(chatId))) return;
-  list.push(Number(chatId));
+  let u = list.find((x) => String(x.chat_id) === String(chatId));
+  if (!u) {
+    u = { chat_id: chatId, username, first_name, last_name, first_seen: now, last_seen: now };
+    list.push(u);
+  } else {
+    u.username = username != null ? username : u.username;
+    u.first_name = first_name != null ? first_name : u.first_name;
+    u.last_name = last_name != null ? last_name : u.last_name;
+    u.last_seen = now;
+  }
   saveBotUsers(list);
 }
 
@@ -184,7 +205,7 @@ const contactState = {};
 
 bot.onText(/\/start(?:\s+(.+))?/, async (msg) => {
   const chatId = msg.chat.id;
-  addBotUser(chatId);
+  addBotUserFromMsg(msg);
   const welcomeText = 'Bienvenue ! Clique ci-dessous pour ouvrir le catalogue.';
   try {
     await bot.sendPhoto(chatId, WELCOME_IMAGE_URL, { caption: welcomeText, ...OPEN_CATALOG_INLINE });
@@ -257,7 +278,8 @@ bot.on('message', async (msg) => {
     }
     let sent = 0;
     let failed = 0;
-    for (const id of users) {
+    for (const u of users) {
+      const id = u && typeof u === 'object' ? u.chat_id : u;
       try {
         if (msg.photo && msg.photo.length) {
           await bot.sendPhoto(id, msg.photo[msg.photo.length - 1].file_id, { caption: msg.caption || '' });
@@ -323,7 +345,7 @@ bot.on('message', async (msg) => {
       console.error('❌ Error sending to owner:', err.message);
     }
   }
-  addBotUser(chatId);
+  addBotUserFromMsg(msg);
   const confirm = getOrderConfirmText();
   try {
     await bot.sendMessage(chatId, confirm, PAYMENT_KEYBOARD);
