@@ -713,6 +713,7 @@ function openProduct(id) {
     if (p.variants?.length) {
         variants = `<div class="selector-section">
             <div class="selector-title">${t('choose_variant')}</div>
+            <div id="variant-count" class="selector-subtitle"></div>
             <div class="variant-grid">${p.variants.map((v,i) =>
                 `<div class="variant-chip" onclick="pickVariant(${i})" id="var-${i}">${escapeHtml(v)}</div>`
             ).join('')}</div></div>`;
@@ -897,6 +898,11 @@ function pickVariant(i) {
     document.querySelectorAll('.variant-chip').forEach((el, j) => {
         el.classList.toggle('selected', selectedVariantIdxs.includes(j));
     });
+    const counter = document.getElementById('variant-count');
+    if (counter) {
+        const n = selectedVariantIdxs.length;
+        counter.textContent = n > 0 ? `${n} variante${n > 1 ? 's' : ''} sélectionnée${n > 1 ? 's' : ''}` : '';
+    }
     updateBtn();
 }
 
