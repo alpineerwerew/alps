@@ -94,6 +94,13 @@
             <textarea id="import-json" placeholder='{"products": [...], "categories": [...]}'></textarea>
             <button type="button" class="btn primary" id="btn-import">Importer</button>
         </div>
+
+        <div class="import-wrap">
+            <h2>Utilisateurs du bot</h2>
+            <p>Liste des utilisateurs qui ont lancé le bot ou passé une commande.</p>
+            <button type="button" class="btn" id="btn-load-users">Voir la liste des utilisateurs</button>
+            <div id="users-list" style="margin-top:0.75rem;font-size:0.85rem;"></div>
+        </div>
     </div>
 
     <script>
@@ -125,6 +132,8 @@
         const productsList = document.getElementById('products-list');
         const categoriesList = document.getElementById('categories-list');
         const importJson = document.getElementById('import-json');
+        const usersList = document.getElementById('users-list');
+        const btnLoadUsers = document.getElementById('btn-load-users');
         const categoryForm = document.getElementById('category-form');
         const catEditId = document.getElementById('cat-edit-id');
         const catName = document.getElementById('cat-name');
@@ -274,6 +283,33 @@
                 renderList();
             } catch (e) {
                 productsList.innerHTML = '<p class="msg err">Impossible de charger les produits.</p>';
+            }
+        }
+
+        async function loadBotUsersList() {
+            usersList.innerHTML = '<p>Chargement...</p>';
+            try {
+                const r = await fetch(API_URL + '/api/admin/bot-users?initData=' + encodeURIComponent(getInitData()));
+                const d = await r.json();
+                if (!r.ok || !d.ok) {
+                    usersList.innerHTML = '<p class="msg err">Erreur lors du chargement des utilisateurs.</p>';
+                    return;
+                }
+                const list = Array.isArray(d.users) ? d.users : [];
+                if (!list.length) {
+                    usersList.innerHTML = '<p>Aucun utilisateur enregistré pour le moment.</p>';
+                    return;
+                }
+                usersList.innerHTML = `
+                    <table>
+                        <thead><tr><th>#</th><th>chat_id</th></tr></thead>
+                        <tbody>
+                            ${list.map((id, i) => `<tr><td>${i+1}</td><td>${id}</td></tr>`).join('')}
+                        </tbody>
+                    </table>
+                `;
+            } catch (e) {
+                usersList.innerHTML = '<p class="msg err">Erreur réseau lors du chargement des utilisateurs.</p>';
             }
         }
 
@@ -558,6 +594,12 @@
                 alert('Erreur réseau');
             }
         });
+
+        if (btnLoadUsers) {
+            btnLoadUsers.addEventListener('click', () => {
+                loadBotUsersList();
+            });
+        }
 
         (async () => {
             if (window.Telegram?.WebApp) Telegram.WebApp.ready();

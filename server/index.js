@@ -465,6 +465,13 @@ app.get('/api/config', (req, res) => {
   });
 });
 
+// ---- Admin: list bot users (for dashboard) ----
+app.get('/api/admin/bot-users', (req, res) => {
+  if (!ensureOwner(req, res)) return;
+  const users = loadBotUsers();
+  res.json({ ok: true, users });
+});
+
 // ---- Products API (public read) ----
 app.get('/api/products', (req, res) => {
   const data = loadProductsData();
