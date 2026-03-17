@@ -468,7 +468,12 @@ app.get('/api/config', (req, res) => {
 // ---- Products API (public read) ----
 app.get('/api/products', (req, res) => {
   const data = loadProductsData();
-  res.json({ categories: data.categories || [], products: data.products || [] });
+  const products = (data.products || []).slice().sort((a, b) => {
+    const sa = Number(a.sort ?? a.id ?? 0);
+    const sb = Number(b.sort ?? b.id ?? 0);
+    return sa - sb;
+  });
+  res.json({ categories: data.categories || [], products });
 });
 
 // ---- Products API (owner only: add, update, delete, import) ----
@@ -481,6 +486,7 @@ app.post('/api/products', (req, res) => {
   const data = loadProductsData();
   const products = data.products || [];
   const maxId = products.length ? Math.max(...products.map((p) => Number(p.id) || 0)) : 0;
+  const maxSort = products.length ? Math.max(...products.map((p) => Number(p.sort) || 0)) : 0;
   const newProduct = {
     id: maxId + 1,
     name: String(product.name).trim(),
@@ -490,6 +496,7 @@ app.post('/api/products', (req, res) => {
     media_type: product.media_type || 'image',
     media: Array.isArray(product.media) ? product.media : [],
     gallery_link: product.gallery_link || null,
+    sort: Number(product.sort) || (maxSort || maxId * 10 || 10),
     category_id: Number(product.category_id) || 1,
     unit_type: product.unit_type || 'gram',
     pricing: Array.isArray(product.pricing) && product.pricing.length
@@ -521,6 +528,7 @@ app.put('/api/products/:id', (req, res) => {
     media_type: (product.media_type ?? products[idx].media_type) || 'image',
     media: Array.isArray(product.media) ? product.media : (products[idx].media || []),
     gallery_link: product.gallery_link !== undefined ? product.gallery_link : products[idx].gallery_link,
+    sort: product.sort !== undefined ? Number(product.sort) || 0 : (products[idx].sort || 0),
     category_id: Number(product.category_id ?? products[idx].category_id) || 1,
     unit_type: (product.unit_type ?? products[idx].unit_type) || 'gram',
     pricing: Array.isArray(product.pricing) && product.pricing.length

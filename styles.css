@@ -1253,6 +1253,14 @@ body {
 .btn-copy-order:active {
     transform: scale(0.98);
 }
+.btn-order {
+    padding: 0.15rem 0.4rem;
+    font-size: 0.75rem;
+    margin-right: 0.1rem;
+}
+.col-order {
+    white-space: nowrap;
+}
 .cart-contact-alt {
     font-size: 0.85rem;
     color: var(--text-secondary);

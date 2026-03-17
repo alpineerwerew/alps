@@ -283,20 +283,74 @@
             return div.innerHTML;
         }
 
+        function ensureProductSorts() {
+            if (!Array.isArray(products)) return;
+            let changed = false;
+            let base = 10;
+            products.forEach((p, idx) => {
+                if (p.sort === undefined || p.sort === null || isNaN(Number(p.sort))) {
+                    p.sort = (idx + 1) * base;
+                    changed = true;
+                }
+            });
+            return changed;
+        }
+
+        async function saveProductSort(id, sort) {
+            try {
+                const r = await fetch(API_URL + '/api/products/' + id, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ...getAuthBody(), product: { sort } })
+                });
+                const d = await r.json();
+                if (!r.ok) {
+                    alert(d.error || 'Erreur');
+                }
+            } catch (e) {
+                console.error('Erreur mise à jour ordre produit', e);
+            }
+        }
+
+        async function moveProduct(id, direction) {
+            const idx = products.findIndex(p => Number(p.id) === Number(id));
+            if (idx === -1) return;
+            const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
+            if (targetIdx < 0 || targetIdx >= products.length) return;
+            const current = products[idx];
+            const target = products[targetIdx];
+            const s1 = Number(current.sort) || (idx + 1) * 10;
+            const s2 = Number(target.sort) || (targetIdx + 1) * 10;
+            current.sort = s2;
+            target.sort = s1;
+            // Réordonner le tableau localement pour refléter le nouvel ordre
+            products.splice(idx, 1);
+            products.splice(targetIdx, 0, current);
+            renderList();
+            // Sauvegarder côté serveur (en arrière-plan)
+            saveProductSort(current.id, current.sort);
+            saveProductSort(target.id, target.sort);
+        }
+
         function renderList() {
             if (!products.length) {
                 productsList.innerHTML = '<p>Aucun produit. Clique sur "Ajouter un produit" ou importe un JSON.</p>';
                 return;
             }
+            ensureProductSorts();
             productsList.innerHTML = `
                 <table>
-                    <thead><tr><th>Nom</th><th>Prix</th><th></th></tr></thead>
+                    <thead><tr><th>Nom</th><th>Prix</th><th>Ordre</th><th></th></tr></thead>
                     <tbody>
                         ${products.map(p => {
                             const priceStr = (p.pricing && p.pricing.length) ? p.pricing.map(x => x.qty + '→' + x.price + ' CHF').join(', ') : '—';
                             return `<tr>
                                 <td>${escapeHtml(p.name)}</td>
                                 <td>${escapeHtml(priceStr)}</td>
+                                <td class="col-order">
+                                    <button type="button" class="btn btn-order" data-move="up" data-id="${p.id}">▲</button>
+                                    <button type="button" class="btn btn-order" data-move="down" data-id="${p.id}">▼</button>
+                                </td>
                                 <td>
                                     <button type="button" class="btn" data-edit="${p.id}">Modifier</button>
                                     <button type="button" class="btn danger" data-delete="${p.id}">Supprimer</button>
@@ -310,6 +364,13 @@
             });
             productsList.querySelectorAll('[data-delete]').forEach(btn => {
                 btn.addEventListener('click', () => deleteProduct(Number(btn.getAttribute('data-delete'))));
+            });
+            productsList.querySelectorAll('.btn-order').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const dir = btn.getAttribute('data-move');
+                    const id = Number(btn.getAttribute('data-id'));
+                    moveProduct(id, dir);
+                });
             });
         }
 
