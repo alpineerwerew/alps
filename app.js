@@ -533,7 +533,7 @@ const PRODUCTS = [
 // =============================================
 let cart = [];
 let selectedPricingIdx = null;
-let selectedVariantIdx = null;
+let selectedVariantIdxs = [];
 let currentProduct = null;
 let selectedCategory = null;
 let contactUrls = { signalUrl: null, threemaUrl: null };
@@ -691,7 +691,7 @@ function openProduct(id) {
     if (!p) return;
     currentProduct = p;
     selectedPricingIdx = null;
-    selectedVariantIdx = null;
+    selectedVariantIdxs = [];
 
     const cats = catalogCategories.length ? catalogCategories : CATEGORIES;
     const cat = cats.find(c => c.id === p.category_id);
@@ -887,8 +887,16 @@ function closeProductModal(e) {
 }
 
 function pickVariant(i) {
-    selectedVariantIdx = i;
-    document.querySelectorAll('.variant-chip').forEach((el,j) => el.classList.toggle('selected', j===i));
+    if (!Array.isArray(selectedVariantIdxs)) selectedVariantIdxs = [];
+    const idxPos = selectedVariantIdxs.indexOf(i);
+    if (idxPos >= 0) {
+        selectedVariantIdxs.splice(idxPos, 1);
+    } else {
+        selectedVariantIdxs.push(i);
+    }
+    document.querySelectorAll('.variant-chip').forEach((el, j) => {
+        el.classList.toggle('selected', selectedVariantIdxs.includes(j));
+    });
     updateBtn();
 }
 
@@ -902,13 +910,19 @@ function updateBtn() {
     const btn = document.getElementById('btn-add');
     if (!btn) return;
     const hv = currentProduct?.variants?.length > 0;
-    btn.disabled = !(selectedPricingIdx !== null && (!hv || selectedVariantIdx !== null));
+    btn.disabled = !(selectedPricingIdx !== null && (!hv || (Array.isArray(selectedVariantIdxs) && selectedVariantIdxs.length > 0)));
 }
 
 function addToCart() {
     if (!currentProduct || selectedPricingIdx === null) return;
     const t = currentProduct.pricing[selectedPricingIdx];
-    const v = (currentProduct.variants && selectedVariantIdx !== null) ? currentProduct.variants[selectedVariantIdx] : null;
+    let v = null;
+    if (currentProduct.variants && Array.isArray(selectedVariantIdxs) && selectedVariantIdxs.length) {
+        v = selectedVariantIdxs
+            .map((idx) => currentProduct.variants[idx])
+            .filter(Boolean)
+            .join(', ');
+    }
 
     cart.push({
         name: currentProduct.name,
