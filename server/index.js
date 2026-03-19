@@ -65,6 +65,7 @@ function getInitDataUser(initData) {
 
 // ---- Bot users (for broadcast + admin list) ----
 const BOT_USERS_FILE = path.join(__dirname, 'bot_users.json');
+const CART_ACTIVITY_FILE = path.join(__dirname, 'cart_activity.json');
 
 function loadBotUsers() {
   try {
@@ -113,6 +114,89 @@ function addBotUserFromMsg(msg) {
     u.last_seen = now;
   }
   saveBotUsers(list);
+}
+
+function addOrUpdateBotUserFromWebAppUser(user) {
+  if (!user || !user.id || String(user.id) === String(OWNER_CHAT_ID)) return;
+  const chatId = user.id;
+  const username = user.username ? '@' + user.username : null;
+  const first_name = user.first_name || null;
+  const last_name = user.last_name || null;
+  const now = new Date().toISOString();
+
+  const list = loadBotUsers();
+  let u = list.find((x) => String(x.chat_id) === String(chatId));
+  if (!u) {
+    u = { chat_id: chatId, username, first_name, last_name, first_seen: now, last_seen: now };
+    list.push(u);
+  } else {
+    u.username = username != null ? username : u.username;
+    u.first_name = first_name != null ? first_name : u.first_name;
+    u.last_name = last_name != null ? last_name : u.last_name;
+    u.last_seen = now;
+  }
+  saveBotUsers(list);
+}
+
+function loadCartActivity() {
+  try {
+    const data = fs.readFileSync(CART_ACTIVITY_FILE, 'utf8');
+    const arr = JSON.parse(data);
+    if (!Array.isArray(arr)) return [];
+    return arr
+      .filter((x) => x && x.chat_id != null)
+      .map((x) => ({
+        chat_id: x.chat_id,
+        username: x.username || null,
+        first_name: x.first_name || null,
+        last_name: x.last_name || null,
+        cart_non_empty: !!x.cart_non_empty,
+        items_count: Number(x.items_count) || 0,
+        updated_at: x.updated_at || null
+      }));
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveCartActivity(rows) {
+  const list = Array.isArray(rows) ? rows.filter((x) => x && String(x.chat_id) !== String(OWNER_CHAT_ID)) : [];
+  try {
+    fs.writeFileSync(CART_ACTIVITY_FILE, JSON.stringify(list, null, 2), 'utf8');
+  } catch (err) {
+    console.error('❌ Could not save cart_activity.json:', err.message);
+  }
+  return list;
+}
+
+function upsertCartActivity(user, payload) {
+  if (!user || !user.id || String(user.id) === String(OWNER_CHAT_ID)) return;
+  const now = new Date().toISOString();
+  const rows = loadCartActivity();
+  let row = rows.find((x) => String(x.chat_id) === String(user.id));
+  const itemsCount = Math.max(0, Number(payload?.items_count) || 0);
+  const nonEmpty = payload?.cart_non_empty !== undefined ? !!payload.cart_non_empty : itemsCount > 0;
+
+  if (!row) {
+    row = {
+      chat_id: user.id,
+      username: user.username ? '@' + user.username : null,
+      first_name: user.first_name || null,
+      last_name: user.last_name || null,
+      cart_non_empty: nonEmpty,
+      items_count: itemsCount,
+      updated_at: now
+    };
+    rows.push(row);
+  } else {
+    row.username = user.username ? '@' + user.username : row.username;
+    row.first_name = user.first_name || row.first_name;
+    row.last_name = user.last_name || row.last_name;
+    row.cart_non_empty = nonEmpty;
+    row.items_count = itemsCount;
+    row.updated_at = now;
+  }
+  saveCartActivity(rows);
 }
 
 let broadcastPending = false;
@@ -494,6 +578,56 @@ app.get('/api/admin/bot-users', (req, res) => {
   res.json({ ok: true, users });
 });
 
+app.get('/api/admin/cart-activity', (req, res) => {
+  if (!ensureOwner(req, res)) return;
+  const users = loadBotUsers().map((u) => (u && typeof u === 'object'
+    ? u
+    : { chat_id: u, username: null, first_name: null, last_name: null, first_seen: null, last_seen: null }));
+  const activity = loadCartActivity();
+  const byChat = new Map();
+
+  users.forEach((u) => {
+    byChat.set(String(u.chat_id), {
+      chat_id: u.chat_id,
+      username: u.username || null,
+      first_name: u.first_name || null,
+      last_name: u.last_name || null,
+      cart_non_empty: false,
+      items_count: 0,
+      updated_at: null
+    });
+  });
+
+  activity.forEach((a) => {
+    const key = String(a.chat_id);
+    const prev = byChat.get(key) || {
+      chat_id: a.chat_id,
+      username: null,
+      first_name: null,
+      last_name: null,
+      cart_non_empty: false,
+      items_count: 0,
+      updated_at: null
+    };
+    byChat.set(key, {
+      ...prev,
+      username: a.username || prev.username,
+      first_name: a.first_name || prev.first_name,
+      last_name: a.last_name || prev.last_name,
+      cart_non_empty: !!a.cart_non_empty,
+      items_count: Number(a.items_count) || 0,
+      updated_at: a.updated_at || prev.updated_at || null
+    });
+  });
+
+  const rows = [...byChat.values()].sort((a, b) => {
+    const ta = a.updated_at ? new Date(a.updated_at).getTime() : 0;
+    const tb = b.updated_at ? new Date(b.updated_at).getTime() : 0;
+    return tb - ta;
+  });
+  res.json({ ok: true, users: rows });
+});
+
 // ---- Products API (public read) ----
 app.get('/api/products', (req, res) => {
   const data = loadProductsData();
@@ -673,6 +807,17 @@ app.post('/api/order', (req, res) => {
     console.error('❌ Error sending confirmation to user:', err.message);
   });
 
+  res.json({ ok: true });
+});
+
+app.post('/api/cart-activity', (req, res) => {
+  const initData = req.body?.initData;
+  const user = getInitDataUser(initData);
+  if (!user || !user.id) {
+    return res.status(401).json({ error: 'Invalid initData' });
+  }
+  addOrUpdateBotUserFromWebAppUser(user);
+  upsertCartActivity(user, req.body || {});
   res.json({ ok: true });
 });
 

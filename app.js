@@ -537,10 +537,38 @@ let selectedVariantIdxs = [];
 let currentProduct = null;
 let selectedCategory = null;
 let contactUrls = { signalUrl: null, threemaUrl: null };
+let cartSyncTimer = null;
 
 function escapeHtml(s) {
     if (!s) return '';
     return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#039;");
+}
+
+function getCartItemsCount() {
+    return cart.reduce((sum, item) => sum + (Number(item && item.count) || 1), 0);
+}
+
+function syncCartActivity() {
+    const initData = getInitData();
+    if (!POINTS_API_URL || !initData) return;
+    const payload = {
+        initData,
+        cart_non_empty: cart.length > 0,
+        items_count: getCartItemsCount()
+    };
+    fetch(`${POINTS_API_URL}/api/cart-activity`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    }).catch(() => {});
+}
+
+function scheduleCartActivitySync() {
+    if (cartSyncTimer) clearTimeout(cartSyncTimer);
+    cartSyncTimer = setTimeout(() => {
+        cartSyncTimer = null;
+        syncCartActivity();
+    }, 200);
 }
 
 async function loadCatalog() {
@@ -939,6 +967,7 @@ function addToCart() {
     });
 
     updateCartBadge();
+    scheduleCartActivitySync();
     closeProductModal();
     showToast(t('toast_added'));
     const fab = document.getElementById('cart-fab');
@@ -1009,6 +1038,7 @@ function renderCart() {
 function removeFromCart(i) {
     cart.splice(i, 1);
     updateCartBadge();
+    scheduleCartActivitySync();
     renderCart();
 }
 
@@ -1063,6 +1093,7 @@ async function checkout() {
             if (res.ok && data.ok) {
                 cart = [];
                 updateCartBadge();
+                scheduleCartActivitySync();
                 closeCart();
                 showToast(t('order_sent'));
                 if (window.Telegram?.WebApp) window.Telegram.WebApp.close();
@@ -1086,6 +1117,7 @@ async function checkout() {
     showToast(t('checkout_hint'));
     cart = [];
     updateCartBadge();
+    scheduleCartActivitySync();
     closeCart();
 }
 

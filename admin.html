@@ -101,6 +101,13 @@
             <button type="button" class="btn" id="btn-load-users">Voir la liste des utilisateurs</button>
             <div id="users-list" style="margin-top:0.75rem;font-size:0.85rem;"></div>
         </div>
+
+        <div class="import-wrap">
+            <h2>Activité panier</h2>
+            <p>Suivi des paniers: vide/non vide, nombre d'articles et dernière activité.</p>
+            <button type="button" class="btn" id="btn-load-cart-activity">Voir l'activité panier</button>
+            <div id="cart-activity-list" style="margin-top:0.75rem;font-size:0.85rem;"></div>
+        </div>
     </div>
 
     <script>
@@ -134,6 +141,8 @@
         const importJson = document.getElementById('import-json');
         const usersList = document.getElementById('users-list');
         const btnLoadUsers = document.getElementById('btn-load-users');
+        const cartActivityList = document.getElementById('cart-activity-list');
+        const btnLoadCartActivity = document.getElementById('btn-load-cart-activity');
         const categoryForm = document.getElementById('category-form');
         const catEditId = document.getElementById('cat-edit-id');
         const catName = document.getElementById('cat-name');
@@ -315,6 +324,41 @@
                 `;
             } catch (e) {
                 usersList.innerHTML = '<p class="msg err">Erreur réseau lors du chargement des utilisateurs.</p>';
+            }
+        }
+
+        async function loadCartActivityList() {
+            cartActivityList.innerHTML = '<p>Chargement...</p>';
+            try {
+                const r = await fetch(API_URL + '/api/admin/cart-activity?initData=' + encodeURIComponent(getInitData()));
+                const d = await r.json();
+                if (!r.ok || !d.ok) {
+                    cartActivityList.innerHTML = '<p class="msg err">Erreur lors du chargement de l\'activité panier.</p>';
+                    return;
+                }
+                const list = Array.isArray(d.users) ? d.users : [];
+                if (!list.length) {
+                    cartActivityList.innerHTML = '<p>Aucune activité panier pour le moment.</p>';
+                    return;
+                }
+                const rows = list.map((u, i) => {
+                    const chatId = u && typeof u === 'object' ? u.chat_id : u;
+                    const username = (u && u.username) ? escapeHtml(u.username) : '';
+                    const name = [u && u.first_name, u && u.last_name].filter(Boolean).join(' ');
+                    const userLabel = username || escapeHtml(name || `ID ${chatId}`);
+                    const nonEmpty = !!(u && u.cart_non_empty);
+                    const itemsCount = Number(u && u.items_count) || 0;
+                    const updatedAt = (u && u.updated_at) ? new Date(u.updated_at).toLocaleString() : '—';
+                    return `<tr><td>${i+1}</td><td>${userLabel}</td><td>${chatId}</td><td>${nonEmpty ? 'Non vide' : 'Vide'}</td><td>${itemsCount}</td><td>${updatedAt}</td></tr>`;
+                });
+                cartActivityList.innerHTML = `
+                    <table>
+                        <thead><tr><th>#</th><th>Utilisateur</th><th>chat_id</th><th>Panier</th><th>Articles</th><th>Dernière activité</th></tr></thead>
+                        <tbody>${rows.join('')}</tbody>
+                    </table>
+                `;
+            } catch (e) {
+                cartActivityList.innerHTML = '<p class="msg err">Erreur réseau lors du chargement de l\'activité panier.</p>';
             }
         }
 
@@ -603,6 +647,11 @@
         if (btnLoadUsers) {
             btnLoadUsers.addEventListener('click', () => {
                 loadBotUsersList();
+            });
+        }
+        if (btnLoadCartActivity) {
+            btnLoadCartActivity.addEventListener('click', () => {
+                loadCartActivityList();
             });
         }
 
