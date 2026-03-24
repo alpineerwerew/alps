@@ -67,6 +67,7 @@ function getInitDataUser(initData) {
 // ---- Bot users (for broadcast + admin list) ----
 const BOT_USERS_FILE = path.join(__dirname, 'bot_users.json');
 const CART_ACTIVITY_FILE = path.join(__dirname, 'cart_activity.json');
+const BOT_CHAT_LANG_FILE = path.join(__dirname, 'bot_chat_lang.json');
 
 function loadBotUsers() {
   try {
@@ -200,6 +201,36 @@ function upsertCartActivity(user, payload) {
   saveCartActivity(rows);
 }
 
+function loadChatLangMap() {
+  try {
+    const raw = fs.readFileSync(BOT_CHAT_LANG_FILE, 'utf8');
+    const o = JSON.parse(raw);
+    return o && typeof o === 'object' && !Array.isArray(o) ? o : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveChatLangMap(map) {
+  try {
+    fs.writeFileSync(BOT_CHAT_LANG_FILE, JSON.stringify(map, null, 2), 'utf8');
+  } catch (e) {
+    console.error('❌ Could not save bot_chat_lang.json:', e.message);
+  }
+}
+
+function getChatLang(chatId) {
+  const v = loadChatLangMap()[String(chatId)];
+  return v === 'fr' || v === 'en' || v === 'de' ? v : null;
+}
+
+function setChatLang(chatId, lang) {
+  if (lang !== 'fr' && lang !== 'en' && lang !== 'de') return;
+  const map = loadChatLangMap();
+  map[String(chatId)] = lang;
+  saveChatLangMap(map);
+}
+
 let broadcastPending = false;
 
 // ---- Parse order total from message text ----
@@ -250,22 +281,134 @@ console.log('✅ Bot started (long polling)');
 // Image de bienvenue (logo Alpine Connexion — tu peux remplacer par ton image dans .env WELCOME_IMAGE_URL)
 const WELCOME_IMAGE_URL = process.env.WELCOME_IMAGE_URL || 'https://res.cloudinary.com/divcybeds/image/upload/v1771239856/Alpine_Connection_Wonka_LETTERING-V01_Logo_2022_o7rhyc.png';
 
-// Clavier utilisateur : MENU pour ouvrir le catalogue
-const USER_KEYBOARD = {
-  reply_markup: {
-    keyboard: [['MENU']],
-    resize_keyboard: true,
-    one_time_keyboard: false,
-    is_persistent: true
+const BOT_STRINGS = {
+  fr: {
+    choose_lang: '👋 Bienvenue ! Choisis ta langue :\n🇫🇷 Français · 🇬🇧 English · 🇩🇪 Deutsch',
+    after_lang: '✅ Parfait ! Utilise MENU pour ouvrir le catalogue, ou AIDE pour l’aide.',
+    menu_btn: 'MENU',
+    help_btn: 'AIDE',
+    catalog_prompt: 'Clique pour ouvrir le catalogue :',
+    catalog_btn: '🌿 Ouvrir le catalogue',
+    order_confirm: '✅ Merci, nous avons bien reçu ta commande.\n\nComment souhaites-tu payer ?',
+    pay_followup: 'Paiement par {method} noté.\n\nOù souhaites-tu poursuivre la discussion ?',
+    pay_order_intro: '\n\nVoici ta commande, tu peux la copier/coller dans Signal ou Threema :\n\n',
+    pay_cash: 'Cash',
+    pay_crypto: 'Crypto',
+    need_lang: 'Choisis d’abord ta langue avec /start.',
+    contact_thanks: 'Merci, nous te recontacterons sur {channel} avec ces coordonnées.',
+    help_detail: `🌱 Bienvenue sur notre bot !
+
+Découvrez nos produits ainsi que toutes nos vidéos en cliquant ci-dessous ⬇️
+@Alpine710_bot
+
+📍 Meetup Valais et alentours
+Vérification obligatoire pour les meetup ! 🪪
+
+📦 Expédition en Suisse  📤🌏
+
+✅ Paiement en espèces 💶 (CHF)
+✅ Paiement crypto
+
+
+Pour plus d'informations, contactez-nous !
+@Alpine710`
+  },
+  en: {
+    choose_lang: '👋 Welcome! Choose your language:\n🇫🇷 Français · 🇬🇧 English · 🇩🇪 Deutsch',
+    after_lang: '✅ Great! Tap MENU to open the catalog, or HELP for assistance.',
+    menu_btn: 'MENU',
+    help_btn: 'HELP',
+    catalog_prompt: 'Tap below to open the catalog:',
+    catalog_btn: '🌿 Open catalog',
+    order_confirm: '✅ Thanks, we received your order.\n\nHow would you like to pay?',
+    pay_followup: 'Payment by {method} noted.\n\nWhere would you like to continue the conversation?',
+    pay_order_intro: '\n\nHere is your order — you can copy/paste it into Signal or Threema:\n\n',
+    pay_cash: 'Cash',
+    pay_crypto: 'Crypto',
+    need_lang: 'Please choose your language first with /start.',
+    contact_thanks: 'Thanks, we will reach you on {channel} with these details.',
+    help_detail: `🌱 Welcome to our bot!
+
+Find our products and all our videos by clicking below ⬇️
+@alpine710
+
+📍 Meet up in Wallis
+Verification required for meet ups! 🪪
+
+📦 Shipping to Switzerland  📤🌏
+
+✅ Cash payment 💶 (CHF)
+✅ Crypto payment 📱
+
+
+For more information, contact us!
+@Alpine710`
+  },
+  de: {
+    choose_lang: '👋 Willkommen! Wähle deine Sprache:\n🇫🇷 Français · 🇬🇧 English · 🇩🇪 Deutsch',
+    after_lang: '✅ Super! Tippe MENU für den Katalog oder HILFE für Hilfe.',
+    menu_btn: 'MENU',
+    help_btn: 'HILFE',
+    catalog_prompt: 'Tippe unten, um den Katalog zu öffnen:',
+    catalog_btn: '🌿 Katalog öffnen',
+    order_confirm: '✅ Danke, wir haben deine Bestellung erhalten.\n\nWie möchtest du bezahlen?',
+    pay_followup: 'Zahlung per {method} notiert.\n\nWo möchtest du weiterschreiben?',
+    pay_order_intro: '\n\nHier ist deine Bestellung — zum Kopieren in Signal oder Threema:\n\n',
+    pay_cash: 'Bargeld',
+    pay_crypto: 'Krypto',
+    need_lang: 'Bitte wähle zuerst deine Sprache mit /start.',
+    contact_thanks: 'Danke, wir melden uns bei dir über {channel} mit diesen Angaben.',
+    help_detail: `🌱 Willkommen bei unserem Bot!
+
+Entdecke unsere Produkte und alle unsere Videos – tippe unten auf MENU ⬇️
+@Alpine710_bot
+
+📍 Meetups im Wallis und Umgebung
+Ausweiskontrolle bei Meetups Pflicht! 🪪
+
+📦 Versand in der Schweiz 📤🌏
+
+✅ Barzahlung 💶 (CHF)
+✅ Krypto-Zahlung 📱
+
+
+Mehr Infos? Schreib uns!
+@Alpine710`
   }
 };
 
-// Un seul bouton : ouvre le catalogue directement (Web App) — utilisé pour /start et menu
-const OPEN_CATALOG_INLINE = {
+const LANG_PICK_INLINE = {
   reply_markup: {
-    inline_keyboard: [[{ text: '🌿 Ouvrir le catalogue', web_app: { url: CATALOG_URL } }]]
+    inline_keyboard: [[
+      { text: 'Français', callback_data: 'lang_fr' },
+      { text: 'English', callback_data: 'lang_en' },
+      { text: 'Deutsch', callback_data: 'lang_de' }
+    ]]
   }
 };
+
+function strLang(chatId) {
+  return BOT_STRINGS[getChatLang(chatId) || 'fr'];
+}
+
+function getUserKeyboardReplyMarkup(lang) {
+  const L = BOT_STRINGS[lang] || BOT_STRINGS.fr;
+  return {
+    keyboard: [[L.menu_btn, L.help_btn]],
+    resize_keyboard: true,
+    one_time_keyboard: false,
+    is_persistent: true
+  };
+}
+
+function getOpenCatalogInline(lang) {
+  const L = BOT_STRINGS[lang] || BOT_STRINGS.fr;
+  return {
+    reply_markup: {
+      inline_keyboard: [[{ text: L.catalog_btn, web_app: { url: CATALOG_URL } }]]
+    }
+  };
+}
 
 const ADMIN_INLINE = {
   reply_markup: {
@@ -273,16 +416,20 @@ const ADMIN_INLINE = {
   }
 };
 
-const PAYMENT_KEYBOARD = {
-  reply_markup: {
-    inline_keyboard: [
-      [{ text: '💵 Cash', callback_data: 'pay_cash' }, { text: '🪙 Crypto', callback_data: 'pay_crypto' }]
-    ]
-  }
-};
+function getPaymentKeyboard(lang) {
+  const L = BOT_STRINGS[lang] || BOT_STRINGS.fr;
+  return {
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: `💵 ${L.pay_cash}`, callback_data: 'pay_cash' }, { text: `🪙 ${L.pay_crypto}`, callback_data: 'pay_crypto' }]
+      ]
+    }
+  };
+}
 
-function getOrderConfirmText() {
-  return '✅ Merci, nous avons bien reçu ta commande.\n\nComment souhaites-tu payer ?';
+function getOrderConfirmText(chatId) {
+  const L = strLang(chatId);
+  return L.order_confirm;
 }
 
 // Suivi du canal de contact après choix du paiement
@@ -291,25 +438,25 @@ const contactState = {};
 bot.onText(/\/start(?:\s+(.+))?/, async (msg) => {
   const chatId = msg.chat.id;
   addBotUserFromMsg(msg);
-  const welcomeText = 'Bienvenue ! Clique ci-dessous pour ouvrir le catalogue.';
+  const caption = BOT_STRINGS.fr.choose_lang;
   try {
-    await bot.sendPhoto(chatId, WELCOME_IMAGE_URL, { caption: welcomeText, ...OPEN_CATALOG_INLINE });
+    await bot.sendPhoto(chatId, WELCOME_IMAGE_URL, { caption, ...LANG_PICK_INLINE });
   } catch (err) {
-    await bot.sendMessage(chatId, welcomeText, OPEN_CATALOG_INLINE);
+    await bot.sendMessage(chatId, caption, LANG_PICK_INLINE);
   }
-  await bot.sendMessage(chatId, 'Ou utilise le bouton MENU pour revenir ici.', USER_KEYBOARD);
 });
 
-function buildHelpMessage(isOwner) {
-  let s = '📋 Commandes disponibles\n\n';
-  s += '/start — Démarrer le bot\n';
-  s += '/menu — Ouvrir le catalogue\n';
-  s += '/help — Afficher cette liste\n\n';
-  s += 'Utilise le bouton MENU pour ouvrir le catalogue.';
+function buildHelpMessage(isOwner, lang) {
+  const L = BOT_STRINGS[lang] || BOT_STRINGS.fr;
+  let s = L.help_detail;
   if (isOwner) {
+    const adminLines = {
+      fr: '/admin — Admin produits\n/broadcast — Message à tous les utilisateurs',
+      en: '/admin — Product admin\n/broadcast — Message all users',
+      de: '/admin — Produkt-Admin\n/broadcast — Nachricht an alle'
+    };
     s += '\n\n——— Admin ———\n';
-    s += '/admin — Ouvrir l’admin (produits)\n';
-    s += '\n/broadcast — Envoyer un message à tous';
+    s += adminLines[lang] || adminLines.fr;
   }
   return s;
 }
@@ -328,7 +475,8 @@ bot.on('message', async (msg) => {
   if (contactState[chatId] && contactState[chatId].channel && text && !text.startsWith('/')) {
     const st = contactState[chatId];
     delete contactState[chatId];
-    await bot.sendMessage(chatId, `Merci, nous te recontacterons sur ${st.channel} avec ces coordonnées.`);
+    const Lc = strLang(chatId);
+    await bot.sendMessage(chatId, Lc.contact_thanks.replace('{channel}', st.channel));
     if (OWNER_CHAT_ID) {
       const lines = [];
       lines.push('📇 Coordonnées client pour commande :');
@@ -382,21 +530,51 @@ bot.on('message', async (msg) => {
     return;
   }
 
-  // Afficher les commandes quand on tape / ou /help ou une commande inconnue
+  // Afficher l'aide / langue : / , /help , commande inconnue
   if (text === '/' || /^\/help\s*$/i.test(text) || (text.startsWith('/') && !KNOWN_CMD_RE.test(text))) {
-    const isOwner = String(chatId) === String(OWNER_CHAT_ID);
-    await bot.sendMessage(chatId, buildHelpMessage(isOwner), USER_KEYBOARD);
+    const lang = getChatLang(chatId);
+    if (!lang) {
+      await bot.sendMessage(chatId, BOT_STRINGS.fr.choose_lang, LANG_PICK_INLINE);
+      return;
+    }
+    await bot.sendMessage(chatId, buildHelpMessage(isOwner, lang), { reply_markup: getUserKeyboardReplyMarkup(lang) });
     return;
   }
 
+  const langUi = getChatLang(chatId);
   const textNorm = (text || '').toLowerCase().trim();
   if (textNorm === 'menu' || textNorm === '/menu') {
-    await bot.sendMessage(chatId, 'Clique pour ouvrir le catalogue :', OPEN_CATALOG_INLINE);
+    if (!langUi) {
+      await bot.sendMessage(chatId, BOT_STRINGS.fr.choose_lang, LANG_PICK_INLINE);
+      return;
+    }
+    const L = BOT_STRINGS[langUi];
+    await bot.sendMessage(chatId, L.catalog_prompt, getOpenCatalogInline(langUi));
     return;
   }
   if ((text || '').trim() === CATALOG_URL || (text || '').trim() === CATALOG_URL + '/') {
-    await bot.sendMessage(chatId, 'Clique pour ouvrir le catalogue :', OPEN_CATALOG_INLINE);
+    if (!langUi) {
+      await bot.sendMessage(chatId, BOT_STRINGS.fr.choose_lang, LANG_PICK_INLINE);
+      return;
+    }
+    const L = BOT_STRINGS[langUi];
+    await bot.sendMessage(chatId, L.catalog_prompt, getOpenCatalogInline(langUi));
     return;
+  }
+  if (textNorm === 'help' || textNorm === 'aide' || textNorm === 'hilfe') {
+    if (!langUi) {
+      await bot.sendMessage(chatId, BOT_STRINGS.fr.choose_lang, LANG_PICK_INLINE);
+      return;
+    }
+    await bot.sendMessage(chatId, buildHelpMessage(isOwner, langUi), { reply_markup: getUserKeyboardReplyMarkup(langUi) });
+    return;
+  }
+  if (langUi) {
+    const Lb = BOT_STRINGS[langUi];
+    if (text === Lb.help_btn) {
+      await bot.sendMessage(chatId, buildHelpMessage(isOwner, langUi), { reply_markup: getUserKeyboardReplyMarkup(langUi) });
+      return;
+    }
   }
   if (String(chatId) === String(OWNER_CHAT_ID) && (textNorm === '/admin' || textNorm === 'admin')) {
     await bot.sendMessage(chatId, 'Admin — Gérer produits (commande /admin uniquement) :', ADMIN_INLINE);
@@ -431,9 +609,10 @@ bot.on('message', async (msg) => {
     }
   }
   addBotUserFromMsg(msg);
-  const confirm = getOrderConfirmText();
+  const langOrd = getChatLang(chatId) || 'fr';
+  const confirm = getOrderConfirmText(chatId);
   try {
-    await bot.sendMessage(chatId, confirm, PAYMENT_KEYBOARD);
+    await bot.sendMessage(chatId, confirm, getPaymentKeyboard(langOrd));
   } catch (err) {
     console.error('❌ Error sending confirmation:', err.message);
   }
@@ -446,16 +625,30 @@ bot.on('callback_query', async (query) => {
   const userName = query.from?.username ? `@${query.from.username}` : [query.from?.first_name, query.from?.last_name].filter(Boolean).join(' ') || `ID ${userId}`;
   const isOwner = String(chatId) === String(OWNER_CHAT_ID);
 
+  if (data === 'lang_fr' || data === 'lang_en' || data === 'lang_de') {
+    try {
+      await bot.answerCallbackQuery(query.id);
+    } catch (e) {}
+    if (!chatId) return;
+    const lang = data.replace('lang_', '');
+    setChatLang(chatId, lang);
+    const L = BOT_STRINGS[lang];
+    await bot.sendMessage(chatId, L.after_lang, { reply_markup: getUserKeyboardReplyMarkup(lang) });
+    return;
+  }
+
   if (data === 'pay_cash' || data === 'pay_crypto') {
-    const method = data === 'pay_cash' ? 'Cash' : 'Crypto';
+    const lang = getChatLang(chatId) || 'fr';
+    const L = BOT_STRINGS[lang];
+    const method = data === 'pay_cash' ? L.pay_cash : L.pay_crypto;
     try {
       await bot.answerCallbackQuery(query.id);
       const orderText = lastOrderByChat[chatId];
       let extra = '';
       if (orderText) {
-        extra = '\n\nVoici ta commande, tu peux la copier/coller dans Signal ou Threema :\n\n' + orderText;
+        extra = L.pay_order_intro + orderText;
       }
-      await bot.sendMessage(chatId, 'Paiement par ' + method + ' noté.\n\nOù souhaites-tu poursuivre la discussion ?' + extra, {
+      await bot.sendMessage(chatId, L.pay_followup.replace('{method}', method) + extra, {
         reply_markup: {
           inline_keyboard: [
             [
@@ -892,8 +1085,9 @@ app.post('/api/order', (req, res) => {
     });
   }
 
-  const confirm = getOrderConfirmText();
-  bot.sendMessage(userId, confirm, PAYMENT_KEYBOARD).catch((err) => {
+  const langOrd = getChatLang(userId) || 'fr';
+  const confirm = getOrderConfirmText(userId);
+  bot.sendMessage(userId, confirm, getPaymentKeyboard(langOrd)).catch((err) => {
     console.error('❌ Error sending confirmation to user:', err.message);
   });
 
