@@ -6,6 +6,7 @@ const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 const crypto = require('crypto');
 const fs = require('fs');
+const { Readable } = require('stream');
 const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
@@ -518,6 +519,55 @@ function saveProductsData(data) {
   }
 }
 
+// ---- Media proxy (hide CDN origin in catalog) — opt-in: PROXY_MEDIA_URLS=1 ----
+const PROXY_MEDIA_URLS = process.env.PROXY_MEDIA_URLS === '1' || process.env.PROXY_MEDIA_URLS === 'true';
+const MEDIA_PROXY_MAX_BYTES = 55 * 1024 * 1024;
+
+function getMediaAllowedHosts() {
+  const raw = process.env.MEDIA_ALLOWED_HOSTS || 'res.cloudinary.com';
+  return raw.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
+}
+
+function canProxyMediaUrl(urlString) {
+  if (!urlString || typeof urlString !== 'string') return false;
+  try {
+    const u = new URL(urlString);
+    if (u.protocol !== 'https:') return false;
+    return getMediaAllowedHosts().includes(u.hostname.toLowerCase());
+  } catch {
+    return false;
+  }
+}
+
+function getPublicCatalogBase(req) {
+  const fromEnv = (CATALOG_URL || '').replace(/\/+$/, '');
+  if (fromEnv) return fromEnv;
+  const proto = (req.get('x-forwarded-proto') || req.protocol || 'https').split(',')[0].trim();
+  const host = req.get('host');
+  if (!host) return '';
+  const p = proto === 'http' && host.includes('localhost') ? 'http' : proto.replace(/^http$/i, 'https');
+  return `${p}://${host}`;
+}
+
+function rewriteMediaUrlForCatalog(u, basePublic) {
+  if (!u || !canProxyMediaUrl(u)) return u;
+  const b = basePublic.replace(/\/+$/, '');
+  return `${b}/api/media?u=${encodeURIComponent(u)}`;
+}
+
+function rewriteProductMediaForCatalog(product, basePublic) {
+  const p = { ...product };
+  if (p.image_url) p.image_url = rewriteMediaUrlForCatalog(p.image_url, basePublic);
+  if (p.video_url) p.video_url = rewriteMediaUrlForCatalog(p.video_url, basePublic);
+  if (Array.isArray(p.media)) {
+    p.media = p.media.map((m) => {
+      if (!m || typeof m !== 'object' || !m.url) return m;
+      return { ...m, url: rewriteMediaUrlForCatalog(m.url, basePublic) };
+    });
+  }
+  return p;
+}
+
 function ensureOwner(req, res) {
   const initData = req.body?.initData || req.query?.initData;
   const userId = validateInitData(initData);
@@ -545,6 +595,7 @@ const uploadMw = multer({ storage, limits: { fileSize: 50 * 1024 * 1024 } }); //
 
 // ---- Express API ----
 const app = express();
+app.set('trust proxy', 1);
 app.use(cors());
 app.use(express.json());
 
@@ -569,6 +620,41 @@ app.get('/api/config', (req, res) => {
     signalUrl: process.env.SIGNAL_CONTACT_URL || null,
     threemaUrl: process.env.THREEMA_CONTACT_URL || null
   });
+});
+
+// Public media proxy: browser only sees your domain (blocks SSRF via host allowlist)
+app.get('/api/media', async (req, res) => {
+  const raw = req.query.u;
+  if (!raw || typeof raw !== 'string') {
+    return res.status(400).send('Bad request');
+  }
+  let target;
+  try {
+    target = decodeURIComponent(raw);
+  } catch {
+    return res.status(400).send('Bad request');
+  }
+  if (!canProxyMediaUrl(target)) {
+    return res.status(403).send('Forbidden');
+  }
+  try {
+    const upstream = await fetch(target, {
+      redirect: 'follow',
+      headers: { 'User-Agent': 'AlpineCatalogMedia/1.0' }
+    });
+    if (!upstream.ok) return res.status(502).send('Bad gateway');
+    const len = upstream.headers.get('content-length');
+    if (len && Number(len) > MEDIA_PROXY_MAX_BYTES) return res.status(413).send('Too large');
+    const ct = upstream.headers.get('content-type') || 'application/octet-stream';
+    res.setHeader('Content-Type', ct);
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    if (!upstream.body) return res.status(502).send('Bad gateway');
+    Readable.fromWeb(upstream.body).on('error', () => {
+      if (!res.headersSent) res.status(502).end();
+    }).pipe(res);
+  } catch (e) {
+    if (!res.headersSent) res.status(502).send('Bad gateway');
+  }
 });
 
 // ---- Admin: list bot users (for dashboard) ----
@@ -631,11 +717,15 @@ app.get('/api/admin/cart-activity', (req, res) => {
 // ---- Products API (public read) ----
 app.get('/api/products', (req, res) => {
   const data = loadProductsData();
-  const products = (data.products || []).slice().sort((a, b) => {
+  let products = (data.products || []).slice().sort((a, b) => {
     const sa = Number(a.sort ?? a.id ?? 0);
     const sb = Number(b.sort ?? b.id ?? 0);
     return sa - sb;
   });
+  const base = getPublicCatalogBase(req);
+  if (PROXY_MEDIA_URLS && base) {
+    products = products.map((p) => rewriteProductMediaForCatalog(p, base));
+  }
   res.json({ categories: data.categories || [], products });
 });
 
