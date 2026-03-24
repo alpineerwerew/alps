@@ -47,13 +47,17 @@ const I18N = {
         open_in_telegram: 'Ouvre depuis Telegram',
         checkout_hint: 'Envoie le message dans Telegram pour confirmer ta commande.',
         nav_catalog: 'Catalogue',
-        order_sent: 'Commande envoyée ! On te répond sur Telegram.',
-        or_contact_signal_threema: 'Envoie ta commande sur :',
+        order_sent: 'Commande envoyée ! Va sur le chat du bot : Signal ou Threema, puis ton identifiant.',
+        or_contact_signal_threema: 'Liens directs (optionnel) :',
         copy_paste_order: 'Copie la commande ci-dessous et colle-la dans le chat.',
-        cart_how_to_send: 'Pour envoyer ta commande :',
-        cart_step1: '1. Copie ta commande',
+        cart_how_to_send: 'Pour valider ta commande :',
+        cart_step_submit: '1. Envoie la commande au bot Telegram',
+        cart_btn_submit: '📩 Envoyer la commande au bot',
+        cart_bot_followup: 'Le bot te demandera sur quel canal te recontacter (Signal ou Threema), puis ton identifiant pour confirmer.',
+        cart_step_copy: 'Optionnel — copie du texte',
         cart_btn_copy: 'Copier la commande',
-        cart_step2: '2. Ouvre Signal ou Threema et colle dans le chat',
+        cart_need_telegram: 'Ouvre le catalogue depuis Telegram pour envoyer la commande.',
+        order_send_failed: 'Envoi impossible. Réessaie dans un instant.',
         open_signal: 'Signal',
         open_threema: 'Threema'
     },
@@ -74,13 +78,17 @@ const I18N = {
         open_in_telegram: 'Open from Telegram',
         checkout_hint: 'Send the message in Telegram to confirm your order.',
         nav_catalog: 'Catalog',
-        order_sent: 'Order sent! We\'ll reply on Telegram.',
-        or_contact_signal_threema: 'Send your order via:',
+        order_sent: 'Order sent! Open the bot chat: choose Signal or Threema, then your contact ID.',
+        or_contact_signal_threema: 'Direct links (optional):',
         copy_paste_order: 'Copy the order below and paste it in the chat.',
-        cart_how_to_send: 'To send your order:',
-        cart_step1: '1. Copy your order',
+        cart_how_to_send: 'To place your order:',
+        cart_step_submit: '1. Send the order to the Telegram bot',
+        cart_btn_submit: '📩 Send order to bot',
+        cart_bot_followup: 'The bot will ask where to reach you (Signal or Threema), then your ID to confirm.',
+        cart_step_copy: 'Optional — copy text',
         cart_btn_copy: 'Copy order',
-        cart_step2: '2. Open Signal or Threema and paste in the chat',
+        cart_need_telegram: 'Open the catalog from Telegram to send your order.',
+        order_send_failed: 'Could not send. Please try again.',
         open_signal: 'Signal',
         open_threema: 'Threema'
     },
@@ -101,13 +109,17 @@ const I18N = {
         open_in_telegram: 'Öffne über Telegram',
         checkout_hint: 'Sende die Nachricht in Telegram, um deine Bestellung zu bestätigen.',
         nav_catalog: 'Katalog',
-        order_sent: 'Bestellung gesendet! Wir antworten dir auf Telegram.',
-        or_contact_signal_threema: 'Sende deine Bestellung per:',
+        order_sent: 'Bestellung gesendet! Öffne den Bot-Chat: Signal oder Threema, dann deine Kennung.',
+        or_contact_signal_threema: 'Direktlinks (optional):',
         copy_paste_order: 'Kopiere die Bestellung unten und füge sie im Chat ein.',
-        cart_how_to_send: 'So sendest du deine Bestellung:',
-        cart_step1: '1. Bestellung kopieren',
+        cart_how_to_send: 'So bestellst du:',
+        cart_step_submit: '1. Bestellung an den Telegram-Bot senden',
+        cart_btn_submit: '📩 Bestellung an Bot senden',
+        cart_bot_followup: 'Der Bot fragt, wie wir dich erreichen (Signal oder Threema), dann deine Kennung zur Bestätigung.',
+        cart_step_copy: 'Optional — Text kopieren',
         cart_btn_copy: 'Bestellung kopieren',
-        cart_step2: '2. Signal oder Threema öffnen und einfügen',
+        cart_need_telegram: 'Öffne den Katalog über Telegram, um die Bestellung zu senden.',
+        order_send_failed: 'Senden fehlgeschlagen. Bitte erneut versuchen.',
         open_signal: 'Signal',
         open_threema: 'Threema'
     }
@@ -1021,12 +1033,14 @@ function renderCart() {
             <span class="cart-total-amount">${total.toFixed(2)} ${CURRENCY}</span>
         </div>
         <p class="cart-how-to-send">${t('cart_how_to_send')}</p>
-        <p class="cart-step-label">${t('cart_step1')}</p>
+        <p class="cart-step-label">${t('cart_step_submit')}</p>
+        <button type="button" class="btn-submit-order" style="${btnStyle}" onclick="checkout()">${t('cart_btn_submit')}</button>
+        <p class="cart-bot-followup">${t('cart_bot_followup')}</p>
+        <p class="cart-step-label">${t('cart_step_copy')}</p>
         <button type="button" class="btn-copy-order" style="${btnStyle}" onclick="copyOrderToClipboard()">${t('cart_btn_copy')}</button>
-        <pre class="cart-order-copy" onclick="copyOrderToClipboard()" title="">${escapeHtml(buildOrderText())}</pre>
-        <p class="cart-step-label">${t('cart_step2')}</p>`;
+        <pre class="cart-order-copy" onclick="copyOrderToClipboard()" title="">${escapeHtml(buildOrderText())}</pre>`;
     if (contactUrls.signalUrl || contactUrls.threemaUrl) {
-        h += `<div class="cart-contact-btns">`;
+        h += `<p class="cart-step-label">${t('or_contact_signal_threema')}</p><div class="cart-contact-btns">`;
         if (contactUrls.signalUrl) h += `<button type="button" class="btn-contact-alt" style="${btnStyle}" data-contact-url="${escapeHtml(contactUrls.signalUrl)}" onclick="openContactUrl(this)">${t('open_signal')}</button>`;
         if (contactUrls.threemaUrl) h += `<button type="button" class="btn-contact-alt" style="${btnStyle}" data-contact-url="${escapeHtml(contactUrls.threemaUrl)}" onclick="openContactUrl(this)">${t('open_threema')}</button>`;
         h += `</div>`;
@@ -1102,23 +1116,11 @@ async function checkout() {
         } catch (e) {}
     }
 
-    const destination = getTelegramDestination();
-    const url = `https://t.me/${destination}?text=${encodeURIComponent(orderText)}`;
-    const tg = window.Telegram?.WebApp;
-    if (tg) {
-        try {
-            tg.openTelegramLink(url);
-        } catch (e) {
-            window.open(url, '_blank');
-        }
-    } else {
-        window.open(url, '_blank');
+    if (getInitData()) {
+        showToast(t('order_send_failed'));
+        return;
     }
-    showToast(t('checkout_hint'));
-    cart = [];
-    updateCartBadge();
-    scheduleCartActivitySync();
-    closeCart();
+    showToast(t('cart_need_telegram'));
 }
 
 function showToast(text) {

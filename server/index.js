@@ -289,11 +289,11 @@ const BOT_STRINGS = {
     help_btn: 'AIDE',
     catalog_prompt: 'Clique pour ouvrir le catalogue :',
     catalog_btn: '🌿 Ouvrir le catalogue',
-    order_confirm: '✅ Merci, nous avons bien reçu ta commande.\n\nComment souhaites-tu payer ?',
-    pay_followup: 'Paiement par {method} noté.\n\nOù souhaites-tu poursuivre la discussion ?',
-    pay_order_intro: '\n\nVoici ta commande, tu peux la copier/coller dans Signal ou Threema :\n\n',
-    pay_cash: 'Cash',
-    pay_crypto: 'Crypto',
+    order_received: '✅ Commande bien reçue !\n\nPour te recontacter et confirmer, choisis le canal sur lequel tu veux qu’on t’écrive :',
+    order_btn_signal: 'Signal',
+    order_btn_threema: 'Threema',
+    order_ask_contact_id: 'Envoie maintenant ton identifiant {channel} (numéro, pseudo ou ID Threema) pour qu’on puisse te joindre.',
+    order_contact_saved: 'Merci ! Nous te contacterons sur {channel} pour confirmer ta commande.',
     need_lang: 'Choisis d’abord ta langue avec /start.',
     contact_thanks: 'Merci, nous te recontacterons sur {channel} avec ces coordonnées.',
     help_detail: `🌱 Bienvenue sur notre bot !
@@ -320,11 +320,11 @@ Pour plus d'informations, contactez-nous !
     help_btn: 'HELP',
     catalog_prompt: 'Tap below to open the catalog:',
     catalog_btn: '🌿 Open catalog',
-    order_confirm: '✅ Thanks, we received your order.\n\nHow would you like to pay?',
-    pay_followup: 'Payment by {method} noted.\n\nWhere would you like to continue the conversation?',
-    pay_order_intro: '\n\nHere is your order — you can copy/paste it into Signal or Threema:\n\n',
-    pay_cash: 'Cash',
-    pay_crypto: 'Crypto',
+    order_received: '✅ Order received!\n\nChoose how you want us to contact you to confirm:',
+    order_btn_signal: 'Signal',
+    order_btn_threema: 'Threema',
+    order_ask_contact_id: 'Send your {channel} identifier now (number, username, or Threema ID) so we can reach you.',
+    order_contact_saved: 'Thanks! We’ll contact you on {channel} to confirm your order.',
     need_lang: 'Please choose your language first with /start.',
     contact_thanks: 'Thanks, we will reach you on {channel} with these details.',
     help_detail: `🌱 Welcome to our bot!
@@ -351,11 +351,11 @@ For more information, contact us!
     help_btn: 'HILFE',
     catalog_prompt: 'Tippe unten, um den Katalog zu öffnen:',
     catalog_btn: '🌿 Katalog öffnen',
-    order_confirm: '✅ Danke, wir haben deine Bestellung erhalten.\n\nWie möchtest du bezahlen?',
-    pay_followup: 'Zahlung per {method} notiert.\n\nWo möchtest du weiterschreiben?',
-    pay_order_intro: '\n\nHier ist deine Bestellung — zum Kopieren in Signal oder Threema:\n\n',
-    pay_cash: 'Bargeld',
-    pay_crypto: 'Krypto',
+    order_received: '✅ Bestellung erhalten!\n\nWähle, wie wir dich zur Bestätigung erreichen sollen:',
+    order_btn_signal: 'Signal',
+    order_btn_threema: 'Threema',
+    order_ask_contact_id: 'Sende jetzt deinen {channel}-Identifikator (Nummer, Nutzername oder Threema-ID).',
+    order_contact_saved: 'Danke! Wir melden uns bei dir über {channel}, um die Bestellung zu bestätigen.',
     need_lang: 'Bitte wähle zuerst deine Sprache mit /start.',
     contact_thanks: 'Danke, wir melden uns bei dir über {channel} mit diesen Angaben.',
     help_detail: `🌱 Willkommen bei unserem Bot!
@@ -416,28 +416,25 @@ const ADMIN_INLINE = {
   }
 };
 
-function getPaymentKeyboard(lang) {
+function getOrderContactKeyboard(lang) {
   const L = BOT_STRINGS[lang] || BOT_STRINGS.fr;
   return {
     reply_markup: {
-      inline_keyboard: [
-        [{ text: `💵 ${L.pay_cash}`, callback_data: 'pay_cash' }, { text: `🪙 ${L.pay_crypto}`, callback_data: 'pay_crypto' }]
-      ]
+      inline_keyboard: [[
+        { text: L.order_btn_signal, callback_data: 'order_contact_signal' },
+        { text: L.order_btn_threema, callback_data: 'order_contact_threema' }
+      ]]
     }
   };
 }
 
-function getOrderConfirmText(chatId) {
-  const L = strLang(chatId);
-  return L.order_confirm;
-}
-
-// Suivi du canal de contact après choix du paiement
+// Suite commande : attente identifiant Signal / Threema
 const contactState = {};
 
 bot.onText(/\/start(?:\s+(.+))?/, async (msg) => {
   const chatId = msg.chat.id;
   addBotUserFromMsg(msg);
+  delete contactState[chatId];
   const caption = BOT_STRINGS.fr.choose_lang;
   try {
     await bot.sendPhoto(chatId, WELCOME_IMAGE_URL, { caption, ...LANG_PICK_INLINE });
@@ -471,20 +468,23 @@ bot.on('message', async (msg) => {
   const userName = msg.from?.username ? `@${msg.from.username}` : [msg.from?.first_name, msg.from?.last_name].filter(Boolean).join(' ') || (userId ? `ID ${userId}` : 'Client');
   const isOwner = String(chatId) === String(OWNER_CHAT_ID);
 
-  // Si on attend les coordonnées de contact après choix du paiement
-  if (contactState[chatId] && contactState[chatId].channel && text && !text.startsWith('/')) {
+  // Identifiant Signal / Threema après une commande (Web App ou message)
+  if (contactState[chatId]?.type === 'order' && contactState[chatId]?.awaitingContactId && text && !text.startsWith('/')) {
     const st = contactState[chatId];
     delete contactState[chatId];
     const Lc = strLang(chatId);
-    await bot.sendMessage(chatId, Lc.contact_thanks.replace('{channel}', st.channel));
+    await bot.sendMessage(chatId, Lc.order_contact_saved.replace('{channel}', st.channel));
+    const orderSnap = lastOrderByChat[chatId] || '';
     if (OWNER_CHAT_ID) {
       const lines = [];
-      lines.push('📇 Coordonnées client pour commande :');
+      lines.push('📇 Identifiant de contact (commande)');
       lines.push('');
       lines.push(`👤 Client : ${userName}`);
-      if (st.method) lines.push(`💰 Paiement : ${st.method}`);
       lines.push(`📲 Canal : ${st.channel}`);
-      lines.push(`📩 Coordonnées : ${text}`);
+      lines.push(`📩 Identifiant : ${text}`);
+      lines.push('');
+      lines.push('──────────');
+      lines.push(orderSnap);
       bot.sendMessage(OWNER_CHAT_ID, lines.join('\n')).catch(() => {});
     }
     return;
@@ -599,6 +599,7 @@ bot.on('message', async (msg) => {
   if (!looksLikeOrder(text)) return;
 
   lastOrderByChat[chatId] = text;
+  delete contactState[chatId];
 
   const fromLabel = msg.chat.username ? `@${msg.chat.username}` : [msg.chat.first_name, msg.chat.last_name].filter(Boolean).join(' ') || `ID ${chatId}`;
   if (OWNER_CHAT_ID) {
@@ -610,9 +611,9 @@ bot.on('message', async (msg) => {
   }
   addBotUserFromMsg(msg);
   const langOrd = getChatLang(chatId) || 'fr';
-  const confirm = getOrderConfirmText(chatId);
+  const L = BOT_STRINGS[langOrd];
   try {
-    await bot.sendMessage(chatId, confirm, getPaymentKeyboard(langOrd));
+    await bot.sendMessage(chatId, L.order_received, getOrderContactKeyboard(langOrd));
   } catch (err) {
     console.error('❌ Error sending confirmation:', err.message);
   }
@@ -637,31 +638,16 @@ bot.on('callback_query', async (query) => {
     return;
   }
 
-  if (data === 'pay_cash' || data === 'pay_crypto') {
-    const lang = getChatLang(chatId) || 'fr';
-    const L = BOT_STRINGS[lang];
-    const method = data === 'pay_cash' ? L.pay_cash : L.pay_crypto;
+  if (data === 'order_contact_signal' || data === 'order_contact_threema') {
     try {
       await bot.answerCallbackQuery(query.id);
-      const orderText = lastOrderByChat[chatId];
-      let extra = '';
-      if (orderText) {
-        extra = L.pay_order_intro + orderText;
-      }
-      await bot.sendMessage(chatId, L.pay_followup.replace('{method}', method) + extra, {
-        reply_markup: {
-          inline_keyboard: [
-            [
-              { text: 'Signal', url: process.env.SIGNAL_CONTACT_URL || 'https://signal.me/#p=TON_NUMERO' },
-              { text: 'Threema', url: process.env.THREEMA_CONTACT_URL || 'https://threema.id/TONID' }
-            ]
-          ]
-        }
-      });
     } catch (e) {}
-    if (OWNER_CHAT_ID) {
-      bot.sendMessage(OWNER_CHAT_ID, 'Paiement choisi par ' + userName + ' : ' + method).catch(() => {});
-    }
+    if (!chatId) return;
+    const channel = data === 'order_contact_signal' ? 'Signal' : 'Threema';
+    contactState[chatId] = { type: 'order', awaitingContactId: true, channel };
+    const lang = getChatLang(chatId) || 'fr';
+    const L = BOT_STRINGS[lang];
+    await bot.sendMessage(chatId, L.order_ask_contact_id.replace('{channel}', channel));
     return;
   }
 
@@ -1085,9 +1071,12 @@ app.post('/api/order', (req, res) => {
     });
   }
 
+  lastOrderByChat[userId] = orderText;
+  delete contactState[userId];
+
   const langOrd = getChatLang(userId) || 'fr';
-  const confirm = getOrderConfirmText(userId);
-  bot.sendMessage(userId, confirm, getPaymentKeyboard(langOrd)).catch((err) => {
+  const L = BOT_STRINGS[langOrd];
+  bot.sendMessage(userId, L.order_received, getOrderContactKeyboard(langOrd)).catch((err) => {
     console.error('❌ Error sending confirmation to user:', err.message);
   });
 
