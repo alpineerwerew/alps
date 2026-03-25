@@ -75,6 +75,7 @@ function getInitDataUser(initData) {
 const BOT_USERS_FILE = path.join(__dirname, 'bot_users.json');
 const CART_ACTIVITY_FILE = path.join(__dirname, 'cart_activity.json');
 const BOT_CHAT_LANG_FILE = path.join(__dirname, 'bot_chat_lang.json');
+const CART_REMINDERS_FILE = path.join(__dirname, 'cart_reminders.json');
 
 function loadBotUsers() {
   try {
@@ -176,6 +177,24 @@ function saveCartActivity(rows) {
     console.error('❌ Could not save cart_activity.json:', err.message);
   }
   return list;
+}
+
+function loadCartReminders() {
+  try {
+    const raw = fs.readFileSync(CART_REMINDERS_FILE, 'utf8');
+    const o = JSON.parse(raw);
+    return o && typeof o === 'object' ? o : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveCartReminders(map) {
+  try {
+    fs.writeFileSync(CART_REMINDERS_FILE, JSON.stringify(map || {}, null, 2), 'utf8');
+  } catch (e) {
+    console.error('❌ Could not save cart_reminders.json:', e.message);
+  }
 }
 
 function upsertCartActivity(user, payload) {
@@ -336,6 +355,9 @@ const BOT_STRINGS = {
     order_contact_saved: 'Merci ! Nous te contacterons sur {channel} pour confirmer ta commande.',
     need_lang: 'Choisis d’abord ta langue avec /start.',
     contact_thanks: 'Merci, nous te recontacterons sur {channel} avec ces coordonnées.',
+    cart_reminder: 'Tu as un panier en attente. Quand tu es prêt(e), valide ta commande via Telegram.\n\nOuvre le catalogue ci-dessous, puis envoie ta commande au bot.',
+    cart_reminder_cta: 'Tu as une question ? Pose-la ici, on te répondra au plus vite.',
+    cart_reminder_question_btn: '❓ Poser une question',
     help_detail: `🌱 Bienvenue sur notre bot !
 
 Découvrez nos produits ainsi que toutes nos vidéos en cliquant ci-dessous ⬇️
@@ -367,6 +389,9 @@ Pour plus d'informations, contactez-nous !
     order_contact_saved: 'Thanks! We’ll contact you on {channel} to confirm your order.',
     need_lang: 'Please choose your language first with /start.',
     contact_thanks: 'Thanks, we will reach you on {channel} with these details.',
+    cart_reminder: 'You have an order draft waiting in your cart. When you are ready, confirm it via Telegram.\n\nOpen the catalog below, then send your order to the bot.',
+    cart_reminder_cta: 'Have a question? Message the bot here and we will get back to you ASAP.',
+    cart_reminder_question_btn: '❓ Ask a question',
     help_detail: `🌱 Welcome to our bot!
 
 Find our products and all our videos by clicking below ⬇️
@@ -398,6 +423,9 @@ For more information, contact us!
     order_contact_saved: 'Danke! Wir melden uns bei dir über {channel}, um die Bestellung zu bestätigen.',
     need_lang: 'Bitte wähle zuerst deine Sprache mit /start.',
     contact_thanks: 'Danke, wir melden uns bei dir über {channel} mit diesen Angaben.',
+    cart_reminder: 'Du hast einen Warenkorb in der Warteschlange. Wenn du bereit bist, bestätige deine Bestellung über Telegram.\n\nÖffne den Katalog unten und sende dann deine Bestellung an den Bot.',
+    cart_reminder_cta: 'Hast du eine Frage? Schreib uns einfach hier, wir melden uns schnell zurück.',
+    cart_reminder_question_btn: '❓ Frage stellen',
     help_detail: `🌱 Willkommen bei unserem Bot!
 
 Entdecke unsere Produkte und alle unsere Videos – tippe unten auf MENU ⬇️
@@ -449,6 +477,80 @@ function getOpenCatalogInline(lang) {
     }
   };
 }
+
+function getCartReminderInline(lang) {
+  const L = BOT_STRINGS[lang] || BOT_STRINGS.fr;
+  return {
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: L.catalog_btn, web_app: { url: CATALOG_URL } }],
+        [{ text: L.cart_reminder_question_btn, callback_data: 'menu_contact' }]
+      ]
+    }
+  };
+}
+
+function startCartReminderScheduler() {
+  const enabled = process.env.CART_REMINDER_ENABLED !== '0';
+  if (!enabled) return;
+
+  const afterMin = Number(process.env.CART_REMINDER_AFTER_MINUTES ?? 15);
+  const repeatHours = Number(process.env.CART_REMINDER_REPEAT_HOURS ?? 6);
+  const checkSeconds = Number(process.env.CART_REMINDER_CHECK_EVERY_SECONDS ?? 120);
+
+  const afterMs = Math.max(1, afterMin) * 60 * 1000;
+  const repeatMs = Math.max(1, repeatHours) * 60 * 60 * 1000;
+  const intervalMs = Math.max(20, checkSeconds) * 1000;
+
+  const interval = setInterval(async () => {
+    if (!isBotEnabled()) return;
+
+    const activity = loadCartActivity();
+    if (!activity.length) return;
+
+    const reminders = loadCartReminders();
+    const now = Date.now();
+    let changed = false;
+
+    for (const row of activity) {
+      const chatId = row?.chat_id;
+      if (!chatId) continue;
+      if (!row.cart_non_empty) continue;
+      if (!row.updated_at) continue;
+      const updatedMs = new Date(row.updated_at).getTime();
+      if (!updatedMs || Number.isNaN(updatedMs)) continue;
+      const ageMs = now - updatedMs;
+      if (ageMs < afterMs) continue;
+
+      const key = String(chatId);
+      const last = reminders[key]?.lastRemindedAt;
+      const lastMs = last ? new Date(last).getTime() : 0;
+      if (lastMs && (now - lastMs) < repeatMs) continue;
+
+      const lang = getChatLang(chatId) || 'fr';
+      const L = BOT_STRINGS[lang] || BOT_STRINGS.fr;
+      try {
+        await bot.sendMessage(
+          chatId,
+          `${L.cart_reminder}\n\n${L.cart_reminder_cta}`,
+          getCartReminderInline(lang)
+        );
+        reminders[key] = { lastRemindedAt: new Date().toISOString() };
+        changed = true;
+      } catch (e) {
+        // ignore, we'll retry on next scheduler tick
+      }
+    }
+
+    if (changed) saveCartReminders(reminders);
+  }, intervalMs);
+
+  // prevent unref so pm2 keeps process alive; interval is fine
+  return interval;
+}
+
+// Start background reminder checks (cart abandoned)
+startCartReminderScheduler();
 
 const ADMIN_INLINE = {
   reply_markup: {
