@@ -587,6 +587,8 @@ let currentProduct = null;
 let selectedCategory = null;
 let contactUrls = { signalUrl: null, threemaUrl: null };
 let cartSyncTimer = null;
+let catalogLoadInFlight = null;
+let contactUrlsLoadInFlight = null;
 
 function getLocalCartKey() {
   // Cart persisté par utilisateur Telegram (via `user.id` dans initData)
@@ -665,10 +667,18 @@ async function loadCatalog() {
         catalogCategories = CATEGORIES;
         return;
     }
+    if (catalogLoadInFlight) return catalogLoadInFlight;
+
+    const controller = new AbortController();
+    const timeoutMs = 9000;
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+    catalogLoadInFlight = (async () => {
     try {
         const r = await fetch(POINTS_API_URL + '/api/products?t=' + Date.now(), {
             cache: 'no-store',
-            headers: catalogApiHeaders()
+            headers: catalogApiHeaders(),
+            signal: controller.signal
         });
         if (r.status === 401) {
             showCatalogAccessError(isTelegramWebApp() ? 'error_catalog_access' : 'open_in_telegram');
@@ -684,19 +694,39 @@ async function loadCatalog() {
     } catch (e) {}
     catalogProducts = PRODUCTS;
     catalogCategories = CATEGORIES;
+    })().finally(() => {
+        clearTimeout(timeout);
+        catalogLoadInFlight = null;
+    });
+
+    return catalogLoadInFlight;
 }
 
 async function loadContactUrls() {
     if (!POINTS_API_URL) return;
+    if (contactUrlsLoadInFlight) return contactUrlsLoadInFlight;
+
+    const controller = new AbortController();
+    const timeoutMs = 7000;
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+    contactUrlsLoadInFlight = (async () => {
     try {
         const r = await fetch(POINTS_API_URL + '/api/config', {
             cache: 'no-store',
-            headers: catalogApiHeaders()
+            headers: catalogApiHeaders(),
+            signal: controller.signal
         });
         if (r.status === 401) return;
         const d = await r.json();
         if (d && (d.signalUrl || d.threemaUrl)) contactUrls = { signalUrl: d.signalUrl || null, threemaUrl: d.threemaUrl || null };
     } catch (e) {}
+    })().finally(() => {
+        clearTimeout(timeout);
+        contactUrlsLoadInFlight = null;
+    });
+
+    return contactUrlsLoadInFlight;
 }
 
 function init() {
