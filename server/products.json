@@ -114,23 +114,23 @@
       "id": 8,
       "name": "Live Rosin – Bored Rosin",
       "description": "",
-      "image_url": "https://res.cloudinary.com/divcybeds/image/upload/v1771229224/IMG_1189_2_enzbko.jpg",
+      "image_url": "https://alpine710.art/api/media?u=https%3A%2F%2Fres.cloudinary.com%2Fdivcybeds%2Fimage%2Fupload%2Fv1771229224%2FIMG_1189_2_enzbko.jpg",
       "video_url": null,
       "media_type": "image",
       "media": [
         {
           "type": "image",
-          "url": "https://res.cloudinary.com/divcybeds/image/upload/v1771229224/IMG_1189_2_enzbko.jpg",
+          "url": "https://alpine710.art/api/media?u=https%3A%2F%2Fres.cloudinary.com%2Fdivcybeds%2Fimage%2Fupload%2Fv1771229224%2FIMG_1189_2_enzbko.jpg",
           "alt": "Live Rosin – Bored Rosin"
         },
         {
           "type": "video",
-          "url": "https://res.cloudinary.com/divcybeds/video/upload/v1773283162/IMG_7847_cwhblo.mp4",
+          "url": "https://alpine710.art/api/media?u=https%3A%2F%2Fres.cloudinary.com%2Fdivcybeds%2Fvideo%2Fupload%2Fv1773283162%2FIMG_7847_cwhblo.mp4",
           "alt": ""
         },
         {
           "type": "video",
-          "url": "https://res.cloudinary.com/divcybeds/video/upload/v1773283162/IMG_7849_t2scrf.mp4",
+          "url": "https://alpine710.art/api/media?u=https%3A%2F%2Fres.cloudinary.com%2Fdivcybeds%2Fvideo%2Fupload%2Fv1773283162%2FIMG_7849_t2scrf.mp4",
           "alt": ""
         }
       ],
@@ -164,6 +164,9 @@
         "Return of Sour",
         "NYC Diesel",
         "Strawguava"
+      ],
+      "badges": [
+        "new"
       ]
     },
     {
@@ -274,18 +277,18 @@
       "id": 13,
       "name": "Tenco - Yellow Zushi 🍣",
       "description": "Fresh batch - 100% Official",
-      "image_url": "https://res.cloudinary.com/divcybeds/image/upload/v1773705833/IMG_1457_sfbzs1.jpg",
+      "image_url": "https://alpine710.art/api/media?u=https%3A%2F%2Fres.cloudinary.com%2Fdivcybeds%2Fimage%2Fupload%2Fv1773705833%2FIMG_1457_sfbzs1.jpg",
       "video_url": null,
       "media_type": "image",
       "media": [
         {
           "type": "image",
-          "url": "https://res.cloudinary.com/divcybeds/image/upload/v1773705833/IMG_1457_sfbzs1.jpg",
+          "url": "https://alpine710.art/api/media?u=https%3A%2F%2Fres.cloudinary.com%2Fdivcybeds%2Fimage%2Fupload%2Fv1773705833%2FIMG_1457_sfbzs1.jpg",
           "alt": "Tenco - Yellow Zushi 🍣"
         },
         {
           "type": "image",
-          "url": "https://res.cloudinary.com/divcybeds/image/upload/v1773705830/IMG_1447_hnrvf2.jpg",
+          "url": "https://alpine710.art/api/media?u=https%3A%2F%2Fres.cloudinary.com%2Fdivcybeds%2Fimage%2Fupload%2Fv1773705830%2FIMG_1447_hnrvf2.jpg",
           "alt": ""
         }
       ],
@@ -309,19 +312,22 @@
       ],
       "variants": [
         "Yellow Zushi"
+      ],
+      "badges": [
+        "new"
       ]
     },
     {
       "id": 14,
       "name": "Wizard trees - Blue Magic  🧙‍♂️",
       "description": "Fresh Batch 20/03",
-      "image_url": "https://res.cloudinary.com/divcybeds/image/upload/v1773715374/photo_2026-03-17_09-42-33_bth9zh.jpg",
+      "image_url": "https://alpine710.art/api/media?u=https%3A%2F%2Fres.cloudinary.com%2Fdivcybeds%2Fimage%2Fupload%2Fv1773715374%2Fphoto_2026-03-17_09-42-33_bth9zh.jpg",
       "video_url": null,
       "media_type": "image",
       "media": [
         {
           "type": "image",
-          "url": "https://res.cloudinary.com/divcybeds/image/upload/v1773715374/photo_2026-03-17_09-42-33_bth9zh.jpg",
+          "url": "https://alpine710.art/api/media?u=https%3A%2F%2Fres.cloudinary.com%2Fdivcybeds%2Fimage%2Fupload%2Fv1773715374%2Fphoto_2026-03-17_09-42-33_bth9zh.jpg",
           "alt": "Wizard trees - Blue Magic  🧙‍♂️"
         }
       ],
@@ -345,24 +351,27 @@
       ],
       "variants": [
         "Blue Magic"
+      ],
+      "badges": [
+        "new"
       ]
     },
     {
       "id": 15,
       "name": "StaticLabz WPFF STATIC",
       "description": "Powered by @TheKarmaCartel\nMade by @Staticlabz.ca",
-      "image_url": "https://res.cloudinary.com/divcybeds/image/upload/v1774365677/photo_2026-03-24_22-20-36_qjg3j7.jpg",
-      "video_url": "https://res.cloudinary.com/divcybeds/video/upload/v1774365678/IMG_8185_ejgt9p.mp4",
+      "image_url": "https://alpine710.art/api/media?u=https%3A%2F%2Fres.cloudinary.com%2Fdivcybeds%2Fimage%2Fupload%2Fv1774365677%2Fphoto_2026-03-24_22-20-36_qjg3j7.jpg",
+      "video_url": "https://alpine710.art/api/media?u=https%3A%2F%2Fres.cloudinary.com%2Fdivcybeds%2Fvideo%2Fupload%2Fv1774365678%2FIMG_8185_ejgt9p.mp4",
       "media_type": "video",
       "media": [
         {
           "type": "image",
-          "url": "https://res.cloudinary.com/divcybeds/image/upload/v1774365677/photo_2026-03-24_22-20-36_qjg3j7.jpg",
+          "url": "https://alpine710.art/api/media?u=https%3A%2F%2Fres.cloudinary.com%2Fdivcybeds%2Fimage%2Fupload%2Fv1774365677%2Fphoto_2026-03-24_22-20-36_qjg3j7.jpg",
           "alt": "StaticLabz WPFF STATIC"
         },
         {
           "type": "video",
-          "url": "https://res.cloudinary.com/divcybeds/video/upload/v1774365678/IMG_8185_ejgt9p.mp4",
+          "url": "https://alpine710.art/api/media?u=https%3A%2F%2Fres.cloudinary.com%2Fdivcybeds%2Fvideo%2Fupload%2Fv1774365678%2FIMG_8185_ejgt9p.mp4",
           "alt": ""
         }
       ],
@@ -392,6 +401,9 @@
         "Puprle Kush",
         "Facemelt x Govermint Oasis",
         "Grappe Fritter"
+      ],
+      "badges": [
+        "new"
       ]
     },
     {
