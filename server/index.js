@@ -240,6 +240,39 @@ function setChatLang(chatId, lang) {
 
 let broadcastPending = false;
 
+// ---- Bot enable/disable (admin control) ----
+const BOT_ENABLED_FILE = path.join(__dirname, 'bot_enabled.json');
+function loadBotEnabled() {
+  try {
+    const raw = fs.readFileSync(BOT_ENABLED_FILE, 'utf8');
+    const o = JSON.parse(raw);
+    return !!o?.enabled;
+  } catch {
+    return true; // default enabled
+  }
+}
+
+function saveBotEnabled(enabled) {
+  const val = !!enabled;
+  try {
+    fs.writeFileSync(BOT_ENABLED_FILE, JSON.stringify({ enabled: val }, null, 2), 'utf8');
+  } catch (e) {
+    console.error('❌ Could not save bot_enabled.json:', e.message);
+  }
+  return val;
+}
+
+let botEnabled = loadBotEnabled();
+function isBotEnabled() {
+  return !!botEnabled;
+}
+
+function setBotEnabled(enabled) {
+  botEnabled = saveBotEnabled(enabled);
+  console.log(`🔧 Telegram bot enabled = ${botEnabled}`);
+  return botEnabled;
+}
+
 // ---- Parse order total from message text ----
 function parseOrderTotal(text) {
   // Match "Total : 123.45 CHF" or "💰 Total : 123.45" or "Gesamt : ..." (FR/EN/DE)
@@ -440,6 +473,8 @@ const contactState = {};
 
 bot.onText(/\/start(?:\s+(.+))?/, async (msg) => {
   const chatId = msg.chat.id;
+  const isOwner = String(chatId) === String(OWNER_CHAT_ID);
+  if (!isBotEnabled() && !isOwner) return;
   addBotUserFromMsg(msg);
   delete contactState[chatId];
   const caption = BOT_STRINGS.fr.choose_lang;
@@ -474,6 +509,7 @@ bot.on('message', async (msg) => {
   const userId = msg.from?.id;
   const userName = msg.from?.username ? `@${msg.from.username}` : [msg.from?.first_name, msg.from?.last_name].filter(Boolean).join(' ') || (userId ? `ID ${userId}` : 'Client');
   const isOwner = String(chatId) === String(OWNER_CHAT_ID);
+  if (!isBotEnabled() && !isOwner) return;
 
   // Identifiant Signal / Threema après une commande (Web App ou message)
   if (contactState[chatId]?.type === 'order' && contactState[chatId]?.awaitingContactId && text && !text.startsWith('/')) {
@@ -603,6 +639,8 @@ function looksLikeOrder(text) {
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
   const text = msg.text || '';
+  const isOwner = String(chatId) === String(OWNER_CHAT_ID);
+  if (!isBotEnabled() && !isOwner) return;
   if (!looksLikeOrder(text)) return;
 
   lastOrderByChat[chatId] = text;
@@ -632,6 +670,12 @@ bot.on('callback_query', async (query) => {
   const userId = query.from?.id;
   const userName = query.from?.username ? `@${query.from.username}` : [query.from?.first_name, query.from?.last_name].filter(Boolean).join(' ') || `ID ${userId}`;
   const isOwner = String(chatId) === String(OWNER_CHAT_ID);
+  if (!isBotEnabled() && !isOwner) {
+    try {
+      await bot.answerCallbackQuery(query.id, { text: 'Bot désactivé', show_alert: true });
+    } catch (e) {}
+    return;
+  }
 
   if (data === 'lang_fr' || data === 'lang_en' || data === 'lang_de') {
     try {
@@ -916,6 +960,19 @@ app.get('/api/admin/cart-activity', (req, res) => {
   res.json({ ok: true, users: rows });
 });
 
+// ---- Admin: enable/disable Telegram bot ----
+app.get('/api/admin/bot-enabled', (req, res) => {
+  if (!ensureOwner(req, res)) return;
+  res.json({ ok: true, enabled: isBotEnabled() });
+});
+
+app.post('/api/admin/bot-toggle', (req, res) => {
+  if (!ensureOwner(req, res)) return;
+  const enabled = !!req.body?.enabled;
+  const val = setBotEnabled(enabled);
+  res.json({ ok: true, enabled: val });
+});
+
 // ---- Products API (public read) ----
 app.get('/api/products', requireTelegramInitForPublicApi, (req, res) => {
   const data = loadProductsData();
@@ -1076,6 +1133,9 @@ app.get('/api/admin/check', (req, res) => {
 
 // ---- Order via API (envoi direct par le bot, sans ouvrir t.me) ----
 app.post('/api/order', (req, res) => {
+  if (!isBotEnabled()) {
+    return res.status(503).json({ error: 'bot_disabled' });
+  }
   const initData = req.body?.initData;
   const orderText = req.body?.orderText;
   const user = getInitDataUser(initData);

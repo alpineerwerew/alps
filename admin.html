@@ -40,6 +40,12 @@
     <div id="content" class="hidden">
         <p><a href="index.html">← Retour au catalogue</a></p>
 
+        <h2>Bot</h2>
+        <div style="border: 1px solid #ddd; border-radius: 8px; padding: 0.9rem; margin: 1rem 0 1.2rem;">
+            <p id="bot-status" style="margin: 0 0 0.6rem; color: #333;">Chargement…</p>
+            <button type="button" class="btn primary" id="btn-bot-toggle">—</button>
+        </div>
+
         <h2>Catégories</h2>
         <form id="category-form">
             <input type="hidden" id="cat-edit-id" value="">
@@ -150,12 +156,15 @@
         const btnLoadUsers = document.getElementById('btn-load-users');
         const cartActivityList = document.getElementById('cart-activity-list');
         const btnLoadCartActivity = document.getElementById('btn-load-cart-activity');
+        const botStatusEl = document.getElementById('bot-status');
+        const btnBotToggle = document.getElementById('btn-bot-toggle');
         const categoryForm = document.getElementById('category-form');
         const catEditId = document.getElementById('cat-edit-id');
         const catName = document.getElementById('cat-name');
         const catSubmitBtn = document.getElementById('cat-submit-btn');
         let categories = [];
         let products = [];
+        let currentBotEnabled = null;
 
         async function checkAdmin() {
             const init = getInitData();
@@ -183,6 +192,47 @@
             loginMsg.classList.add('hidden');
             content.classList.remove('hidden');
             return true;
+        }
+
+        async function loadBotEnabled() {
+            if (!botStatusEl || !btnBotToggle) return;
+            botStatusEl.textContent = 'Chargement…';
+            try {
+                const r = await fetch(API_URL + '/api/admin/bot-enabled?initData=' + encodeURIComponent(getInitData()));
+                const d = await r.json();
+                if (!r.ok || !d.ok) {
+                    botStatusEl.textContent = 'Erreur lors du chargement.';
+                    return;
+                }
+                currentBotEnabled = !!d.enabled;
+                botStatusEl.textContent = currentBotEnabled ? 'Bot : activé' : 'Bot : désactivé';
+                btnBotToggle.textContent = currentBotEnabled ? 'Désactiver le bot' : 'Activer le bot';
+            } catch (e) {
+                botStatusEl.textContent = 'Erreur réseau.';
+            }
+        }
+
+        async function toggleBotEnabled() {
+            if (!btnBotToggle || currentBotEnabled === null) return;
+            const nextEnabled = !currentBotEnabled;
+            btnBotToggle.disabled = true;
+            try {
+                const r = await fetch(API_URL + '/api/admin/bot-toggle', {
+                    method: 'POST',
+                    headers: getAuthHeadersJson(),
+                    body: JSON.stringify({ ...getAuthBody(), enabled: nextEnabled })
+                });
+                const d = await r.json().catch(() => ({}));
+                if (!r.ok || !d.ok) {
+                    alert(d.error || 'Erreur lors du changement d’état du bot.');
+                    return;
+                }
+                await loadBotEnabled();
+            } catch (e) {
+                alert('Erreur réseau.');
+            } finally {
+                btnBotToggle.disabled = false;
+            }
         }
 
         function parsePricing(str) {
@@ -662,9 +712,18 @@
             });
         }
 
+        if (btnBotToggle) {
+            btnBotToggle.addEventListener('click', () => {
+                toggleBotEnabled();
+            });
+        }
+
         (async () => {
             if (window.Telegram?.WebApp) Telegram.WebApp.ready();
-            if (await checkAdmin()) load();
+            if (await checkAdmin()) {
+                load();
+                loadBotEnabled();
+            }
         })();
     </script>
 </body>
