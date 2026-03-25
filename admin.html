@@ -72,6 +72,17 @@
             <input type="text" id="p-pricing" placeholder="7:160, 28:600">
             <label>Variants (une par ligne ou séparés par des virgules)</label>
             <textarea id="p-variants" placeholder="Lemon up, Untruly OG"></textarea>
+            <label>Badges (mise en avant)</label>
+            <div style="display:flex;gap:1rem;align-items:center;margin-top:0.25rem;">
+                <label style="display:flex;gap:0.5rem;align-items:center;">
+                    <input type="checkbox" id="p-badge-new">
+                    New
+                </label>
+                <label style="display:flex;gap:0.5rem;align-items:center;">
+                    <input type="checkbox" id="p-badge-promo">
+                    Promotion
+                </label>
+            </div>
             <label>Image (URL ou envoi)</label>
             <input type="url" id="p-image_url" placeholder="https://... ou envoie une photo ci-dessous">
             <div class="upload-row">
@@ -142,6 +153,8 @@
         const pCategory = document.getElementById('p-category');
         const pPricing = document.getElementById('p-pricing');
         const pVariants = document.getElementById('p-variants');
+        const pBadgeNew = document.getElementById('p-badge-new');
+        const pBadgePromo = document.getElementById('p-badge-promo');
         const pImageUrl = document.getElementById('p-image_url');
         const pMediaExtra = document.getElementById('p-media-extra');
         const pVideoUrl = document.getElementById('p-video_url');
@@ -525,6 +538,9 @@
             pCategory.value = p.category_id || 1;
             pPricing.value = (p.pricing && p.pricing.length) ? p.pricing.map(x => x.qty + ':' + x.price).join(', ') : '';
             pVariants.value = (p.variants && p.variants.length) ? p.variants.join(', ') : '';
+            const badges = Array.isArray(p.badges) ? p.badges.map((b) => String(b).toLowerCase()) : [];
+            pBadgeNew.checked = badges.includes('new');
+            pBadgePromo.checked = badges.includes('promotion') || badges.includes('promo');
             pImageUrl.value = p.image_url || '';
             pVideoUrl.value = p.video_url || '';
             const extraMedia = Array.isArray(p.media)
@@ -603,6 +619,8 @@
             productForm.classList.remove('hidden');
             fillCategoriesSelect();
             pVariants.value = '';
+            if (pBadgeNew) pBadgeNew.checked = false;
+            if (pBadgePromo) pBadgePromo.checked = false;
             pVideoUrl.value = '';
             if (pMediaExtra) pMediaExtra.value = '';
             uploadImageStatus.textContent = '';
@@ -629,6 +647,9 @@
                     }
                 });
             }
+            const badges = [];
+            if (pBadgeNew && pBadgeNew.checked) badges.push('new');
+            if (pBadgePromo && pBadgePromo.checked) badges.push('promotion');
             const payload = {
                 name: productName,
                 description: pDescription.value.trim(),
@@ -640,7 +661,8 @@
                 media_type: videoUrl ? 'video' : 'image',
                 media: media.length ? media : (imageUrl ? [{ type: 'image', url: imageUrl, alt: productName }] : []),
                 gallery_link: null,
-                unit_type: 'gram'
+                unit_type: 'gram',
+                badges
             };
             try {
                 if (id) {

@@ -733,6 +733,30 @@ function getPrimaryMedia(product) {
     return null;
 }
 
+function normalizeBadgeKey(key) {
+    const k = String(key || '').toLowerCase().trim();
+    if (k === 'promo') return 'promotion';
+    return k;
+}
+
+function getProductBadges(product) {
+    const raw = Array.isArray(product?.badges) ? product.badges : [];
+    const allowed = new Set(['new', 'promotion']);
+    const out = [];
+    for (const x of raw) {
+        const k = normalizeBadgeKey(x);
+        if (!allowed.has(k)) continue;
+        if (!out.includes(k)) out.push(k);
+    }
+    return out;
+}
+
+function badgeLabel(key) {
+    if (key === 'new') return 'NEW';
+    if (key === 'promotion') return 'PROMO';
+    return String(key || '');
+}
+
 function renderProducts() {
     const grid = document.getElementById('products-grid');
     const list = catalogProducts.length ? catalogProducts : PRODUCTS;
@@ -747,6 +771,13 @@ function renderProducts() {
 
     grid.innerHTML = filtered.map(p => {
         let media = '';
+        const badges = getProductBadges(p).slice(0, 2);
+        const badgeHtml = badges.length
+            ? `<div class="product-badge-wrap">${badges.map((b) => {
+                const cls = b === 'new' ? 'product-badge-new' : 'product-badge-promotion';
+                return `<span class="product-badge ${cls}">${escapeHtml(badgeLabel(b))}</span>`;
+              }).join('')}</div>`
+            : '';
 
         // Si un tableau de médias est défini, on prend le premier comme visuel de carte
         const primary = getPrimaryMedia(p);
@@ -770,7 +801,7 @@ function renderProducts() {
 
         return `
             <div class="product-card" onclick="openProduct(${p.id})">
-                <div class="product-media-wrap">${media}</div>
+                <div class="product-media-wrap">${badgeHtml}${media}</div>
                 <div class="product-card-body">
                     <div class="product-card-name">${escapeHtml(p.name)}</div>
                     <div class="product-card-desc">${escapeHtml((p.description||'').split('\n')[0])}</div>
@@ -1091,9 +1122,8 @@ function renderCart() {
         <p class="cart-step-label">${t('cart_step_submit')}</p>
         <button type="button" class="btn-submit-order" style="${btnStyle}" onclick="checkout()">${t('cart_btn_submit')}</button>
         <p class="cart-bot-followup">${t('cart_bot_followup')}</p>
-        <p class="cart-step-label">${t('cart_step_copy')}</p>
         <button type="button" class="btn-copy-order" style="${btnStyle}" onclick="copyOrderToClipboard()">${t('cart_btn_copy')}</button>
-        <pre class="cart-order-copy" onclick="copyOrderToClipboard()" title="">${escapeHtml(buildOrderText())}</pre>`;
+        `;
     if (contactUrls.signalUrl || contactUrls.threemaUrl) {
         h += `<p class="cart-step-label">${t('or_contact_signal_threema')}</p><div class="cart-contact-btns">`;
         if (contactUrls.signalUrl) h += `<button type="button" class="btn-contact-alt" style="${btnStyle}" data-contact-url="${escapeHtml(contactUrls.signalUrl)}" onclick="openContactUrl(this)">${t('open_signal')}</button>`;

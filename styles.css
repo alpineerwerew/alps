@@ -521,6 +521,40 @@ body {
     background: linear-gradient(135deg, #1a1a1a, #222);
 }
 
+.product-badge-wrap {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    pointer-events: none;
+}
+
+.product-badge {
+    font-size: 0.65rem;
+    font-weight: 900;
+    padding: 4px 8px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+    backdrop-filter: blur(4px);
+}
+
+.product-badge-new {
+    background: rgba(34, 197, 94, 0.18);
+    color: #86efac;
+    border-color: rgba(134, 239, 172, 0.35);
+}
+
+.product-badge-promotion {
+    background: rgba(245, 158, 11, 0.18);
+    color: #fde68a;
+    border-color: rgba(253, 230, 138, 0.35);
+}
+
 .product-card-body {
     padding: 0.6rem 0.75rem 0.75rem;
     flex: 1;

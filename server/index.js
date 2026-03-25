@@ -741,6 +741,19 @@ function loadProductsData() {
   }
 }
 
+function sanitizeBadges(input) {
+  const allowed = new Set(['new', 'promotion', 'promo']);
+  if (!Array.isArray(input)) return [];
+  const out = [];
+  for (const x of input) {
+    const k = String(x || '').toLowerCase().trim();
+    if (!allowed.has(k)) continue;
+    if (!out.includes(k)) out.push(k);
+  }
+  // Normalize promo -> promotion
+  return out.map((k) => (k === 'promo' ? 'promotion' : k));
+}
+
 function saveProductsData(data) {
   try {
     fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(data, null, 2), 'utf8');
@@ -1014,7 +1027,8 @@ app.post('/api/products', (req, res) => {
     pricing: Array.isArray(product.pricing) && product.pricing.length
       ? product.pricing.map((x) => ({ qty: Number(x.qty) || 0, price: Number(x.price) || 0 }))
       : [{ qty: 1, price: 0 }],
-    variants: Array.isArray(product.variants) ? product.variants : []
+    variants: Array.isArray(product.variants) ? product.variants : [],
+    badges: sanitizeBadges(product.badges)
   };
   products.push(newProduct);
   data.products = products;
@@ -1046,7 +1060,8 @@ app.put('/api/products/:id', (req, res) => {
     pricing: Array.isArray(product.pricing) && product.pricing.length
       ? product.pricing.map((x) => ({ qty: Number(x.qty) || 0, price: Number(x.price) || 0 }))
       : (products[idx].pricing || [{ qty: 1, price: 0 }]),
-    variants: Array.isArray(product.variants) ? product.variants : (products[idx].variants || [])
+    variants: Array.isArray(product.variants) ? product.variants : (products[idx].variants || []),
+    badges: product.badges !== undefined ? sanitizeBadges(product.badges) : (products[idx].badges || [])
   };
   data.products = products;
   saveProductsData(data);
