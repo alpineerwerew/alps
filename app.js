@@ -1160,26 +1160,6 @@ function removeFromCart(i) {
     renderCart();
 }
 
-function openContactUrl(btn) {
-    const url = btn && btn.getAttribute && btn.getAttribute('data-contact-url');
-    if (url) window.open(url, '_blank', 'noopener,noreferrer');
-}
-
-function copyOrderToClipboard() {
-    const text = buildOrderText();
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(text).then(() => showToast('✓ Copié')).catch(() => {});
-    } else {
-        const el = document.createElement('textarea');
-        el.value = text;
-        document.body.appendChild(el);
-        el.select();
-        document.execCommand('copy');
-        document.body.removeChild(el);
-        showToast('✓ Copié');
-    }
-}
-
 function buildOrderText() {
     let total = 0;
     let msg = `${t('order_header')}\n\n`;

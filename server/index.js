@@ -606,6 +606,16 @@ function buildHelpMessage(isOwner, lang) {
 }
 
 const KNOWN_CMD_RE = /^\/(start|menu|admin|help|broadcast|cancel)(\s|$)/i;
+const ORDER_PREFIXES = ['🛒 Nouvelle Commande', '🛒 New Order', '🛒 Neue Bestellung'];
+const lastOrderByChat = {};
+function looksLikeOrder(text) {
+  if (!text || text.length < 10) return false;
+  // Exact start (from catalog)
+  if (ORDER_PREFIXES.some((p) => text.startsWith(p))) return true;
+  // Fallback: message contains order total line (in case URL was truncated on mobile)
+  if (/(?:Total|Gesamt)\s*:\s*[\d.,]+(?:\s*CHF)?/i.test(text) || /[\d.,]+\s*CHF\s*$/m.test(text)) return true;
+  return false;
+}
 
 // Réponses aux boutons du menu (bouton Accès boutique ouvre le Web App directement)
 bot.on('message', async (msg) => {
@@ -724,48 +734,33 @@ bot.on('message', async (msg) => {
       return;
     }
   }
+
+  if (looksLikeOrder(text)) {
+    lastOrderByChat[chatId] = text;
+    delete contactState[chatId];
+
+    const fromLabel = msg.chat.username ? `@${msg.chat.username}` : [msg.chat.first_name, msg.chat.last_name].filter(Boolean).join(' ') || `ID ${chatId}`;
+    if (OWNER_CHAT_ID) {
+      try {
+        await bot.sendMessage(OWNER_CHAT_ID, `📥 Nouvelle commande reçue :\n\n${text}\n\n👤 Client : ${fromLabel}`);
+      } catch (err) {
+        console.error('❌ Error sending to owner:', err.message);
+      }
+    }
+    addBotUserFromMsg(msg);
+    const langOrd = getChatLang(chatId) || 'fr';
+    const L = BOT_STRINGS[langOrd];
+    try {
+      await bot.sendMessage(chatId, L.order_received, getOrderContactKeyboard(langOrd));
+    } catch (err) {
+      console.error('❌ Error sending confirmation:', err.message);
+    }
+    return;
+  }
+
   if (String(chatId) === String(OWNER_CHAT_ID) && (textNorm === '/admin' || textNorm === 'admin')) {
     await bot.sendMessage(chatId, 'Admin — Gérer produits (commande /admin uniquement) :', ADMIN_INLINE);
     return;
-  }
-});
-
-const ORDER_PREFIXES = ['🛒 Nouvelle Commande', '🛒 New Order', '🛒 Neue Bestellung'];
-const lastOrderByChat = {};
-function looksLikeOrder(text) {
-  if (!text || text.length < 10) return false;
-  // Exact start (from catalog)
-  if (ORDER_PREFIXES.some((p) => text.startsWith(p))) return true;
-  // Fallback: message contains order total line (in case URL was truncated on mobile)
-  if (/(?:Total|Gesamt)\s*:\s*[\d.,]+(?:\s*CHF)?/i.test(text) || /[\d.,]+\s*CHF\s*$/m.test(text)) return true;
-  return false;
-}
-
-bot.on('message', async (msg) => {
-  const chatId = msg.chat.id;
-  const text = msg.text || '';
-  const isOwner = String(chatId) === String(OWNER_CHAT_ID);
-  if (!isBotEnabled() && !isOwner) return;
-  if (!looksLikeOrder(text)) return;
-
-  lastOrderByChat[chatId] = text;
-  delete contactState[chatId];
-
-  const fromLabel = msg.chat.username ? `@${msg.chat.username}` : [msg.chat.first_name, msg.chat.last_name].filter(Boolean).join(' ') || `ID ${chatId}`;
-  if (OWNER_CHAT_ID) {
-    try {
-      await bot.sendMessage(OWNER_CHAT_ID, `📥 Nouvelle commande reçue :\n\n${text}\n\n👤 Client : ${fromLabel}`);
-    } catch (err) {
-      console.error('❌ Error sending to owner:', err.message);
-    }
-  }
-  addBotUserFromMsg(msg);
-  const langOrd = getChatLang(chatId) || 'fr';
-  const L = BOT_STRINGS[langOrd];
-  try {
-    await bot.sendMessage(chatId, L.order_received, getOrderContactKeyboard(langOrd));
-  } catch (err) {
-    console.error('❌ Error sending confirmation:', err.message);
   }
 });
 
