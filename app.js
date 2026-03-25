@@ -202,7 +202,8 @@ const CATEGORIES = [
     { id: 1, name: "Flower 🌸" },
     { id: 2, name: "Live Rosin 🍯" },
     { id: 3, name: "Static Hash ⚡" },
-    { id: 4, name: "Water Hash 🧊" }
+    { id: 4, name: "Water Hash 🧊" },
+    { id: 5, name: "Vapes 💨" }
 ];
 
 // =============================================
@@ -592,7 +593,8 @@ async function loadCatalog() {
     try {
         const r = await fetch(POINTS_API_URL + '/api/products?t=' + Date.now(), { cache: 'no-store' });
         const d = await r.json();
-        if (d.products && d.products.length > 0) {
+        // Toujours prendre la réponse API si OK (même liste vide) — sinon on retombe sur PRODUCTS embarqués = vieux catalogue.
+        if (r.ok && d && Array.isArray(d.products)) {
             catalogProducts = d.products;
             catalogCategories = (d.categories && d.categories.length) ? d.categories : CATEGORIES;
             return;
