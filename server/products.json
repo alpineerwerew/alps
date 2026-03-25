@@ -24,29 +24,25 @@
   "products": [
     {
       "id": 1,
-      "name": "Strainz Worldwide 7G jars ",
+      "name": "Strainz Worldwide 7G jars",
       "description": "Top Shelf Exotic Flower – Jars 7g",
-      "image_url": "/images/lemon-up-1.jpg",
+      "image_url": "https://alpine710.art/api/media?u=https%3A%2F%2Fres.cloudinary.com%2Fdivcybeds%2Fimage%2Fupload%2Fv1771229216%2FIMG_0537_wd7aji.jpg",
       "video_url": null,
       "media_type": "image",
       "media": [
         {
           "type": "image",
-          "url": "https://res.cloudinary.com/divcybeds/image/upload/v1771229215/IMG_0542_q30mvc.jpg",
-          "alt": "Lemon Up - Vue principale"
+          "url": "https://alpine710.art/api/media?u=https%3A%2F%2Fres.cloudinary.com%2Fdivcybeds%2Fimage%2Fupload%2Fv1771229216%2FIMG_0537_wd7aji.jpg",
+          "alt": "Strainz Worldwide 7G jars"
         },
         {
           "type": "image",
-          "url": "https://res.cloudinary.com/divcybeds/image/upload/v1771229216/IMG_0537_wd7aji.jpg",
-          "alt": "Untruly OG - Vue principale"
-        },
-        {
-          "type": "video",
-          "url": "https://res.cloudinary.com/divcybeds/video/upload/v1771243903/IMG_6071_c6psmh.mp4",
-          "alt": "Untruly OG - Combustion"
+          "url": "https://alpine710.art/api/media?u=https%3A%2F%2Fres.cloudinary.com%2Fdivcybeds%2Fimage%2Fupload%2Fv1771229215%2FIMG_0542_q30mvc.jpg",
+          "alt": ""
         }
       ],
       "gallery_link": null,
+      "sort": 30,
       "category_id": 1,
       "unit_type": "gram",
       "pricing": [
@@ -72,37 +68,18 @@
       "id": 3,
       "name": "Strainz Worldwide 3.5G bags",
       "description": "Top Shelf Exotic Flower – Bags 3.5g",
-      "image_url": null,
+      "image_url": "https://res.cloudinary.com/divcybeds/image/upload/v1771245550/photo_2026-02-16_19-39-00_em4zrk.jpg",
       "video_url": null,
       "media_type": "image",
       "media": [
         {
           "type": "image",
           "url": "https://res.cloudinary.com/divcybeds/image/upload/v1771245550/photo_2026-02-16_19-39-00_em4zrk.jpg",
-          "alt": "Strainz vu principal"
-        },
-        {
-          "type": "video",
-          "url": "https://res.cloudinary.com/divcybeds/video/upload/v1771244860/IMG_6537_1_xsoo91.mov",
-          "alt": "Permanent Paradise - Vue principale"
-        },
-        {
-          "type": "video",
-          "url": "https://res.cloudinary.com/divcybeds/video/upload/v1771244837/IMG_6536_1_mqv093.mov",
-          "alt": "Crunch Berries - Vue principale"
-        },
-        {
-          "type": "video",
-          "url": "https://res.cloudinary.com/divcybeds/video/upload/v1771244837/IMG_6535_1_aniznq.mov",
-          "alt": "PearlZ - Vue principale"
-        },
-        {
-          "type": "video",
-          "url": "https://res.cloudinary.com/divcybeds/video/upload/v1771244838/IMG_6534_1_oxm7j3.mov",
-          "alt": "Glacier - Vue principale"
+          "alt": "Strainz Worldwide 3.5G bags"
         }
       ],
       "gallery_link": null,
+      "sort": 30,
       "category_id": 1,
       "unit_type": "gram",
       "pricing": [
@@ -128,75 +105,47 @@
         }
       ],
       "variants": [
-        "Glacier",
         "PearlZ",
         "Crunch Berries",
         "Permanent Paradise"
       ]
     },
     {
-      "id": 7,
-      "name": "RX (RS11 × Gelato X) – Greendawg",
-      "description": "Top Shelf Exotic Flower – Bags 3.5g",
-      "image_url": null,
+      "id": 8,
+      "name": "Live Rosin – Bored Rosin",
+      "description": "",
+      "image_url": "https://res.cloudinary.com/divcybeds/image/upload/v1771229224/IMG_1189_2_enzbko.jpg",
       "video_url": null,
       "media_type": "image",
       "media": [
         {
           "type": "image",
-          "url": "https://res.cloudinary.com/divcybeds/image/upload/v1771245991/photo_2026-02-16_19-46-15_iukenz.jpg",
-          "alt": "RX (RS11 × Gelato X) - Vue principale"
+          "url": "https://res.cloudinary.com/divcybeds/image/upload/v1771229224/IMG_1189_2_enzbko.jpg",
+          "alt": "Live Rosin – Bored Rosin"
         },
         {
           "type": "video",
-          "url": "https://res.cloudinary.com/divcybeds/video/upload/v1771246248/IMG_6645_ry1h5p.mov",
-          "alt": "RX (RS11 × Gelato X) - Vue principale"
+          "url": "https://res.cloudinary.com/divcybeds/video/upload/v1773283162/IMG_7847_cwhblo.mp4",
+          "alt": ""
+        },
+        {
+          "type": "video",
+          "url": "https://res.cloudinary.com/divcybeds/video/upload/v1773283162/IMG_7849_t2scrf.mp4",
+          "alt": ""
         }
       ],
       "gallery_link": null,
-      "category_id": 1,
-      "unit_type": "gram",
-      "pricing": [
-        {
-          "qty": 3.5,
-          "price": 90
-        },
-        {
-          "qty": 14,
-          "price": 340
-        },
-        {
-          "qty": 28,
-          "price": 640
-        }
-      ],
-      "variants": []
-    },
-    {
-      "id": 8,
-      "name": "Live Rosin – Bored Rosin",
-      "description": "Live Hash Rosin USA 120-70u 1-3 washes",
-      "image_url": null,
-      "video_url": null,
-      "media_type": "image",
-      "media": [
-        {
-          "type": "image",
-          "url": "https://res.cloudinary.com/divcybeds/image/upload/v1771231081/A459A9EA-82AB-4B06-98EF-3A0100DA673D_vhtlyk.jpg",
-          "alt": "Bored Rosin - Vue principale"
-        }
-      ],
-      "gallery_link": null,
+      "sort": 30,
       "category_id": 2,
       "unit_type": "gram",
       "pricing": [
         {
           "qty": 2,
-          "price": 180
+          "price": 170
         },
         {
           "qty": 6,
-          "price": 450
+          "price": 420
         },
         {
           "qty": 14,
@@ -204,36 +153,45 @@
         },
         {
           "qty": 28,
-          "price": 1700
+          "price": 1600
         }
       ],
       "variants": [
         "Candy Fumez",
         "Black Maple",
-        "Moroccan Peaches",
+        "Honey Banana",
+        "HFCS",
+        "Return of Sour",
+        "NYC Diesel",
         "Strawguava"
       ]
     },
     {
       "id": 9,
-      "name": "Premium Grade WPFF ICE 707",
-      "description": "Single Source Premium Water Hash WPFF USA ",
-      "image_url": null,
-      "video_url": null,
-      "media_type": "image",
+      "name": "ICE WPFF 🇺🇸",
+      "description": "Single Source \nFrom @707Melts\nMade in USA",
+      "image_url": "https://alpine710.art/api/media?u=https%3A%2F%2Fres.cloudinary.com%2Fdivcybeds%2Fimage%2Fupload%2Fv1773283790%2Fphoto_2026-03-12_09-48-30_w6hnwj.jpg",
+      "video_url": "https://alpine710.art/api/media?u=https%3A%2F%2Fres.cloudinary.com%2Fdivcybeds%2Fvideo%2Fupload%2Fv1773283739%2FIMG_7776_j14mjb.mp4",
+      "media_type": "video",
       "media": [
         {
           "type": "image",
-          "url": "https://res.cloudinary.com/divcybeds/image/upload/v1771246304/photo_2026-02-16_19-48-12_t2q48y.jpg",
-          "alt": "Static Hash - Vue principale"
+          "url": "https://alpine710.art/api/media?u=https%3A%2F%2Fres.cloudinary.com%2Fdivcybeds%2Fimage%2Fupload%2Fv1773283790%2Fphoto_2026-03-12_09-48-30_w6hnwj.jpg",
+          "alt": "ICE WPFF 🇺🇸"
         },
         {
           "type": "video",
-          "url": "https://res.cloudinary.com/divcybeds/video/upload/v1771246032/IMG_6639_o2q1nb.mp4",
-          "alt": "Static Hash - Combustion"
+          "url": "https://alpine710.art/api/media?u=https%3A%2F%2Fres.cloudinary.com%2Fdivcybeds%2Fvideo%2Fupload%2Fv1773283739%2FIMG_7776_j14mjb.mp4",
+          "alt": ""
+        },
+        {
+          "type": "video",
+          "url": "https://alpine710.art/api/media?u=https%3A%2F%2Fres.cloudinary.com%2Fdivcybeds%2Fvideo%2Fupload%2Fv1773283693%2FIMG_7309_j4e2hh.mp4",
+          "alt": ""
         }
       ],
       "gallery_link": null,
+      "sort": 20,
       "category_id": 4,
       "unit_type": "gram",
       "pricing": [
@@ -260,80 +218,198 @@
       ],
       "variants": [
         "Oreoz Blizzard",
-        "ZOAP",
-        "Moroccan Peaches",
         "Grape Cream",
         "Orange Cream",
         "Ice Cream Cake",
         "GMO",
-        "Garlic Nightmare"
+        "Tangerine Dreams",
+        "Euroz",
+        "Mimosa",
+        "Tangi",
+        "Tropicana Cherry",
+        "Rainbow Guava",
+        "Melon Z",
+        "Hash Burger"
       ]
     },
     {
-      "id": 10,
-      "name": "Water Hash – Commercial  WPFF ICE",
-      "description": "Commercial Grade Water Hash",
-      "image_url": null,
+      "id": 12,
+      "name": "Whole Melt Vape – 100% Official",
+      "description": "Lab Tested + QR Code \n100% Officiel",
+      "image_url": "https://res.cloudinary.com/divcybeds/image/upload/v1773283160/wholemelt2_ojntoi.jpg",
       "video_url": null,
       "media_type": "image",
       "media": [
         {
           "type": "image",
-          "url": "https://res.cloudinary.com/divcybeds/image/upload/v1771246304/photo_2026-02-16_19-48-12_t2q48y.jpg",
-          "alt": "Static Hash - Vue principale"
-        },
-        {
-          "type": "video",
-          "url": "https://res.cloudinary.com/divcybeds/video/upload/v1771246032/IMG_6639_o2q1nb.mp4",
-          "alt": "Static Hash - Combustion"
+          "url": "https://res.cloudinary.com/divcybeds/image/upload/v1773283160/wholemelt2_ojntoi.jpg",
+          "alt": "Whole Melt Vape – 100% Official"
         }
       ],
       "gallery_link": null,
-      "category_id": 4,
+      "sort": 20,
+      "category_id": 5,
       "unit_type": "gram",
       "pricing": [
         {
+          "qty": 1,
+          "price": 80
+        },
+        {
           "qty": 5,
-          "price": 150
+          "price": 350
         },
         {
           "qty": 10,
-          "price": 260
+          "price": 600
         },
         {
-          "qty": 20,
-          "price": 450
-        },
-        {
-          "qty": 50,
-          "price": 1000
+          "qty": 25,
+          "price": 1375
         }
       ],
-      "variants": [
-        "Sour Diesel",
-        "White Runtz"
-      ]
+      "variants": []
     },
     {
-      "id": 11,
-      "name": "Static Hash – Single Source Premium",
-      "description": "Premium Static Hash",
-      "image_url": null,
+      "id": 13,
+      "name": "Tenco - Yellow Zushi 🍣",
+      "description": "Fresh batch - 100% Official",
+      "image_url": "https://res.cloudinary.com/divcybeds/image/upload/v1773705833/IMG_1457_sfbzs1.jpg",
       "video_url": null,
       "media_type": "image",
       "media": [
         {
           "type": "image",
-          "url": "https://res.cloudinary.com/divcybeds/image/upload/v1771246304/photo_2026-02-16_19-48-12_t2q48y.jpg",
-          "alt": "Static Hash - Vue principale"
+          "url": "https://res.cloudinary.com/divcybeds/image/upload/v1773705833/IMG_1457_sfbzs1.jpg",
+          "alt": "Tenco - Yellow Zushi 🍣"
         },
         {
-          "type": "video",
-          "url": "https://res.cloudinary.com/divcybeds/video/upload/v1771246032/IMG_6639_o2q1nb.mp4",
-          "alt": "Static Hash - Combustion"
+          "type": "image",
+          "url": "https://res.cloudinary.com/divcybeds/image/upload/v1773705830/IMG_1447_hnrvf2.jpg",
+          "alt": ""
         }
       ],
       "gallery_link": null,
+      "sort": 10,
+      "category_id": 1,
+      "unit_type": "gram",
+      "pricing": [
+        {
+          "qty": 3.5,
+          "price": 120
+        },
+        {
+          "qty": 14,
+          "price": 400
+        },
+        {
+          "qty": 28,
+          "price": 750
+        }
+      ],
+      "variants": [
+        "Yellow Zushi"
+      ]
+    },
+    {
+      "id": 14,
+      "name": "Wizard trees - Blue Magic  🧙‍♂️",
+      "description": "Fresh Batch 20/03",
+      "image_url": "https://res.cloudinary.com/divcybeds/image/upload/v1773715374/photo_2026-03-17_09-42-33_bth9zh.jpg",
+      "video_url": null,
+      "media_type": "image",
+      "media": [
+        {
+          "type": "image",
+          "url": "https://res.cloudinary.com/divcybeds/image/upload/v1773715374/photo_2026-03-17_09-42-33_bth9zh.jpg",
+          "alt": "Wizard trees - Blue Magic  🧙‍♂️"
+        }
+      ],
+      "gallery_link": null,
+      "sort": 10,
+      "category_id": 1,
+      "unit_type": "gram",
+      "pricing": [
+        {
+          "qty": 3.5,
+          "price": 120
+        },
+        {
+          "qty": 14,
+          "price": 400
+        },
+        {
+          "qty": 28,
+          "price": 750
+        }
+      ],
+      "variants": [
+        "Blue Magic"
+      ]
+    },
+    {
+      "id": 15,
+      "name": "StaticLabz WPFF STATIC",
+      "description": "Powered by @TheKarmaCartel\nMade by @Staticlabz.ca",
+      "image_url": "https://res.cloudinary.com/divcybeds/image/upload/v1774365677/photo_2026-03-24_22-20-36_qjg3j7.jpg",
+      "video_url": "https://res.cloudinary.com/divcybeds/video/upload/v1774365678/IMG_8185_ejgt9p.mp4",
+      "media_type": "video",
+      "media": [
+        {
+          "type": "image",
+          "url": "https://res.cloudinary.com/divcybeds/image/upload/v1774365677/photo_2026-03-24_22-20-36_qjg3j7.jpg",
+          "alt": "StaticLabz WPFF STATIC"
+        },
+        {
+          "type": "video",
+          "url": "https://res.cloudinary.com/divcybeds/video/upload/v1774365678/IMG_8185_ejgt9p.mp4",
+          "alt": ""
+        }
+      ],
+      "gallery_link": null,
+      "sort": 30,
+      "category_id": 3,
+      "unit_type": "gram",
+      "pricing": [
+        {
+          "qty": 1,
+          "price": 60
+        },
+        {
+          "qty": 5,
+          "price": 250
+        },
+        {
+          "qty": 10,
+          "price": 400
+        },
+        {
+          "qty": 50,
+          "price": 1700
+        }
+      ],
+      "variants": [
+        "Puprle Kush",
+        "Facemelt x Govermint Oasis",
+        "Grappe Fritter"
+      ]
+    },
+    {
+      "id": 16,
+      "name": "Static USA",
+      "description": "Made by @707Melts\nFrom USA",
+      "image_url": null,
+      "video_url": "https://res.cloudinary.com/divcybeds/video/upload/v1774429978/IMG_1112_y0cm9v_2_orwqgu.mp4",
+      "media_type": "video",
+      "media": [
+        {
+          "type": "video",
+          "url": "https://res.cloudinary.com/divcybeds/video/upload/v1774429978/IMG_1112_y0cm9v_2_orwqgu.mp4",
+          "alt": ""
+        }
+      ],
+      "gallery_link": null,
+      "sort": 30,
       "category_id": 3,
       "unit_type": "gram",
       "pricing": [
@@ -351,78 +427,14 @@
         },
         {
           "qty": 50,
-          "price": 1500
+          "price": 1200
         }
       ],
       "variants": [
-        "Gov. Oasis (Meltalien)",
-        "Mendo Punch (Meltalien)",
-        "Tropicana Cherry (707melts)",
-        "Grape Gas (707melts)"
+        "Grape gas",
+        "Govermints Oasis",
+        "Mendo Punch"
       ]
-    },
-    {
-      "id": 12,
-      "name": "Whole Melt Vape – 100% Official",
-      "description": "Lab Tested + QR Code – 20+ Flavors Available",
-      "image_url": null,
-      "video_url": null,
-      "media_type": "image",
-      "media": [
-        {
-          "type": "image",
-          "url": "https://res.cloudinary.com/divcybeds/image/upload/v1771246562/photo_2026-02-16_19-55-49_p0acwv.jpg",
-          "alt": "Vapes Visual 1"
-        },
-        {
-          "type": "image",
-          "url": "https://res.cloudinary.com/divcybeds/image/upload/v1771246562/photo_2026-02-16_19-55-45_z9rluj.jpg",
-          "alt": "Vapes Visual 2"
-        },
-        {
-          "type": "image",
-          "url": "https://res.cloudinary.com/divcybeds/image/upload/v1771246562/photo_2026-02-16_19-55-51_lhfbfb.jpg",
-          "alt": "Vapes Visual 3"
-        }
-      ],
-      "gallery_link": null,
-      "category_id": 5,
-      "unit_type": "unit",
-      "pricing": [
-        {
-          "qty": 1,
-          "price": 80
-        },
-        {
-          "qty": 5,
-          "price": 350
-        },
-        {
-          "qty": 10,
-          "price": 600
-        },
-        {
-          "qty": 25,
-          "price": 1375
-        },
-        {
-          "qty": 50,
-          "price": 2300
-        },
-        {
-          "qty": 100,
-          "price": 3500
-        },
-        {
-          "qty": 200,
-          "price": 6800
-        },
-        {
-          "qty": 300,
-          "price": 9000
-        }
-      ],
-      "variants": []
     }
   ]
 }
