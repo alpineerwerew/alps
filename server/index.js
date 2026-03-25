@@ -19,6 +19,11 @@ const OWNER_CHAT_ID = process.env.OWNER_CHAT_ID;
 const CATALOG_URL = (process.env.CATALOG_URL || 'https://alpine710.art').replace(/^http:\/\//i, 'https://');
 const PORT = process.env.PORT || 3000;
 
+// Catalogue : API + pages d’entrée protégés (désactiver en dev navigateur : TELEGRAM_WEBAPP_ONLY=0)
+const TELEGRAM_WEBAPP_ONLY = process.env.TELEGRAM_WEBAPP_ONLY !== '0';
+const TELEGRAM_HTML_BLOCK = TELEGRAM_WEBAPP_ONLY && process.env.TELEGRAM_HTML_NO_BLOCK !== '1';
+const TELEGRAM_HTML_UA_ONLY = process.env.TELEGRAM_HTML_UA_ONLY === '1';
+
 if (!BOT_TOKEN) {
   console.error('❌ BOT_TOKEN is missing. Set it in server/.env');
   process.exit(1);
@@ -759,6 +764,15 @@ function ensureOwner(req, res) {
   return userId;
 }
 
+function requireTelegramInitForPublicApi(req, res, next) {
+  if (!TELEGRAM_WEBAPP_ONLY) return next();
+  const initData = req.get('X-Telegram-Init-Data') || req.query?.initData;
+  if (!validateInitData(initData)) {
+    return res.status(401).json({ error: 'telegram_required' });
+  }
+  next();
+}
+
 // ---- Uploads (photos / vidéos admin) ----
 const UPLOAD_DIR = path.join(__dirname, 'uploads');
 try {
@@ -777,7 +791,14 @@ const uploadMw = multer({ storage, limits: { fileSize: 50 * 1024 * 1024 } }); //
 // ---- Express API ----
 const app = express();
 app.set('trust proxy', 1);
-app.use(cors());
+app.use(
+  cors({
+    origin: true,
+    credentials: true,
+    methods: ['GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'X-Telegram-Init-Data']
+  })
+);
 app.use(express.json());
 
 // Fichiers uploadés accessibles en /uploads/...
@@ -796,7 +817,7 @@ app.post('/api/upload', uploadMw.single('file'), (req, res) => {
 });
 
 // ---- Public config (Signal / Threema links for catalog) ----
-app.get('/api/config', (req, res) => {
+app.get('/api/config', requireTelegramInitForPublicApi, (req, res) => {
   res.json({
     signalUrl: process.env.SIGNAL_CONTACT_URL || null,
     threemaUrl: process.env.THREEMA_CONTACT_URL || null
@@ -896,7 +917,7 @@ app.get('/api/admin/cart-activity', (req, res) => {
 });
 
 // ---- Products API (public read) ----
-app.get('/api/products', (req, res) => {
+app.get('/api/products', requireTelegramInitForPublicApi, (req, res) => {
   const data = loadProductsData();
   let products = (data.products || []).slice().sort((a, b) => {
     const sa = Number(a.sort ?? a.id ?? 0);
@@ -1098,7 +1119,73 @@ app.post('/api/cart-activity', (req, res) => {
 
 // Servir le frontend (catalogue + admin) depuis la racine du projet pour test en local
 const staticRoot = path.join(__dirname, '..');
-app.use(express.static(staticRoot));
+
+function isCatalogGateHtmlPath(reqPath) {
+  const n = String(reqPath || '/')
+    .replace(/\\/g, '/')
+    .toLowerCase();
+  if (n === '/' || n === '') return true;
+  return n === '/index.html' || n === '/admin.html';
+}
+
+function requestHasTelegramWebAppQuery(req) {
+  const q = req.query || {};
+  return Object.keys(q).some((k) => k.toLowerCase().startsWith('tgwebapp'));
+}
+
+function requestLooksLikeTelegramWebView(req) {
+  if (requestHasTelegramWebAppQuery(req)) return true;
+  const ua = (req.get('user-agent') || '').toLowerCase();
+  if (TELEGRAM_HTML_UA_ONLY) {
+    return ua.includes('telegram') || ua.includes('; wv)');
+  }
+  if (ua.includes('telegram')) return true;
+  if (ua.includes('; wv)')) return true;
+  const ref = (req.get('referer') || '').toLowerCase();
+  if (ref.includes('t.me') || ref.includes('telegram.org') || ref.includes('web.telegram.org')) return true;
+  const dest = (req.get('sec-fetch-dest') || '').toLowerCase();
+  if (dest === 'iframe') return true;
+  return false;
+}
+
+function replyCatalogHtmlForbidden(_req, res) {
+  res.status(403);
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-store');
+  return res.send(
+    '<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Accès restreint</title></head><body style="font-family:system-ui,sans-serif;padding:2rem;max-width:28rem;margin:0 auto;line-height:1.5;"><p>Le catalogue est ouvert uniquement depuis le bot Telegram (Mini App).</p></body></html>'
+  );
+}
+
+function catalogHtmlSecurityGate(req, res, next) {
+  if (!TELEGRAM_HTML_BLOCK) return next();
+  if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+  if (!isCatalogGateHtmlPath(req.path)) return next();
+  if (requestLooksLikeTelegramWebView(req)) return next();
+  return replyCatalogHtmlForbidden(req, res);
+}
+
+function sendPublicHtml(relName) {
+  const abs = path.join(staticRoot, relName);
+  return (req, res, next) => {
+    res.setHeader('Cache-Control', 'no-store, private');
+    res.sendFile(abs, (err) => (err ? next(err) : undefined));
+  };
+}
+
+app.use(catalogHtmlSecurityGate);
+
+['get', 'head'].forEach((method) => {
+  app[method]('/', sendPublicHtml('index.html'));
+  app[method]('/index.html', sendPublicHtml('index.html'));
+  app[method]('/admin.html', sendPublicHtml('admin.html'));
+});
+
+app.use(express.static(staticRoot, { index: false }));
+
+if (TELEGRAM_WEBAPP_ONLY) {
+  console.log('🔐 TELEGRAM_WEBAPP_ONLY : catalogue réservé au bot (API signée + filtre HTML). Local sans Telegram : TELEGRAM_WEBAPP_ONLY=0 dans server/.env');
+}
 
 const listenPort = Number(PORT);
 const nodeSslCert = process.env.NODE_SSL_CERT;

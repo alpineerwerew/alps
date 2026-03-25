@@ -73,6 +73,16 @@ Optionnel : `CATALOG_URL=https://alpine710.art`, `REFERRAL_BONUS=15` (points pou
 
 Ou avec un éditeur si installé : `nano .env` ou `vi .env`.
 
+**Catalogue réservé au bot Telegram (par défaut)** : avec `TELEGRAM_WEBAPP_ONLY` absent ou différent de `0`, le serveur exige une Mini App (pages `index.html` / `admin.html` filtrées + `initData` signé pour `GET /api/products` et `GET /api/config`). En local sans Telegram, ajoute dans `server/.env` :
+
+```bash
+TELEGRAM_WEBAPP_ONLY=0
+```
+
+Optionnel : `TELEGRAM_HTML_NO_BLOCK=1` pour ne pas bloquer l’accès HTML direct tout en gardant l’API protégée. `TELEGRAM_HTML_UA_ONLY=1` pour n’autoriser le HTML qu’avec un User-Agent type WebView / Telegram (plus strict).
+
+Avant un `git pull` sur le VPS, sauvegarde `server/products.json` si tu as modifié le catalogue depuis l’admin (évite d’écraser tes données).
+
 ---
 
 ## 5. Lancer le bot en continu (pm2)

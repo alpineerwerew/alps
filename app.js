@@ -23,7 +23,7 @@ const POINTS_API_URL = (typeof window !== "undefined" && window.location.origin)
   : "https://alpine710.art";
 
 // =============================================
-// 🌐 LANGUES / I18Nvu
+// 🌐 LANGUES / I18N
 // =============================================
 
 const SUPPORTED_LANGS = ['fr', 'en', 'de'];
@@ -45,6 +45,7 @@ const I18N = {
         price_from_prefix: 'dès ',
         no_products: 'Aucun produit trouvé',
         open_in_telegram: 'Ouvre depuis Telegram',
+        error_catalog_access: 'Impossible d’accéder au catalogue. Ouvre l’application depuis le bot Telegram.',
         checkout_hint: 'Envoie le message dans Telegram pour confirmer ta commande.',
         nav_catalog: 'Catalogue',
         order_sent: 'Commande envoyée ! Va sur le chat du bot : Signal ou Threema, puis ton identifiant.',
@@ -76,6 +77,7 @@ const I18N = {
         price_from_prefix: 'from ',
         no_products: 'No products found',
         open_in_telegram: 'Open from Telegram',
+        error_catalog_access: 'Cannot load the catalog. Open the app from the Telegram bot.',
         checkout_hint: 'Send the message in Telegram to confirm your order.',
         nav_catalog: 'Catalog',
         order_sent: 'Order sent! Open the bot chat: choose Signal or Threema, then your contact ID.',
@@ -107,6 +109,7 @@ const I18N = {
         price_from_prefix: 'ab ',
         no_products: 'Keine Produkte gefunden',
         open_in_telegram: 'Öffne über Telegram',
+        error_catalog_access: 'Katalog nicht erreichbar. Öffne die App über den Telegram-Bot.',
         checkout_hint: 'Sende die Nachricht in Telegram, um deine Bestellung zu bestätigen.',
         nav_catalog: 'Katalog',
         order_sent: 'Bestellung gesendet! Öffne den Bot-Chat: Signal oder Threema, dann deine Kennung.',
@@ -157,6 +160,39 @@ function setLang(lang) {
 function getInitData() {
     const tg = window.Telegram?.WebApp;
     return (tg && tg.initData) ? tg.initData : '';
+}
+
+function isTelegramWebApp() {
+    return !!(window.Telegram && window.Telegram.WebApp);
+}
+
+function catalogApiHeaders() {
+    const init = getInitData();
+    const h = {};
+    if (init) h['X-Telegram-Init-Data'] = init;
+    return h;
+}
+
+async function waitForInitData(maxMs = 2800) {
+    const step = 80;
+    let t = 0;
+    while (t < maxMs) {
+        if (getInitData()) return true;
+        await new Promise((r) => setTimeout(r, step));
+        t += step;
+    }
+    return !!getInitData();
+}
+
+function showCatalogAccessError(messageKey) {
+    const appEl = document.getElementById('app');
+    const fab = document.getElementById('cart-fab');
+    const err = document.getElementById('catalog-access-error');
+    const msgEl = document.getElementById('catalog-access-error-msg');
+    if (appEl) appEl.classList.add('hidden');
+    if (fab) fab.classList.add('hidden');
+    if (err) err.classList.remove('hidden');
+    if (msgEl) msgEl.textContent = t(messageKey || 'error_catalog_access');
 }
 
 function applyTranslations() {
@@ -591,7 +627,14 @@ async function loadCatalog() {
         return;
     }
     try {
-        const r = await fetch(POINTS_API_URL + '/api/products?t=' + Date.now(), { cache: 'no-store' });
+        const r = await fetch(POINTS_API_URL + '/api/products?t=' + Date.now(), {
+            cache: 'no-store',
+            headers: catalogApiHeaders()
+        });
+        if (r.status === 401) {
+            showCatalogAccessError(isTelegramWebApp() ? 'error_catalog_access' : 'open_in_telegram');
+            return;
+        }
         const d = await r.json();
         // Toujours prendre la réponse API si OK (même liste vide) — sinon on retombe sur PRODUCTS embarqués = vieux catalogue.
         if (r.ok && d && Array.isArray(d.products)) {
@@ -607,7 +650,11 @@ async function loadCatalog() {
 async function loadContactUrls() {
     if (!POINTS_API_URL) return;
     try {
-        const r = await fetch(POINTS_API_URL + '/api/config', { cache: 'no-store' });
+        const r = await fetch(POINTS_API_URL + '/api/config', {
+            cache: 'no-store',
+            headers: catalogApiHeaders()
+        });
+        if (r.status === 401) return;
         const d = await r.json();
         if (d && (d.signalUrl || d.threemaUrl)) contactUrls = { signalUrl: d.signalUrl || null, threemaUrl: d.threemaUrl || null };
     } catch (e) {}
@@ -615,16 +662,22 @@ async function loadContactUrls() {
 
 function init() {
     document.title = "Alpine Connexion";
+    const tg = window.Telegram?.WebApp;
+    if (tg) {
+        try {
+            tg.ready();
+            tg.expand();
+        } catch (e) {}
+    }
     (async () => {
+        if (isTelegramWebApp()) await waitForInitData();
         await loadCatalog();
+        const appEl = document.getElementById('app');
+        if (appEl && appEl.classList.contains('hidden')) return;
         await loadContactUrls();
         buildFilters();
         applyTranslations();
         renderProducts();
-        try {
-            const tg = window.Telegram?.WebApp;
-            if (tg) { tg.expand(); tg.ready(); }
-        } catch (e) {}
     })();
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') refreshCatalog();

@@ -48,6 +48,32 @@ body {
     padding-bottom: 72px;
 }
 
+#app.hidden {
+    display: none !important;
+}
+
+.catalog-access-error {
+    min-height: 60vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem 1.25rem;
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 1rem;
+    line-height: 1.55;
+    max-width: 22rem;
+    margin: 0 auto;
+}
+
+.catalog-access-error.hidden {
+    display: none !important;
+}
+
+#cart-fab.hidden {
+    display: none !important;
+}
+
 .view-panel.hidden {
     display: none !important;
 }

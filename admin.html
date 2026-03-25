@@ -120,6 +120,13 @@
             return { initData: getInitData() };
         }
 
+        function getAuthHeadersJson() {
+            const init = getInitData();
+            const h = { 'Content-Type': 'application/json' };
+            if (init) h['X-Telegram-Init-Data'] = init;
+            return h;
+        }
+
         const loginMsg = document.getElementById('login-msg');
         const content = document.getElementById('content');
         const productForm = document.getElementById('product-form');
@@ -283,7 +290,7 @@
 
         async function load() {
             try {
-                const r = await fetch(API_URL + '/api/products');
+                const r = await fetch(API_URL + '/api/products', { headers: getAuthHeadersJson() });
                 const d = await r.json();
                 categories = d.categories || [];
                 products = d.products || [];
