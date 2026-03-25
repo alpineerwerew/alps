@@ -6,6 +6,8 @@ const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 const crypto = require('crypto');
 const fs = require('fs');
+const http = require('http');
+const https = require('https');
 const { Readable } = require('stream');
 const express = require('express');
 const cors = require('cors');
@@ -1098,8 +1100,45 @@ app.post('/api/cart-activity', (req, res) => {
 const staticRoot = path.join(__dirname, '..');
 app.use(express.static(staticRoot));
 
-app.listen(PORT, () => {
-  console.log(`✅ API running on port ${PORT}`);
-  console.log(`   Catalogue : http://localhost:${PORT}/`);
-  console.log(`   Admin    : http://localhost:${PORT}/admin.html`);
-});
+const listenPort = Number(PORT);
+const nodeSslCert = process.env.NODE_SSL_CERT;
+const nodeSslKey = process.env.NODE_SSL_KEY;
+// 0 = désactiver la redirection http→https (ex. tout en 3000 en local)
+const httpRedirectPort = Number(process.env.HTTP_REDIRECT_PORT ?? 80);
+
+function logListenBanner(proto, port) {
+  const base = proto === 'https' ? `https://localhost:${port}` : `http://localhost:${port}`;
+  console.log(`✅ API + catalogue (${proto}) sur le port ${port}`);
+  console.log(`   Catalogue : ${base}/`);
+  console.log(`   Admin    : ${base}/admin.html`);
+}
+
+if (nodeSslCert && nodeSslKey) {
+  let creds;
+  try {
+    creds = {
+      cert: fs.readFileSync(nodeSslCert),
+      key: fs.readFileSync(nodeSslKey)
+    };
+  } catch (e) {
+    console.error('❌ Lecture NODE_SSL_CERT / NODE_SSL_KEY impossible :', e.message);
+    process.exit(1);
+  }
+  https.createServer(creds, app).listen(listenPort, () => logListenBanner('https', listenPort));
+  if (httpRedirectPort > 0) {
+    http
+      .createServer((req, res) => {
+        const host = req.headers.host || '';
+        res.writeHead(301, { Location: `https://${host}${req.url || '/'}` });
+        res.end();
+      })
+      .listen(httpRedirectPort, () => {
+        console.log(`✅ HTTP → HTTPS (redirection) sur le port ${httpRedirectPort}`);
+      })
+      .on('error', (err) => {
+        console.warn(`⚠️ Redirection HTTP non démarrée (port ${httpRedirectPort}) :`, err.message);
+      });
+  }
+} else {
+  app.listen(listenPort, () => logListenBanner('http', listenPort));
+}
