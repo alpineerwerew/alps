@@ -1112,13 +1112,12 @@ function renderCart() {
         </div>`;
     });
 
-    const btnStyle = 'background:linear-gradient(135deg,#1a1a1a 0%,#2d2d2d 100%);color:#fff;border:none;border-radius:10px;padding:14px 20px;font-weight:700;font-size:0.95rem;letter-spacing:0.5px;box-shadow:0 4px 14px rgba(0,0,0,0.35);min-height:48px;';
     h += `<div class="cart-footer">
         <div class="cart-total-row">
             <span class="cart-total-label">${t('total_label')}</span>
             <span class="cart-total-amount">${total.toFixed(2)} ${CURRENCY}</span>
         </div>
-        <button type="button" class="btn-submit-order" style="${btnStyle}" onclick="checkout()">${t('cart_btn_submit')}</button>
+        <button type="button" class="btn-checkout" onclick="checkout()">${t('cart_btn_submit')}</button>
     `;
     h += `</div>`;
     c.innerHTML = h;
