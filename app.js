@@ -588,6 +588,45 @@ let selectedCategory = null;
 let contactUrls = { signalUrl: null, threemaUrl: null };
 let cartSyncTimer = null;
 
+function getLocalCartKey() {
+  // Cart persisté par utilisateur Telegram (via `user.id` dans initData)
+  const init = getInitData();
+  if (!init) return 'ac_cart_guest';
+  try {
+    const params = new URLSearchParams(init);
+    const userStr = params.get('user');
+    if (!userStr) return 'ac_cart_guest';
+    const user = JSON.parse(decodeURIComponent(userStr));
+    if (!user?.id) return 'ac_cart_guest';
+    return `ac_cart_${user.id}`;
+  } catch {
+    return 'ac_cart_guest';
+  }
+}
+
+function persistCart() {
+  try {
+    const key = getLocalCartKey();
+    localStorage.setItem(key, JSON.stringify({ cart }));
+  } catch {
+    // localStorage peut être bloqué dans certains WebViews : on ignore
+  }
+}
+
+function restoreCart() {
+  try {
+    const key = getLocalCartKey();
+    const raw = localStorage.getItem(key);
+    if (!raw) return false;
+    const parsed = JSON.parse(raw);
+    if (!parsed || !Array.isArray(parsed.cart)) return false;
+    cart = parsed.cart;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function escapeHtml(s) {
     if (!s) return '';
     return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#039;");
@@ -671,6 +710,8 @@ function init() {
     }
     (async () => {
         if (isTelegramWebApp()) await waitForInitData();
+        // Restaurer le panier avant le rendu UI (pour que le badge + contenu soient cohérents).
+        restoreCart();
         await loadCatalog();
         const appEl = document.getElementById('app');
         if (appEl && appEl.classList.contains('hidden')) return;
@@ -678,6 +719,8 @@ function init() {
         buildFilters();
         applyTranslations();
         renderProducts();
+        updateCartBadge();
+        if (cart.length) scheduleCartActivitySync();
     })();
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') refreshCatalog();
@@ -1065,6 +1108,7 @@ function addToCart() {
     });
 
     updateCartBadge();
+    persistCart();
     scheduleCartActivitySync();
     closeProductModal();
     showToast(t('toast_added'));
@@ -1126,6 +1170,7 @@ function renderCart() {
 function removeFromCart(i) {
     cart.splice(i, 1);
     updateCartBadge();
+    persistCart();
     scheduleCartActivitySync();
     renderCart();
 }
@@ -1181,6 +1226,7 @@ async function checkout() {
             if (res.ok && data.ok) {
                 cart = [];
                 updateCartBadge();
+                persistCart();
                 scheduleCartActivitySync();
                 closeCart();
                 showToast(t('order_sent'));
