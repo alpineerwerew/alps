@@ -1118,18 +1118,8 @@ function renderCart() {
             <span class="cart-total-label">${t('total_label')}</span>
             <span class="cart-total-amount">${total.toFixed(2)} ${CURRENCY}</span>
         </div>
-        <p class="cart-how-to-send">${t('cart_how_to_send')}</p>
-        <p class="cart-step-label">${t('cart_step_submit')}</p>
         <button type="button" class="btn-submit-order" style="${btnStyle}" onclick="checkout()">${t('cart_btn_submit')}</button>
-        <p class="cart-bot-followup">${t('cart_bot_followup')}</p>
-        <button type="button" class="btn-copy-order" style="${btnStyle}" onclick="copyOrderToClipboard()">${t('cart_btn_copy')}</button>
-        `;
-    if (contactUrls.signalUrl || contactUrls.threemaUrl) {
-        h += `<p class="cart-step-label">${t('or_contact_signal_threema')}</p><div class="cart-contact-btns">`;
-        if (contactUrls.signalUrl) h += `<button type="button" class="btn-contact-alt" style="${btnStyle}" data-contact-url="${escapeHtml(contactUrls.signalUrl)}" onclick="openContactUrl(this)">${t('open_signal')}</button>`;
-        if (contactUrls.threemaUrl) h += `<button type="button" class="btn-contact-alt" style="${btnStyle}" data-contact-url="${escapeHtml(contactUrls.threemaUrl)}" onclick="openContactUrl(this)">${t('open_threema')}</button>`;
-        h += `</div>`;
-    }
+    `;
     h += `</div>`;
     c.innerHTML = h;
 }
