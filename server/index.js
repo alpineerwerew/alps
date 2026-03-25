@@ -462,7 +462,14 @@ function strLang(chatId) {
 function getUserKeyboardReplyMarkup(lang) {
   const L = BOT_STRINGS[lang] || BOT_STRINGS.fr;
   return {
-    keyboard: [[L.menu_btn, L.help_btn]],
+    // MENU est un bouton WebApp pour ouvrir directement le catalogue en 1 clic.
+    // HELP reste un bouton texte : il renvoie un message que le bot traite.
+    keyboard: [
+      [
+        { text: L.menu_btn, web_app: { url: CATALOG_URL } },
+        L.help_btn
+      ]
+    ],
     resize_keyboard: true,
     one_time_keyboard: false,
     is_persistent: true
