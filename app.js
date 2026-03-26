@@ -625,7 +625,6 @@ function showAgeGate() {
     return new Promise((resolve) => {
         const onAccept = () => {
             cleanup();
-            try { sessionStorage.setItem('ac_age_ok', '1'); } catch (e) {}
             closeAgeGate();
             resolve(true);
         };
@@ -645,9 +644,6 @@ function showAgeGate() {
 }
 
 async function ensureAgeConfirmed() {
-    try {
-        if (sessionStorage.getItem('ac_age_ok') === '1') return true;
-    } catch (e) {}
     if (ageGateInFlight) return ageGateInFlight;
     ageGateInFlight = showAgeGate().finally(() => { ageGateInFlight = null; });
     return ageGateInFlight;
