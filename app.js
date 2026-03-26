@@ -836,7 +836,10 @@ function renderReviewsList() {
                         ${r.verified ? '<span class="review-verified">Verified</span>' : ''}
                     </div>
                 </div>
-                <time class="review-date" datetime="${escapeHtml(r.date)}">${escapeHtml(formatReviewDate(r.date))}</time>
+                <div class="review-card-aside">
+                    ${r.product_image ? `<img class="review-product-thumb" src="${escapeHtml(r.product_image)}" alt="Product from reviewed order" loading="lazy">` : ''}
+                    <time class="review-date" datetime="${escapeHtml(r.date)}">${escapeHtml(formatReviewDate(r.date))}</time>
+                </div>
             </div>
             <div class="review-rating-wrap">${renderStarIcons(r.rating, `${r.name} rating`)}</div>
             <p class="review-body">${escapeHtml(r.text)}</p>

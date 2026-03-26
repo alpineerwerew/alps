@@ -295,7 +295,8 @@ function loadReviews() {
         date: String(r.date || new Date().toISOString().slice(0, 10)),
         verified: !!r.verified,
         approved: !!r.approved,
-        created_at: r.created_at || null
+        created_at: r.created_at || null,
+        product_image: r.product_image ? String(r.product_image) : null
       }))
       .filter((r) => r.name && r.title && r.text);
   } catch {
@@ -354,6 +355,22 @@ function parseOrderForReference(orderText) {
   };
 }
 
+function inferProductImageFromItems(items) {
+  const wanted = Array.isArray(items) ? items.map((x) => String(x || '').toLowerCase()).filter(Boolean) : [];
+  if (!wanted.length) return null;
+  const data = loadProductsData();
+  const products = Array.isArray(data?.products) ? data.products : [];
+  for (const w of wanted) {
+    const hit = products.find((p) => {
+      const name = String(p?.name || '').toLowerCase();
+      return !!name && (name.includes(w) || w.includes(name));
+    });
+    if (hit && hit.image_url) return String(hit.image_url);
+    if (hit && Array.isArray(hit.media) && hit.media[0]?.url) return String(hit.media[0].url);
+  }
+  return null;
+}
+
 function appendOrderHistory(user, orderText) {
   if (!user || !user.id) return null;
   const summary = parseOrderForReference(orderText);
@@ -367,6 +384,7 @@ function appendOrderHistory(user, orderText) {
     last_name: user.last_name || null,
     order_text: String(orderText || ''),
     items: summary.items,
+    product_image: inferProductImageFromItems(summary.items),
     total_chf: summary.total_chf,
     created_at: new Date().toISOString(),
     status: 'confirmed'
@@ -1423,7 +1441,8 @@ app.post('/api/reviews', requireTelegramInitForPublicApi, (req, res) => {
     approved: false,
     user_id: String(user.id),
     order_ref: latestOrder.ref || null,
-    ordered_items: Array.isArray(latestOrder.items) ? latestOrder.items.slice(0, 5) : []
+    ordered_items: Array.isArray(latestOrder.items) ? latestOrder.items.slice(0, 5) : [],
+    product_image: latestOrder.product_image || inferProductImageFromItems(latestOrder.items || [])
   };
   rows.unshift(row);
   saveReviews(rows);
