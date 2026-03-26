@@ -60,7 +60,11 @@ const I18N = {
         cart_need_telegram: 'Ouvre le catalogue depuis Telegram pour envoyer la commande.',
         order_send_failed: 'Envoi impossible. Réessaie dans un instant.',
         open_signal: 'Signal',
-        open_threema: 'Threema'
+        open_threema: 'Threema',
+        age_gate_title: '🔞 Accès réservé aux 18 ans et +',
+        age_gate_text: 'En entrant, tu confirmes avoir 18 ans ou plus et accepter du contenu pour adultes.',
+        age_gate_accept: 'J’ai 18 ans ou plus',
+        age_gate_decline: 'Quitter'
     },
     en: {
         filter_all: '📂 All categories',
@@ -92,7 +96,11 @@ const I18N = {
         cart_need_telegram: 'Open the catalog from Telegram to send your order.',
         order_send_failed: 'Could not send. Please try again.',
         open_signal: 'Signal',
-        open_threema: 'Threema'
+        open_threema: 'Threema',
+        age_gate_title: '🔞 Access is restricted to 18+',
+        age_gate_text: 'By entering, you confirm that you are 18 years old or above and accept adult content.',
+        age_gate_accept: 'I am 18+',
+        age_gate_decline: 'Leave'
     },
     de: {
         filter_all: '📂 Alle Kategorien',
@@ -124,7 +132,11 @@ const I18N = {
         cart_need_telegram: 'Öffne den Katalog über Telegram, um die Bestellung zu senden.',
         order_send_failed: 'Senden fehlgeschlagen. Bitte erneut versuchen.',
         open_signal: 'Signal',
-        open_threema: 'Threema'
+        open_threema: 'Threema',
+        age_gate_title: '🔞 Zugang nur für Personen ab 18',
+        age_gate_text: 'Mit dem Eintritt bestätigst du, dass du mindestens 18 Jahre alt bist und Inhalte für Erwachsene akzeptierst.',
+        age_gate_accept: 'Ich bin 18+',
+        age_gate_decline: 'Verlassen'
     }
 };
 
@@ -589,6 +601,57 @@ let contactUrls = { signalUrl: null, threemaUrl: null };
 let cartSyncTimer = null;
 let catalogLoadInFlight = null;
 let contactUrlsLoadInFlight = null;
+let ageGateInFlight = null;
+
+function closeAgeGate() {
+    const gate = document.getElementById('age-gate');
+    if (gate) gate.classList.add('hidden');
+}
+
+function showAgeGate() {
+    const gate = document.getElementById('age-gate');
+    if (!gate) return Promise.resolve(true);
+    const title = document.getElementById('age-gate-title');
+    const text = document.getElementById('age-gate-text');
+    const ok = document.getElementById('age-gate-accept');
+    const no = document.getElementById('age-gate-decline');
+
+    if (title) title.textContent = t('age_gate_title');
+    if (text) text.textContent = t('age_gate_text');
+    if (ok) ok.textContent = t('age_gate_accept');
+    if (no) no.textContent = t('age_gate_decline');
+    gate.classList.remove('hidden');
+
+    return new Promise((resolve) => {
+        const onAccept = () => {
+            cleanup();
+            try { sessionStorage.setItem('ac_age_ok', '1'); } catch (e) {}
+            closeAgeGate();
+            resolve(true);
+        };
+        const onDecline = () => {
+            cleanup();
+            closeAgeGate();
+            showCatalogAccessError('open_in_telegram');
+            resolve(false);
+        };
+        const cleanup = () => {
+            ok?.removeEventListener('click', onAccept);
+            no?.removeEventListener('click', onDecline);
+        };
+        ok?.addEventListener('click', onAccept);
+        no?.addEventListener('click', onDecline);
+    });
+}
+
+async function ensureAgeConfirmed() {
+    try {
+        if (sessionStorage.getItem('ac_age_ok') === '1') return true;
+    } catch (e) {}
+    if (ageGateInFlight) return ageGateInFlight;
+    ageGateInFlight = showAgeGate().finally(() => { ageGateInFlight = null; });
+    return ageGateInFlight;
+}
 
 function escapeHtml(s) {
     if (!s) return '';
@@ -701,6 +764,8 @@ function init() {
     }
     (async () => {
         if (isTelegramWebApp()) await waitForInitData();
+        const ageOk = await ensureAgeConfirmed();
+        if (!ageOk) return;
         await loadCatalog();
         const appEl = document.getElementById('app');
         if (appEl && appEl.classList.contains('hidden')) return;

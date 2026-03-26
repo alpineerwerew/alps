@@ -12,6 +12,17 @@
 </head>
 <body>
 
+<div id="age-gate" class="age-gate hidden" role="dialog" aria-modal="true" aria-labelledby="age-gate-title">
+    <div class="age-gate-card">
+        <h2 id="age-gate-title"></h2>
+        <p id="age-gate-text"></p>
+        <div class="age-gate-actions">
+            <button id="age-gate-accept" type="button" class="age-gate-btn age-gate-btn-primary"></button>
+            <button id="age-gate-decline" type="button" class="age-gate-btn age-gate-btn-secondary"></button>
+        </div>
+    </div>
+</div>
+
 <div id="catalog-access-error" class="catalog-access-error hidden" role="alert" aria-live="assertive">
     <p id="catalog-access-error-msg"></p>
 </div>
@@ -95,7 +106,7 @@
 <!-- #endregion -->
 
 <!-- #region Scripts -->
-<script src="app.js?v=20260326-ux-satisfaction"></script>
+<script src="app.js?v=20260326-age-gate"></script>
 <!-- #endregion -->
 </body>
 </html>
