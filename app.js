@@ -956,6 +956,7 @@ async function initReviewsSection() {
         renderReviewsSummary();
         renderReviewsList();
         form.reset();
+        showToast('Thanks! Your review will be published after admin verification.');
         closeModal();
     });
     renderReviewsSummary();
