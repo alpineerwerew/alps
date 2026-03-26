@@ -67,9 +67,14 @@ Crée le fichier avec tes vraies valeurs (sans guillemets autour des valeurs) :
 ```bash
 echo 'BOT_TOKEN=ton_token_botfather' > .env
 echo 'OWNER_CHAT_ID=ton_chat_id_telegram' >> .env
+echo 'CATALOG_URL=https://alpine710.art' >> .env
 ```
 
-Optionnel : `CATALOG_URL=https://alpine710.art`, `REFERRAL_BONUS=15` (points pour un filleul qui commande), `IG_REVIEW_POINTS=15` (points pour un avis IG validé) (lien du bouton « Accès boutique »), `WELCOME_IMAGE_URL=…` (image au /start), `WELCOME_PROMO_LINE=…` (ligne promo sous le message d’accueil), `ORDER_RESPONSE_SLA_HOURS=12` (délai de réponse affiché après commande), `THANK_YOU_LINE_FR` / `THANK_YOU_LINE_EN` / `THANK_YOU_LINE_DE` (message court après identifiant Signal/Threema), rappels panier : `CART_REMINDER_ENABLED=1` (défaut répétition **24 h** via `CART_REMINDER_REPEAT_HOURS`).
+**`CATALOG_URL`** = URL **HTTPS** publique du catalogue (sans `/` à la fin). Sert au bouton **Web App** Telegram, aux liens admin, aux URLs d’upload. Si absent, le code utilise par défaut `https://alpine710.art` — mais il vaut mieux la fixer dans `.env` pour un autre domaine.
+
+Optionnel : `WELCOME_IMAGE_URL=…` (image au /start), `WELCOME_PROMO_LINE=…` (une ligne sous l’accueil `/start`, avant choix de langue), `ORDER_RESPONSE_SLA_HOURS=12` (délai de réponse affiché après commande), `THANK_YOU_LINE_FR` / `THANK_YOU_LINE_EN` / `THANK_YOU_LINE_DE` (message court après identifiant Signal/Threema), rappels panier : `CART_REMINDER_ENABLED=1` (défaut répétition **24 h** via `CART_REMINDER_REPEAT_HOURS`).
+
+> **Points / parrainage / avis Instagram** : pas implémentés dans ce dépôt (des fichiers `points.json` / `refs.json` dans `.gitignore` sont des vestiges). La section Nginx qui cite `/api/points` est un exemple générique ; le bot actuel n’expose pas ces routes.
 
 Ou avec un éditeur si installé : `nano .env` ou `vi .env`.
 
@@ -154,8 +159,8 @@ ufw enable
 ```
 
 - **22** : SSH  
-- **3000** : API du bot (points / récompenses)  
-- **80** : pour HTTPS plus tard si tu mets un domaine
+- **3000** : utile seulement si tu proxies l’API derrière Nginx (sinon Node écoute souvent **80/443** directement)  
+- **80** / **443** : HTTP / HTTPS du catalogue + `/api`
 
 ---
 
@@ -219,7 +224,7 @@ apt install -y certbot python3-certbot-nginx
 certbot --nginx -d alpine710.art -d www.alpine710.art
 ```
 
-Résultat : **https://alpine710.art** affiche le catalogue, et les appels à `/api/points`, `/api/rewards`, etc. partent vers le bot. Dans `app.js` tu as déjà `POINTS_API_URL = "https://alpine710.art"` (même domaine = pas de souci CORS).
+Résultat : **https://alpine710.art** sert le catalogue et les routes **`/api/*`** (produits, commande, etc.) via le proxy. Dans `app.js`, `POINTS_API_URL` pointe en pratique sur la même origine (`window.location.origin` en prod) — ce n’est pas un système de « points » séparé dans le code actuel.
 
 ---
 
