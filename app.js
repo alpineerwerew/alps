@@ -711,6 +711,129 @@ let cartSyncTimer = null;
 let catalogLoadInFlight = null;
 let contactUrlsLoadInFlight = null;
 let ageGateInFlight = null;
+const MOCK_REVIEWS = [];
+let reviewFilter = 'all';
+let reviewSort = 'recent';
+let visibleReviewsCount = 6;
+
+function formatReviewDate(value) {
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return value;
+    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+function getReviewsByCurrentSettings() {
+    let list = MOCK_REVIEWS.slice();
+    if (reviewFilter !== 'all') {
+        const expected = Number(reviewFilter);
+        list = list.filter((r) => Number(r.rating) === expected);
+    }
+    if (reviewSort === 'high') {
+        list.sort((a, b) => b.rating - a.rating || new Date(b.date) - new Date(a.date));
+    } else if (reviewSort === 'low') {
+        list.sort((a, b) => a.rating - b.rating || new Date(b.date) - new Date(a.date));
+    } else {
+        list.sort((a, b) => new Date(b.date) - new Date(a.date));
+    }
+    return list;
+}
+
+function renderStarIcons(rating, labelPrefix) {
+    const safe = Math.max(0, Math.min(5, Number(rating) || 0));
+    let stars = '';
+    for (let i = 1; i <= 5; i++) {
+        const filled = i <= safe ? 'is-filled' : '';
+        stars += `<span class="review-star ${filled}" aria-hidden="true">★</span>`;
+    }
+    return `<span class="review-stars" aria-label="${escapeHtml(labelPrefix)} ${safe} out of 5">${stars}</span>`;
+}
+
+function renderReviewsSummary() {
+    const el = document.getElementById('reviews-summary');
+    if (!el) return;
+    const total = MOCK_REVIEWS.length;
+    const avg = total ? (MOCK_REVIEWS.reduce((sum, r) => sum + Number(r.rating || 0), 0) / total) : 0;
+    const counts = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+    MOCK_REVIEWS.forEach((r) => {
+        const key = Number(r.rating);
+        if (counts[key] != null) counts[key] += 1;
+    });
+    const bars = [5, 4, 3, 2, 1].map((n) => {
+        const count = counts[n] || 0;
+        const pct = total ? Math.round((count / total) * 100) : 0;
+        return `<div class="rating-row">
+            <div class="rating-row-label">${n}★</div>
+            <div class="rating-bar-track"><div class="rating-bar-fill" style="width:${pct}%;"></div></div>
+            <div class="rating-row-count">${count}</div>
+        </div>`;
+    }).join('');
+    el.innerHTML = `
+        <div class="summary-score">
+            <div class="summary-score-value">${avg.toFixed(1)}</div>
+            <div class="summary-score-stars">${renderStarIcons(Math.round(avg), 'Average rating')}</div>
+            <div class="summary-score-meta">${total} reviews</div>
+        </div>
+        <div class="summary-breakdown">${bars}</div>
+    `;
+}
+
+function renderReviewsList() {
+    const listEl = document.getElementById('reviews-list');
+    const loadMoreBtn = document.getElementById('reviews-load-more');
+    if (!listEl || !loadMoreBtn) return;
+    const source = getReviewsByCurrentSettings();
+    const visible = source.slice(0, visibleReviewsCount);
+    if (!visible.length) {
+        listEl.innerHTML = `<div class="review-empty">No reviews yet. Be the first verified customer to leave feedback.</div>`;
+        loadMoreBtn.classList.add('hidden');
+        return;
+    }
+    listEl.innerHTML = visible.map((r) => `
+        <article class="review-card">
+            <div class="review-card-top">
+                <div>
+                    <h3 class="review-title">${escapeHtml(r.title)}</h3>
+                    <div class="review-author-row">
+                        <span class="review-author">${escapeHtml(r.name)}</span>
+                        ${r.verified ? '<span class="review-verified">Verified</span>' : ''}
+                    </div>
+                </div>
+                <time class="review-date" datetime="${escapeHtml(r.date)}">${escapeHtml(formatReviewDate(r.date))}</time>
+            </div>
+            <div class="review-rating-wrap">${renderStarIcons(r.rating, `${r.name} rating`)}</div>
+            <p class="review-body">${escapeHtml(r.text)}</p>
+        </article>
+    `).join('');
+    if (visibleReviewsCount < source.length) loadMoreBtn.classList.remove('hidden');
+    else loadMoreBtn.classList.add('hidden');
+}
+
+function initReviewsSection() {
+    const filterEl = document.getElementById('review-filter');
+    const sortEl = document.getElementById('review-sort');
+    const loadMoreBtn = document.getElementById('reviews-load-more');
+    if (!filterEl || !sortEl || !loadMoreBtn) return;
+    if (MOCK_REVIEWS.length === 0) {
+        filterEl.disabled = true;
+        sortEl.disabled = true;
+    }
+    filterEl.addEventListener('change', (e) => {
+        reviewFilter = e.target.value || 'all';
+        visibleReviewsCount = 6;
+        renderReviewsList();
+    });
+    sortEl.addEventListener('change', (e) => {
+        reviewSort = e.target.value || 'recent';
+        visibleReviewsCount = 6;
+        renderReviewsList();
+    });
+    loadMoreBtn.addEventListener('click', () => {
+        visibleReviewsCount += 4;
+        renderReviewsList();
+    });
+    renderReviewsSummary();
+    renderReviewsList();
+}
 
 function closeAgeGate() {
     const gate = document.getElementById('age-gate');
@@ -930,6 +1053,7 @@ function init() {
     document.title = "Alpine Connexion";
     autoUseCashback = getAutoUseCashbackPref();
     wireCashbackUi();
+    initReviewsSection();
     const tg = window.Telegram?.WebApp;
     if (tg) {
         try {

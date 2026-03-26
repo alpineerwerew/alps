@@ -75,6 +75,40 @@
         <main class="products-wrap">
             <div class="products-grid" id="products-grid"></div>
         </main>
+        <section class="reviews-section" aria-labelledby="reviews-title">
+            <div class="reviews-shell">
+                <div class="reviews-header">
+                    <h2 id="reviews-title">Customer Reviews</h2>
+                    <p class="reviews-subtitle">Trusted feedback from verified buyers</p>
+                </div>
+                <div class="reviews-summary" id="reviews-summary"></div>
+                <div class="reviews-toolbar">
+                    <label class="reviews-control">
+                        <span>Filter</span>
+                        <select id="review-filter" aria-label="Filter reviews by rating">
+                            <option value="all">All ratings</option>
+                            <option value="5">5★ only</option>
+                            <option value="4">4★ only</option>
+                            <option value="3">3★ only</option>
+                            <option value="2">2★ only</option>
+                            <option value="1">1★ only</option>
+                        </select>
+                    </label>
+                    <label class="reviews-control">
+                        <span>Sort</span>
+                        <select id="review-sort" aria-label="Sort reviews">
+                            <option value="recent">Most recent</option>
+                            <option value="high">Highest rating</option>
+                            <option value="low">Lowest rating</option>
+                        </select>
+                    </label>
+                </div>
+                <div id="reviews-list" class="reviews-list"></div>
+                <div class="reviews-footer">
+                    <button id="reviews-load-more" class="reviews-load-more" type="button">Load more reviews</button>
+                </div>
+            </div>
+        </section>
     </div>
     <!-- #endregion -->
 
