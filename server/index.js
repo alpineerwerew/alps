@@ -423,10 +423,10 @@ function getOrderProducts(order) {
 }
 
 const LOYALTY_TIERS = [
-  { key: 'bronze', label: 'Bronze', min_points: 0, rewards: ['Member pricing access'] },
-  { key: 'silver', label: 'Silver', min_points: 1000, rewards: ['2% member discount', 'Priority support'] },
-  { key: 'gold', label: 'Gold', min_points: 2500, rewards: ['5% member discount', 'Priority handling', 'Early drops'] },
-  { key: 'platinum', label: 'Platinum', min_points: 10000, rewards: ['8% member discount', 'Free shipping', 'VIP offers'] }
+  { key: 'bronze', label: 'Bronze', min_points: 0, discount_percent: 0, rewards: [] },
+  { key: 'silver', label: 'Silver', min_points: 1000, discount_percent: 1, rewards: ['1% member discount', 'Free shipping'] },
+  { key: 'gold', label: 'Gold', min_points: 2500, discount_percent: 3, rewards: ['3% member discount', 'Free shipping'] },
+  { key: 'platinum', label: 'Platinum', min_points: 10000, discount_percent: 5, rewards: ['5% member discount', 'Free shipping'] }
 ];
 
 function loadLoyaltyPoints() {
@@ -479,6 +479,7 @@ function buildLoyaltySnapshot(points) {
     tier_key: tier.key,
     tier_label: tier.label,
     current_min: base,
+    discount_percent: Number(tier.discount_percent) || 0,
     next_tier_key: next ? next.key : null,
     next_tier_label: next ? next.label : null,
     next_tier_min: next ? next.min_points : null,

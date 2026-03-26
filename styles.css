@@ -586,7 +586,7 @@ body {
 }
 
 .loyalty-section {
-    padding: 0.6rem 1rem 0.3rem;
+    padding: 0.4rem 1rem 0.15rem;
     max-width: 980px;
     margin: 0 auto;
 }
@@ -594,8 +594,8 @@ body {
 .loyalty-card {
     background: linear-gradient(180deg, rgba(22, 22, 36, 0.96), rgba(13, 13, 24, 0.96));
     border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 16px;
-    padding: 0.9rem;
+    border-radius: 14px;
+    padding: 0.62rem 0.68rem;
     box-shadow: 0 10px 26px rgba(0, 0, 0, 0.35);
 }
 
@@ -607,12 +607,12 @@ body {
 }
 
 .loyalty-head h3 {
-    font-size: 0.98rem;
+    font-size: 0.86rem;
     font-weight: 700;
 }
 
 .loyalty-level-badge {
-    font-size: 0.72rem;
+    font-size: 0.64rem;
     font-weight: 800;
     text-transform: uppercase;
     letter-spacing: 0.06em;
@@ -627,24 +627,42 @@ body {
 .loyalty-level-badge.tier-gold { color: #fde68a; background: rgba(217, 119, 6, 0.22); border-color: rgba(251, 191, 36, 0.45); }
 .loyalty-level-badge.tier-platinum { color: #e0e7ff; background: rgba(99, 102, 241, 0.25); border-color: rgba(129, 140, 248, 0.4); }
 
-.loyalty-points-row {
-    margin-top: 0.6rem;
+.loyalty-summary-row {
+    margin-top: 0.35rem;
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 0.55rem;
+}
+
+.loyalty-points-row {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
     color: var(--text-secondary);
-    font-size: 0.84rem;
+    font-size: 0.74rem;
 }
 
 .loyalty-points-row strong {
-    font-size: 1.35rem;
-    font-family: var(--font-display);
+    font-size: 0.96rem;
+    font-family: var(--font-body);
+    font-weight: 800;
     color: #fff;
 }
 
+.loyalty-toggle {
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.05);
+    color: #d1d5db;
+    border-radius: 8px;
+    font-size: 0.7rem;
+    padding: 0.3rem 0.5rem;
+    cursor: pointer;
+}
+
 .loyalty-progress-track {
-    margin-top: 0.55rem;
-    height: 10px;
+    margin-top: 0.4rem;
+    height: 7px;
     border-radius: 999px;
     background: rgba(255, 255, 255, 0.12);
     overflow: hidden;
@@ -659,16 +677,19 @@ body {
 }
 
 .loyalty-meta {
-    margin-top: 0.45rem;
+    margin-top: 0.3rem;
     display: flex;
     justify-content: space-between;
     gap: 0.55rem;
-    font-size: 0.76rem;
+    font-size: 0.67rem;
     color: var(--text-secondary);
 }
 
+.loyalty-details {
+    margin-top: 0.45rem;
+}
+
 .loyalty-rewards {
-    margin-top: 0.75rem;
     display: grid;
     gap: 0.44rem;
 }
@@ -676,7 +697,7 @@ body {
 .loyalty-reward {
     border-radius: 10px;
     border: 1px solid rgba(255, 255, 255, 0.12);
-    padding: 0.5rem 0.58rem;
+    padding: 0.42rem 0.52rem;
     background: rgba(255, 255, 255, 0.03);
 }
 
@@ -690,13 +711,13 @@ body {
 }
 
 .loyalty-reward-tier {
-    font-size: 0.74rem;
+    font-size: 0.68rem;
     font-weight: 700;
 }
 
 .loyalty-reward-items {
     margin-top: 0.18rem;
-    font-size: 0.74rem;
+    font-size: 0.66rem;
     color: var(--text-secondary);
 }
 

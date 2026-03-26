@@ -79,8 +79,10 @@ Paiement en espèces : pas de cashback.`,
         cashback_modal_ok: 'Compris',
         cashback_auto_apply: 'Utiliser automatiquement mon crédit cashback',
         cashback_discount_label: 'Cashback appliqué',
+        loyalty_discount_label: 'Réduction fidélité',
         cashback_subtotal_label: 'Sous-total',
         cashback_payable_label: 'Total à payer',
+        rounded_total_note: 'Total final arrondi au CHF le plus proche',
         cashback_insufficient: 'Solde cashback insuffisant.',
         cashback_applied_to_order: 'Cashback appliqué'
     },
@@ -133,8 +135,10 @@ Cash payments: no cashback.`,
         cashback_modal_ok: 'Got it',
         cashback_auto_apply: 'Automatically use my cashback credit',
         cashback_discount_label: 'Cashback applied',
+        loyalty_discount_label: 'Loyalty discount',
         cashback_subtotal_label: 'Subtotal',
         cashback_payable_label: 'Total to pay',
+        rounded_total_note: 'Final total rounded to nearest CHF',
         cashback_insufficient: 'Cashback balance is insufficient.',
         cashback_applied_to_order: 'Cashback used'
     },
@@ -187,8 +191,10 @@ Barzahlung: kein Cashback.`,
         cashback_modal_ok: 'Alles klar',
         cashback_auto_apply: 'Mein Cashback-Guthaben automatisch nutzen',
         cashback_discount_label: 'Cashback verwendet',
+        loyalty_discount_label: 'Treuerabatt',
         cashback_subtotal_label: 'Zwischensumme',
         cashback_payable_label: 'Zu zahlen',
+        rounded_total_note: 'Endbetrag auf den naechsten CHF gerundet',
         cashback_insufficient: 'Cashback-Guthaben ist nicht ausreichend.',
         cashback_applied_to_order: 'Cashback genutzt'
     }
@@ -1181,14 +1187,19 @@ function setAutoUseCashbackPref(v) {
 
 function computeCartTotals() {
     const subtotal = cart.reduce((sum, item) => sum + (Number(item?.price) || 0), 0);
-    const discount = autoUseCashback ? Math.min(subtotal, Math.max(0, Number(myCashbackBalanceChf) || 0)) : 0;
-    const payable = Math.max(0, subtotal - discount);
-    return { subtotal, discount, payable };
+    const loyaltyPct = Math.max(0, Number(loyaltySnapshot?.discount_percent) || 0);
+    const loyaltyDiscount = Math.max(0, subtotal * (loyaltyPct / 100));
+    const afterLoyalty = Math.max(0, subtotal - loyaltyDiscount);
+    const cashbackDiscount = autoUseCashback ? Math.min(afterLoyalty, Math.max(0, Number(myCashbackBalanceChf) || 0)) : 0;
+    const rawPayable = Math.max(0, afterLoyalty - cashbackDiscount);
+    const payableRounded = Math.max(0, Math.round(rawPayable));
+    return { subtotal, loyaltyPct, loyaltyDiscount, cashbackDiscount, rawPayable, payableRounded };
 }
 
 let cashbackLoadInFlight = null;
 let loyaltyLoadInFlight = null;
 let loyaltySnapshot = null;
+let loyaltyExpanded = false;
 async function loadMyCashback() {
     if (!POINTS_API_URL || !getInitData()) return;
     if (cashbackLoadInFlight) return cashbackLoadInFlight;
@@ -1220,7 +1231,9 @@ function renderLoyalty(snapshot) {
     const progressLabel = document.getElementById('loyalty-progress-label');
     const nextLabel = document.getElementById('loyalty-next-label');
     const rewardsEl = document.getElementById('loyalty-rewards');
-    if (!levelBadge || !pointsEl || !fillEl || !progressLabel || !nextLabel || !rewardsEl) return;
+    const details = document.getElementById('loyalty-details');
+    const toggle = document.getElementById('loyalty-toggle');
+    if (!levelBadge || !pointsEl || !fillEl || !progressLabel || !nextLabel || !rewardsEl || !details || !toggle) return;
     const snap = snapshot || {
         points: 0,
         tier_label: 'Bronze',
@@ -1246,6 +1259,9 @@ function renderLoyalty(snapshot) {
             <div class="loyalty-reward-items">${escapeHtml((Array.isArray(r.items) ? r.items.join(' • ') : ''))}</div>
         </div>
     `).join('');
+    details.classList.toggle('hidden', !loyaltyExpanded);
+    toggle.setAttribute('aria-expanded', loyaltyExpanded ? 'true' : 'false');
+    toggle.textContent = loyaltyExpanded ? 'Hide' : 'Details';
 }
 
 async function loadLoyaltyStatus() {
@@ -1285,6 +1301,14 @@ function init() {
     document.title = "Alpine Connexion";
     autoUseCashback = getAutoUseCashbackPref();
     renderLoyalty(null);
+    const loyaltyToggle = document.getElementById('loyalty-toggle');
+    const loyaltyDetails = document.getElementById('loyalty-details');
+    if (loyaltyToggle && loyaltyDetails) {
+        loyaltyToggle.addEventListener('click', () => {
+            loyaltyExpanded = !loyaltyExpanded;
+            renderLoyalty(loyaltySnapshot);
+        });
+    }
     wireCashbackUi();
     initReviewsSection();
     const tg = window.Telegram?.WebApp;
@@ -1765,18 +1789,23 @@ function renderCart() {
             <span class="cart-total-label">${t('cashback_subtotal_label')}</span>
             <span class="cart-total-amount cart-total-amount-small">${totals.subtotal.toFixed(2)} ${CURRENCY}</span>
         </div>
+        <div class="cart-total-row cart-total-discount-row">
+            <span class="cart-total-label">${t('loyalty_discount_label')} (${totals.loyaltyPct}%)</span>
+            <span class="cart-total-discount">- ${totals.loyaltyDiscount.toFixed(2)} ${CURRENCY}</span>
+        </div>
         <label class="cart-cashback-toggle">
             <input type="checkbox" id="cart-auto-cashback" ${autoUseCashback ? 'checked' : ''}>
             <span>${t('cashback_auto_apply')} (${formatChfAmount(myCashbackBalanceChf)})</span>
         </label>
         <div class="cart-total-row cart-total-discount-row">
             <span class="cart-total-label">${t('cashback_discount_label')}</span>
-            <span class="cart-total-discount">- ${totals.discount.toFixed(2)} ${CURRENCY}</span>
+            <span class="cart-total-discount">- ${totals.cashbackDiscount.toFixed(2)} ${CURRENCY}</span>
         </div>
         <div class="cart-total-row">
             <span class="cart-total-label">${t('cashback_payable_label')}</span>
-            <span class="cart-total-amount">${totals.payable.toFixed(2)} ${CURRENCY}</span>
+            <span class="cart-total-amount">${totals.payableRounded.toFixed(0)} ${CURRENCY}</span>
         </div>
+        <div class="checkout-hint">${t('rounded_total_note')}</div>
         <button type="button" class="btn-checkout" onclick="checkout()">${t('cart_btn_submit')}</button>
         <button type="button" class="btn-clear-cart" onclick="clearSavedCart()">${t('cart_btn_clear_saved')}</button>
     `;
@@ -1818,10 +1847,13 @@ function buildOrderText(totals) {
         if (item.variant) msg += ` (${item.variant})`;
         msg += `\n   📦 ${item.qty} ${u} — ${item.price} ${CURRENCY}\n\n`;
     });
-    if (tvals.discount > 0) {
-        msg += `${t('cashback_applied_to_order')} : -${tvals.discount.toFixed(2)} ${CURRENCY}\n`;
+    if (tvals.loyaltyDiscount > 0) {
+        msg += `${t('loyalty_discount_label')} (${tvals.loyaltyPct}%) : -${tvals.loyaltyDiscount.toFixed(2)} ${CURRENCY}\n`;
     }
-    msg += `${t('order_total')} : ${tvals.payable.toFixed(2)} ${CURRENCY}`;
+    if (tvals.cashbackDiscount > 0) {
+        msg += `${t('cashback_applied_to_order')} : -${tvals.cashbackDiscount.toFixed(2)} ${CURRENCY}\n`;
+    }
+    msg += `${t('order_total')} : ${tvals.payableRounded.toFixed(0)} ${CURRENCY}`;
     return msg;
 }
 
@@ -1838,7 +1870,7 @@ async function checkout() {
                 body: JSON.stringify({
                     initData: getInitData(),
                     orderText,
-                    cashback_use_chf: totals.discount
+                    cashback_use_chf: totals.cashbackDiscount
                 })
             });
             const data = await res.json().catch(() => ({}));
