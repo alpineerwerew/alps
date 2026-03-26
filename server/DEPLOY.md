@@ -87,9 +87,35 @@ Avant un `git pull` sur le VPS, sauvegarde `server/products.json` si tu as modif
 
 ## 5. Lancer le bot en continu (pm2)
 
+### Recommandé : **deux processus** (catalogue toujours joignable)
+
+Le fichier `server/ecosystem.config.cjs` lance **`alps-web`** (HTTPS + API + fichiers statiques) et **`alps-bot`** (Telegram uniquement). Si le polling Telegram ralentit, le site continue de répondre. Les commandes passées depuis la Mini App vont dans `server/order_queue.jsonl` puis sont envoyées par le processus bot.
+
+```bash
+cd /chemin/vers/alps/server
+npm install -g pm2
+pm2 delete alps-bot 2>/dev/null   # si tu avais l’ancien nom unique
+pm2 start ecosystem.config.cjs
+pm2 save
+pm2 startup
+```
+
+Vérifier :
+
+```bash
+pm2 status
+pm2 logs alps-web
+pm2 logs alps-bot
+curl -k -sS https://127.0.0.1/healthz   # doit renvoyer {"ok":true,...}
+```
+
+**Optionnel (watchdog)** : si tu veux redémarrer automatiquement quand `/healthz` ne répond plus, ajoute une tâche cron (root) qui appelle `curl` puis `pm2 restart alps-web`.
+
+### Ancien mode : un seul processus
+
 ```bash
 npm install -g pm2
-pm2 start index.js --name alps-bot
+PROCESS_ROLE=all pm2 start index.js --name alps-bot
 pm2 save
 pm2 startup
 ```
@@ -200,7 +226,8 @@ cd /opt/alps
 git pull
 cd server
 npm install --production
-pm2 restart alps-bot
+pm2 restart alps-web alps-bot
+# ou si tu es encore en un seul processus : pm2 restart alps-bot
 ```
 
 ---
@@ -211,5 +238,6 @@ pm2 restart alps-bot
 |----------|-------------|
 | `pm2 status` | Voir si le bot tourne |
 | `pm2 logs alps-bot` | Voir les logs en direct |
-| `pm2 restart alps-bot` | Redémarrer après une modif |
+| `pm2 restart alps-web alps-bot` | Redémarrer web + bot (mode 2 processus) |
+| `pm2 restart alps-bot` | Redémarrer l’ancien processus unique |
 | `pm2 stop alps-bot` | Arrêter le bot |

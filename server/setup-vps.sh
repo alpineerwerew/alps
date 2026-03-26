@@ -46,9 +46,17 @@ else
   echo ".env existe déjà, on ne le modifie pas."
 fi
 
-echo "=== Bot (pm2) ==="
+echo "=== Bot + catalogue (pm2) ==="
 npm install -g pm2 2>/dev/null || true
-if pm2 describe alps-bot &>/dev/null; then
+if [ -f "$SERVER_DIR/ecosystem.config.cjs" ]; then
+  if pm2 describe alps-web &>/dev/null || pm2 describe alps-bot &>/dev/null; then
+    pm2 reload "$SERVER_DIR/ecosystem.config.cjs" --update-env
+  else
+    pm2 start "$SERVER_DIR/ecosystem.config.cjs"
+  fi
+  pm2 save
+  pm2 startup 2>/dev/null || true
+elif pm2 describe alps-bot &>/dev/null; then
   pm2 restart alps-bot
 else
   pm2 start index.js --name alps-bot

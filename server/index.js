@@ -18,6 +18,16 @@ const BOT_TOKEN = process.env.BOT_TOKEN;
 const OWNER_CHAT_ID = process.env.OWNER_CHAT_ID;
 const CATALOG_URL = (process.env.CATALOG_URL || 'https://alpine710.art').replace(/^http:\/\//i, 'https://');
 const PORT = process.env.PORT || 3000;
+// `all` (défaut) = bot + web dans le même processus. `web` = catalogue/API seuls. `bot` = Telegram seul (recommandé avec `web` pour uptime).
+const PROCESS_ROLE_RAW = String(process.env.PROCESS_ROLE || 'all').toLowerCase().trim();
+const PROCESS_ROLE = PROCESS_ROLE_RAW === 'web' || PROCESS_ROLE_RAW === 'bot' ? PROCESS_ROLE_RAW : 'all';
+const IS_WEB = PROCESS_ROLE === 'all' || PROCESS_ROLE === 'web';
+const IS_BOT = PROCESS_ROLE === 'all' || PROCESS_ROLE === 'bot';
+if (PROCESS_ROLE_RAW && PROCESS_ROLE_RAW !== 'all' && PROCESS_ROLE_RAW !== 'web' && PROCESS_ROLE_RAW !== 'bot') {
+  console.error('❌ PROCESS_ROLE doit être all, web ou bot');
+  process.exit(1);
+}
+console.log(`ℹ️ PROCESS_ROLE=${PROCESS_ROLE} (web=${IS_WEB}, bot=${IS_BOT})`);
 
 // Catalogue : API + pages d’entrée protégés (désactiver en dev navigateur : TELEGRAM_WEBAPP_ONLY=0)
 const TELEGRAM_WEBAPP_ONLY = process.env.TELEGRAM_WEBAPP_ONLY !== '0';
@@ -76,6 +86,7 @@ const BOT_USERS_FILE = path.join(__dirname, 'bot_users.json');
 const CART_ACTIVITY_FILE = path.join(__dirname, 'cart_activity.json');
 const BOT_CHAT_LANG_FILE = path.join(__dirname, 'bot_chat_lang.json');
 const CART_REMINDERS_FILE = path.join(__dirname, 'cart_reminders.json');
+const ORDER_QUEUE_FILE = path.join(__dirname, 'order_queue.jsonl');
 
 function loadBotUsers() {
   try {
@@ -304,38 +315,42 @@ function parseOrderTotal(text) {
   return 0;
 }
 
-// ---- Telegram Bot ----
-const bot = new TelegramBot(BOT_TOKEN, { polling: true });
-
-// Une seule commande affichée : /start. Tout le reste se fait via les boutons.
-const DEFAULT_COMMANDS = [
-  { command: 'start', description: 'Ouvrir le menu' }
-];
-
-const OWNER_COMMANDS = [
-  ...DEFAULT_COMMANDS,
-  { command: 'admin', description: 'Admin (produits)' },
-  { command: 'broadcast', description: 'Message à tous' }
-];
-
-bot.setMyCommands(DEFAULT_COMMANDS).then(() => console.log('✅ Commandes (défaut) enregistrées')).catch((e) => console.warn('setMyCommands default:', e?.message));
-if (OWNER_CHAT_ID) {
-  const ownerId = Number(OWNER_CHAT_ID) || OWNER_CHAT_ID;
-  bot.setMyCommands(OWNER_COMMANDS, { scope: { type: 'chat', chat_id: ownerId } })
-    .then(() => console.log('✅ Commandes (admin) enregistrées pour owner'))
-    .catch((e) => console.warn('setMyCommands owner:', e?.message));
-}
-
-// Ne pas crasher sur une erreur de polling (réseau, etc.)
-bot.on('polling_error', (err) => {
-  console.error('❌ Telegram polling_error:', err.message);
-});
+// ---- Telegram Bot (PROCESS_ROLE=web → pas de polling ici ; lancer un 2e processus PROCESS_ROLE=bot) ----
+let bot = null;
 
 process.on('unhandledRejection', (reason, p) => {
   console.error('❌ Unhandled Rejection:', reason);
 });
 
-console.log('✅ Bot started (long polling)');
+if (IS_BOT) {
+  bot = new TelegramBot(BOT_TOKEN, { polling: true });
+
+  const DEFAULT_COMMANDS = [
+    { command: 'start', description: 'Ouvrir le menu' }
+  ];
+
+  const OWNER_COMMANDS = [
+    ...DEFAULT_COMMANDS,
+    { command: 'admin', description: 'Admin (produits)' },
+    { command: 'broadcast', description: 'Message à tous' }
+  ];
+
+  bot.setMyCommands(DEFAULT_COMMANDS).then(() => console.log('✅ Commandes (défaut) enregistrées')).catch((e) => console.warn('setMyCommands default:', e?.message));
+  if (OWNER_CHAT_ID) {
+    const ownerId = Number(OWNER_CHAT_ID) || OWNER_CHAT_ID;
+    bot.setMyCommands(OWNER_COMMANDS, { scope: { type: 'chat', chat_id: ownerId } })
+      .then(() => console.log('✅ Commandes (admin) enregistrées pour owner'))
+      .catch((e) => console.warn('setMyCommands owner:', e?.message));
+  }
+
+  bot.on('polling_error', (err) => {
+    console.error('❌ Telegram polling_error:', err.message);
+  });
+
+  console.log('✅ Bot started (long polling)');
+} else {
+  console.log('ℹ️ PROCESS_ROLE=web : pas de Telegram sur ce processus — lance aussi `alps-bot` (PROCESS_ROLE=bot).');
+}
 
 // Image de bienvenue (logo Alpine Connexion — tu peux remplacer par ton image dans .env WELCOME_IMAGE_URL)
 const WELCOME_IMAGE_URL = process.env.WELCOME_IMAGE_URL || 'https://res.cloudinary.com/divcybeds/image/upload/v1771239856/Alpine_Connection_Wonka_LETTERING-V01_Logo_2022_o7rhyc.png';
@@ -553,7 +568,7 @@ function startCartReminderScheduler() {
 }
 
 // Start background reminder checks (cart abandoned)
-startCartReminderScheduler();
+if (IS_BOT) startCartReminderScheduler();
 
 const ADMIN_INLINE = {
   reply_markup: {
@@ -573,22 +588,15 @@ function getOrderContactKeyboard(lang) {
   };
 }
 
-// Suite commande : attente identifiant Signal / Threema
-const contactState = {};
-
-bot.onText(/\/start(?:\s+(.+))?/, async (msg) => {
-  const chatId = msg.chat.id;
-  const isOwner = String(chatId) === String(OWNER_CHAT_ID);
-  if (!isBotEnabled() && !isOwner) return;
-  addBotUserFromMsg(msg);
-  delete contactState[chatId];
-  const caption = BOT_STRINGS.fr.choose_lang;
-  try {
-    await bot.sendPhoto(chatId, WELCOME_IMAGE_URL, { caption, ...LANG_PICK_INLINE });
-  } catch (err) {
-    await bot.sendMessage(chatId, caption, LANG_PICK_INLINE);
-  }
-});
+const KNOWN_CMD_RE = /^\/(start|menu|admin|help|broadcast|cancel)(\s|$)/i;
+const ORDER_PREFIXES = ['🛒 Nouvelle Commande', '🛒 New Order', '🛒 Neue Bestellung'];
+const lastOrderByChat = {};
+function looksLikeOrder(text) {
+  if (!text || text.length < 10) return false;
+  if (ORDER_PREFIXES.some((p) => text.startsWith(p))) return true;
+  if (/(?:Total|Gesamt)\s*:\s*[\d.,]+(?:\s*CHF)?/i.test(text) || /[\d.,]+\s*CHF\s*$/m.test(text)) return true;
+  return false;
+}
 
 function buildHelpMessage(isOwner, lang) {
   const L = BOT_STRINGS[lang] || BOT_STRINGS.fr;
@@ -605,17 +613,94 @@ function buildHelpMessage(isOwner, lang) {
   return s;
 }
 
-const KNOWN_CMD_RE = /^\/(start|menu|admin|help|broadcast|cancel)(\s|$)/i;
-const ORDER_PREFIXES = ['🛒 Nouvelle Commande', '🛒 New Order', '🛒 Neue Bestellung'];
-const lastOrderByChat = {};
-function looksLikeOrder(text) {
-  if (!text || text.length < 10) return false;
-  // Exact start (from catalog)
-  if (ORDER_PREFIXES.some((p) => text.startsWith(p))) return true;
-  // Fallback: message contains order total line (in case URL was truncated on mobile)
-  if (/(?:Total|Gesamt)\s*:\s*[\d.,]+(?:\s*CHF)?/i.test(text) || /[\d.,]+\s*CHF\s*$/m.test(text)) return true;
-  return false;
+// Suite commande : attente identifiant Signal / Threema
+const contactState = {};
+
+async function deliverQueuedWebOrder(user, orderText) {
+  if (!bot) return;
+  const userId = user.id;
+  lastOrderByChat[userId] = orderText;
+  delete contactState[userId];
+  const fromLabel = user.username ? `@${user.username}` : [user.first_name, user.last_name].filter(Boolean).join(' ') || `ID ${userId}`;
+  if (OWNER_CHAT_ID) {
+    try {
+      await bot.sendMessage(OWNER_CHAT_ID, `📥 Nouvelle commande reçue :\n\n${orderText}\n\n👤 Client : ${fromLabel}`);
+    } catch (err) {
+      console.error('❌ Error sending order to owner:', err.message);
+    }
+  }
+  const langOrd = getChatLang(userId) || 'fr';
+  const L = BOT_STRINGS[langOrd];
+  try {
+    await bot.sendMessage(userId, L.order_received, getOrderContactKeyboard(langOrd));
+  } catch (err) {
+    console.error('❌ Error sending confirmation to user:', err.message);
+  }
 }
+
+function drainOrderQueueOnce() {
+  if (!bot) return;
+  try {
+    if (!fs.existsSync(ORDER_QUEUE_FILE)) return;
+    const workPath = `${ORDER_QUEUE_FILE}.${process.pid}.work`;
+    try {
+      fs.renameSync(ORDER_QUEUE_FILE, workPath);
+    } catch (e) {
+      if (e.code === 'ENOENT') return;
+      throw e;
+    }
+    const raw = fs.readFileSync(workPath, 'utf8');
+    try {
+      fs.unlinkSync(workPath);
+    } catch (e) {
+      /* ignore */
+    }
+    for (const line of raw.split('\n')) {
+      if (!line.trim()) continue;
+      let row;
+      try {
+        row = JSON.parse(line);
+      } catch {
+        continue;
+      }
+      if (row.type !== 'web_order' || !row.user?.id || !row.orderText) continue;
+      void deliverQueuedWebOrder(row.user, row.orderText);
+    }
+  } catch (e) {
+    console.error('❌ order_queue drain:', e.message);
+  }
+}
+
+function enqueueWebOrderSync(user, orderText) {
+  const line =
+    JSON.stringify({
+      type: 'web_order',
+      user: {
+        id: user.id,
+        username: user.username,
+        first_name: user.first_name,
+        last_name: user.last_name
+      },
+      orderText,
+      enqueuedAt: new Date().toISOString()
+    }) + '\n';
+  fs.appendFileSync(ORDER_QUEUE_FILE, line, 'utf8');
+}
+
+if (IS_BOT) {
+bot.onText(/\/start(?:\s+(.+))?/, async (msg) => {
+  const chatId = msg.chat.id;
+  const isOwner = String(chatId) === String(OWNER_CHAT_ID);
+  if (!isBotEnabled() && !isOwner) return;
+  addBotUserFromMsg(msg);
+  delete contactState[chatId];
+  const caption = BOT_STRINGS.fr.choose_lang;
+  try {
+    await bot.sendPhoto(chatId, WELCOME_IMAGE_URL, { caption, ...LANG_PICK_INLINE });
+  } catch (err) {
+    await bot.sendMessage(chatId, caption, LANG_PICK_INLINE);
+  }
+});
 
 // Réponses aux boutons du menu (bouton Accès boutique ouvre le Web App directement)
 bot.on('message', async (msg) => {
@@ -829,6 +914,10 @@ bot.on('callback_query', async (query) => {
   }
 });
 
+}
+
+if (IS_BOT) setInterval(drainOrderQueueOnce, 1500);
+
 // ---- Products store (products.json) ----
 const PRODUCTS_FILE = path.join(__dirname, 'products.json');
 
@@ -957,6 +1046,11 @@ app.use(
   })
 );
 app.use(express.json());
+
+app.get('/healthz', (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.status(200).json({ ok: true, role: PROCESS_ROLE, t: Date.now() });
+});
 
 // Fichiers uploadés accessibles en /uploads/...
 app.use('/uploads', express.static(UPLOAD_DIR));
@@ -1261,6 +1355,18 @@ app.post('/api/order', (req, res) => {
     return res.status(400).json({ error: 'Invalid order' });
   }
   const userId = user.id;
+  addOrUpdateBotUserFromWebAppUser(user);
+
+  if (PROCESS_ROLE === 'web') {
+    try {
+      enqueueWebOrderSync(user, orderText);
+    } catch (e) {
+      console.error('❌ order_queue:', e.message);
+      return res.status(500).json({ error: 'queue_failed' });
+    }
+    return res.json({ ok: true, queued: true });
+  }
+
   const fromLabel = user.username ? `@${user.username}` : [user.first_name, user.last_name].filter(Boolean).join(' ') || `ID ${userId}`;
 
   if (OWNER_CHAT_ID) {
@@ -1367,15 +1473,30 @@ const nodeSslCert = process.env.NODE_SSL_CERT;
 const nodeSslKey = process.env.NODE_SSL_KEY;
 // 0 = désactiver la redirection http→https (ex. tout en 3000 en local)
 const httpRedirectPort = Number(process.env.HTTP_REDIRECT_PORT ?? 80);
+// Sur certains VPS, sans hôte explicite Node peut n’écouter que sur :: alors que le comportement IPv4/443 (TLS) reste capricieux ; 0.0.0.0 force l’IPv4. Surcharge : LISTEN_HOST=:: ou 127.0.0.1
+const listenHostRaw = process.env.LISTEN_HOST;
+const listenHost =
+  listenHostRaw !== undefined && String(listenHostRaw).trim() !== ''
+    ? String(listenHostRaw).trim()
+    : nodeSslCert && nodeSslKey
+      ? '0.0.0.0'
+      : undefined;
+
+function listenOptions(port) {
+  return listenHost ? { port, host: listenHost } : { port };
+}
 
 function logListenBanner(proto, port) {
   const base = proto === 'https' ? `https://localhost:${port}` : `http://localhost:${port}`;
   console.log(`✅ API + catalogue (${proto}) sur le port ${port}`);
+  if (listenHost) console.log(`   bind : ${listenHost}`);
   console.log(`   Catalogue : ${base}/`);
   console.log(`   Admin    : ${base}/admin.html`);
 }
 
-if (nodeSslCert && nodeSslKey) {
+if (!IS_WEB) {
+  console.log(`🤖 PROCESS_ROLE=${PROCESS_ROLE} : pas d’écoute HTTP sur ce processus (santé : queue commandes web → Telegram).`);
+} else if (nodeSslCert && nodeSslKey) {
   let creds;
   try {
     creds = {
@@ -1386,7 +1507,7 @@ if (nodeSslCert && nodeSslKey) {
     console.error('❌ Lecture NODE_SSL_CERT / NODE_SSL_KEY impossible :', e.message);
     process.exit(1);
   }
-  https.createServer(creds, app).listen(listenPort, () => logListenBanner('https', listenPort));
+  https.createServer(creds, app).listen(listenOptions(listenPort), () => logListenBanner('https', listenPort));
   if (httpRedirectPort > 0) {
     http
       .createServer((req, res) => {
@@ -1394,13 +1515,13 @@ if (nodeSslCert && nodeSslKey) {
         res.writeHead(301, { Location: `https://${host}${req.url || '/'}` });
         res.end();
       })
-      .listen(httpRedirectPort, () => {
-        console.log(`✅ HTTP → HTTPS (redirection) sur le port ${httpRedirectPort}`);
+      .listen(listenOptions(httpRedirectPort), () => {
+        console.log(`✅ HTTP → HTTPS (redirection) sur le port ${httpRedirectPort}${listenHost ? ` (bind ${listenHost})` : ''}`);
       })
       .on('error', (err) => {
         console.warn(`⚠️ Redirection HTTP non démarrée (port ${httpRedirectPort}) :`, err.message);
       });
   }
 } else {
-  app.listen(listenPort, () => logListenBanner('http', listenPort));
+  app.listen(listenOptions(listenPort), () => logListenBanner('http', listenPort));
 }
