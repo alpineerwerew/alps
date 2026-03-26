@@ -134,6 +134,10 @@
         <form id="review-form" class="review-form">
             <div id="review-order-ref-hint" class="review-order-ref-hint">Checking order reference...</div>
             <label>
+                Product from this order
+                <select id="review-product" required></select>
+            </label>
+            <label>
                 Name
                 <input id="review-name" type="text" maxlength="60" required>
             </label>
@@ -190,7 +194,7 @@
 <!-- #endregion -->
 
 <!-- #region Scripts -->
-<script src="app.js?v=20260326-reviews-order-reference"></script>
+<script src="app.js?v=20260326-per-product-reviews"></script>
 <!-- #endregion -->
 </body>
 </html>

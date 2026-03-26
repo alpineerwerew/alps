@@ -296,7 +296,9 @@ function loadReviews() {
         verified: !!r.verified,
         approved: !!r.approved,
         created_at: r.created_at || null,
-        product_image: r.product_image ? String(r.product_image) : null
+        product_image: r.product_image ? String(r.product_image) : null,
+        product_id: r.product_id != null ? Number(r.product_id) : null,
+        product_name: r.product_name ? String(r.product_name).slice(0, 120) : null
       }))
       .filter((r) => r.name && r.title && r.text);
   } catch {
@@ -355,25 +357,35 @@ function parseOrderForReference(orderText) {
   };
 }
 
-function inferProductImageFromItems(items) {
+function findMatchedProductsFromItems(items) {
   const wanted = Array.isArray(items) ? items.map((x) => String(x || '').toLowerCase()).filter(Boolean) : [];
-  if (!wanted.length) return null;
+  if (!wanted.length) return [];
   const data = loadProductsData();
   const products = Array.isArray(data?.products) ? data.products : [];
+  const out = [];
+  const seen = new Set();
   for (const w of wanted) {
     const hit = products.find((p) => {
       const name = String(p?.name || '').toLowerCase();
       return !!name && (name.includes(w) || w.includes(name));
     });
-    if (hit && hit.image_url) return String(hit.image_url);
-    if (hit && Array.isArray(hit.media) && hit.media[0]?.url) return String(hit.media[0].url);
+    if (!hit || seen.has(String(hit.id))) continue;
+    seen.add(String(hit.id));
+    out.push({
+      id: Number(hit.id) || null,
+      name: String(hit.name || '').slice(0, 120),
+      image_url: hit.image_url
+        ? String(hit.image_url)
+        : (Array.isArray(hit.media) && hit.media[0]?.url ? String(hit.media[0].url) : null)
+    });
   }
-  return null;
+  return out.filter((p) => p.id != null);
 }
 
 function appendOrderHistory(user, orderText) {
   if (!user || !user.id) return null;
   const summary = parseOrderForReference(orderText);
+  const matchedProducts = findMatchedProductsFromItems(summary.items);
   const rows = loadOrdersHistory();
   const row = {
     id: Date.now(),
@@ -384,7 +396,8 @@ function appendOrderHistory(user, orderText) {
     last_name: user.last_name || null,
     order_text: String(orderText || ''),
     items: summary.items,
-    product_image: inferProductImageFromItems(summary.items),
+    products: matchedProducts,
+    product_image: matchedProducts[0]?.image_url || null,
     total_chf: summary.total_chf,
     created_at: new Date().toISOString(),
     status: 'confirmed'
@@ -399,6 +412,13 @@ function getLatestConfirmedOrderForUser(userId) {
   if (!userId) return null;
   const rows = loadOrdersHistory();
   return rows.find((r) => String(r.user_id) === String(userId) && (r.status || 'confirmed') === 'confirmed') || null;
+}
+
+function getOrderProducts(order) {
+  if (!order) return [];
+  const list = Array.isArray(order.products) ? order.products.filter((p) => p && p.id != null) : [];
+  if (list.length) return list;
+  return findMatchedProductsFromItems(Array.isArray(order.items) ? order.items : []);
 }
 
 function upsertCartActivity(user, payload) {
@@ -1381,25 +1401,37 @@ app.get('/api/reviews/eligibility', requireTelegramInitForPublicApi, (req, res) 
   if (!latestOrder) {
     return res.json({ ok: true, can_review: false, reason: 'review_requires_confirmed_order' });
   }
+  const orderProducts = getOrderProducts(latestOrder);
+  if (!orderProducts.length) {
+    return res.json({ ok: true, can_review: false, reason: 'review_no_product_match', order_ref: latestOrder.ref || null });
+  }
   const rows = loadReviews();
-  const alreadyReviewed = rows.some((r) =>
-    String(r.user_id || '') === String(user.id) &&
-    String(r.order_ref || '') === String(latestOrder.ref || '')
+  const reviewedSet = new Set(
+    rows
+      .filter((r) =>
+        String(r.user_id || '') === String(user.id) &&
+        String(r.order_ref || '') === String(latestOrder.ref || '') &&
+        r.product_id != null
+      )
+      .map((r) => String(r.product_id))
   );
-  if (alreadyReviewed) {
+  const eligibleProducts = orderProducts.filter((p) => !reviewedSet.has(String(p.id)));
+  if (!eligibleProducts.length) {
     return res.json({
       ok: true,
       can_review: false,
-      reason: 'review_already_exists_for_order',
+      reason: 'review_already_exists_for_order_products',
       order_ref: latestOrder.ref || null,
-      ordered_items: Array.isArray(latestOrder.items) ? latestOrder.items.slice(0, 5) : []
+      ordered_items: Array.isArray(latestOrder.items) ? latestOrder.items.slice(0, 5) : [],
+      eligible_products: []
     });
   }
   return res.json({
     ok: true,
     can_review: true,
     order_ref: latestOrder.ref || null,
-    ordered_items: Array.isArray(latestOrder.items) ? latestOrder.items.slice(0, 5) : []
+    ordered_items: Array.isArray(latestOrder.items) ? latestOrder.items.slice(0, 5) : [],
+    eligible_products: eligibleProducts
   });
 });
 
@@ -1421,13 +1453,20 @@ app.post('/api/reviews', requireTelegramInitForPublicApi, (req, res) => {
   if (!latestOrder) {
     return res.status(403).json({ error: 'review_requires_confirmed_order' });
   }
+  const productIdReq = Number(req.body?.product_id);
+  const latestOrderProducts = getOrderProducts(latestOrder);
+  const matchedProduct = latestOrderProducts.find((p) => Number(p.id) === productIdReq);
+  if (!matchedProduct) {
+    return res.status(400).json({ error: 'review_product_not_in_order' });
+  }
   const rows = loadReviews();
   const alreadyReviewed = rows.some((r) =>
     String(r.user_id || '') === String(user.id) &&
-    String(r.order_ref || '') === String(latestOrder.ref || '')
+    String(r.order_ref || '') === String(latestOrder.ref || '') &&
+    Number(r.product_id) === productIdReq
   );
   if (alreadyReviewed) {
-    return res.status(409).json({ error: 'review_already_exists_for_order' });
+    return res.status(409).json({ error: 'review_already_exists_for_order_product' });
   }
   const row = {
     id: Date.now(),
@@ -1442,7 +1481,9 @@ app.post('/api/reviews', requireTelegramInitForPublicApi, (req, res) => {
     user_id: String(user.id),
     order_ref: latestOrder.ref || null,
     ordered_items: Array.isArray(latestOrder.items) ? latestOrder.items.slice(0, 5) : [],
-    product_image: latestOrder.product_image || inferProductImageFromItems(latestOrder.items || [])
+    product_id: Number(matchedProduct.id),
+    product_name: String(matchedProduct.name || '').slice(0, 120),
+    product_image: matchedProduct.image_url || latestOrder.product_image || null
   };
   rows.unshift(row);
   saveReviews(rows);

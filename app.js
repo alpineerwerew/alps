@@ -716,6 +716,7 @@ let reviewFilter = 'all';
 let reviewSort = 'recent';
 let visibleReviewsCount = 6;
 let reviewEligibility = null;
+let productRatingMap = new Map();
 let reviewsLoadInFlight = null;
 
 async function loadOrganicReviews() {
@@ -776,6 +777,26 @@ function getReviewsByCurrentSettings() {
     return list;
 }
 
+function rebuildProductRatingMap() {
+    const m = new Map();
+    organicReviews.forEach((r) => {
+        const pid = Number(r?.product_id);
+        if (!Number.isFinite(pid) || pid <= 0) return;
+        const prev = m.get(pid) || { count: 0, sum: 0 };
+        prev.count += 1;
+        prev.sum += Math.max(1, Math.min(5, Number(r.rating) || 0));
+        m.set(pid, prev);
+    });
+    productRatingMap = m;
+}
+
+function getProductRatingMeta(productId) {
+    const pid = Number(productId);
+    const v = productRatingMap.get(pid);
+    if (!v || !v.count) return null;
+    return { avg: v.sum / v.count, count: v.count };
+}
+
 function renderStarIcons(rating, labelPrefix) {
     const safe = Math.max(0, Math.min(5, Number(rating) || 0));
     let stars = '';
@@ -831,6 +852,7 @@ function renderReviewsList() {
             <div class="review-card-top">
                 <div>
                     <h3 class="review-title">${escapeHtml(r.title)}</h3>
+                    ${r.product_name ? `<div class="review-product-name">${escapeHtml(r.product_name)}</div>` : ''}
                     <div class="review-author-row">
                         <span class="review-author">${escapeHtml(r.name)}</span>
                         ${r.verified ? '<span class="review-verified">Verified</span>' : ''}
@@ -859,8 +881,10 @@ async function initReviewsSection() {
     const closeBtn = document.getElementById('review-modal-close');
     const form = document.getElementById('review-form');
     const refHint = document.getElementById('review-order-ref-hint');
-    if (!filterEl || !sortEl || !loadMoreBtn || !addBtn || !modal || !closeBtn || !form) return;
+    const productSel = document.getElementById('review-product');
+    if (!filterEl || !sortEl || !loadMoreBtn || !addBtn || !modal || !closeBtn || !form || !productSel) return;
     organicReviews = await loadOrganicReviews();
+    rebuildProductRatingMap();
     if (organicReviews.length === 0) {
         filterEl.disabled = true;
         sortEl.disabled = true;
@@ -883,8 +907,10 @@ async function initReviewsSection() {
         modal.classList.remove('hidden');
         if (refHint) refHint.textContent = 'Checking order reference...';
         reviewEligibility = await loadReviewEligibility();
+        productSel.innerHTML = '';
         if (!reviewEligibility) {
             if (refHint) refHint.textContent = 'Unable to check order reference right now.';
+            productSel.disabled = true;
             return;
         }
         const items = Array.isArray(reviewEligibility.ordered_items) && reviewEligibility.ordered_items.length
@@ -894,9 +920,19 @@ async function initReviewsSection() {
             if (refHint) refHint.textContent = `Order reference: ${reviewEligibility.order_ref}${items}`;
         } else if (reviewEligibility.reason === 'review_requires_confirmed_order') {
             if (refHint) refHint.textContent = 'No confirmed order found yet for your account.';
+        } else if (reviewEligibility.reason === 'review_already_exists_for_order_products') {
+            if (refHint) refHint.textContent = `All products from order ${reviewEligibility.order_ref || ''} are already reviewed.`;
         } else {
             if (refHint) refHint.textContent = 'Order reference unavailable.';
         }
+        const opts = Array.isArray(reviewEligibility.eligible_products) ? reviewEligibility.eligible_products : [];
+        if (!opts.length) {
+            productSel.innerHTML = '<option value="">No eligible product found</option>';
+            productSel.disabled = true;
+            return;
+        }
+        productSel.innerHTML = opts.map((p) => `<option value="${Number(p.id)}">${escapeHtml(p.name || `Product #${p.id}`)}</option>`).join('');
+        productSel.disabled = false;
     };
     const closeModal = () => modal.classList.add('hidden');
     addBtn.addEventListener('click', openModal);
@@ -908,11 +944,12 @@ async function initReviewsSection() {
         e.preventDefault();
         const name = document.getElementById('review-name')?.value?.trim();
         const rating = Number(document.getElementById('review-rating')?.value || 5);
+        const productId = Number(document.getElementById('review-product')?.value);
         const title = document.getElementById('review-title-input')?.value?.trim();
         const text = document.getElementById('review-text')?.value?.trim();
-        if (!name || !title || !text) return;
+        if (!name || !title || !text || !Number.isFinite(productId) || productId <= 0) return;
         if (reviewEligibility && reviewEligibility.can_review === false) {
-            if (reviewEligibility.reason === 'review_already_exists_for_order') {
+            if (reviewEligibility.reason === 'review_already_exists_for_order' || reviewEligibility.reason === 'review_already_exists_for_order_products') {
                 showToast('You already reviewed this order reference.');
             } else {
                 showToast('Only customers with a confirmed order can post a review.');
@@ -926,6 +963,7 @@ async function initReviewsSection() {
                 body: JSON.stringify({
                     initData: getInitData(),
                     name,
+                    product_id: productId,
                     rating: Math.max(1, Math.min(5, rating || 5)),
                     title,
                     text
@@ -937,14 +975,19 @@ async function initReviewsSection() {
                     showToast('Only customers with a confirmed order can post a review.');
                     return;
                 }
-                if (d?.error === 'review_already_exists_for_order') {
+                if (d?.error === 'review_already_exists_for_order' || d?.error === 'review_already_exists_for_order_product') {
                     showToast('You already reviewed this order reference.');
+                    return;
+                }
+                if (d?.error === 'review_product_not_in_order') {
+                    showToast('Select a product from your confirmed order.');
                     return;
                 }
                 showToast('Review submit failed. Please retry.');
                 return;
             }
             organicReviews = await loadOrganicReviews();
+            rebuildProductRatingMap();
         } catch (err) {
             showToast('Network error while sending review.');
             return;
@@ -958,12 +1001,14 @@ async function initReviewsSection() {
         visibleReviewsCount = 6;
         renderReviewsSummary();
         renderReviewsList();
+        renderProducts();
         form.reset();
         showToast('Thanks! Your review will be published after admin verification.');
         closeModal();
     });
     renderReviewsSummary();
     renderReviewsList();
+    renderProducts();
 }
 
 function closeAgeGate() {
@@ -1328,6 +1373,10 @@ function renderProducts() {
 
         const fp = p.pricing?.[0];
         const price = fp ? `<span class="price-from">${t('price_from_prefix')}</span>${fp.price} ${CURRENCY}` : '';
+        const rm = getProductRatingMeta(p.id);
+        const ratingHtml = rm
+            ? `<div class="product-rating-line" aria-label="Rated ${rm.avg.toFixed(1)} out of 5 from ${rm.count} reviews">★ ${rm.avg.toFixed(1)} <span>(${rm.count})</span></div>`
+            : '';
 
         return `
             <div class="product-card" onclick="openProduct(${p.id})">
@@ -1335,6 +1384,7 @@ function renderProducts() {
                 <div class="product-card-body">
                     <div class="product-card-name">${escapeHtml(p.name)}</div>
                     <div class="product-card-desc">${escapeHtml((p.description||'').split('\n')[0])}</div>
+                    ${ratingHtml}
                     <div class="product-card-price">${price}</div>
                 </div>
             </div>`;
@@ -1392,12 +1442,17 @@ function openProduct(id) {
 
     let gallery = p.gallery_link
         ? `<a href="${escapeHtml(p.gallery_link)}" target="_blank" class="gallery-link">📸 Voir les photos</a>` : '';
+    const rm = getProductRatingMeta(p.id);
+    const modalRatingHtml = rm
+        ? `<div class="product-modal-rating">★ ${rm.avg.toFixed(1)} · ${rm.count} review${rm.count > 1 ? 's' : ''}</div>`
+        : '';
 
     document.getElementById('modal-content').innerHTML = `
         ${media}
         <div class="modal-body">
             <div class="modal-title">${escapeHtml(p.name)}</div>
             <div class="modal-category-badge">${escapeHtml(cat?.name || '')}</div>
+            ${modalRatingHtml}
             <div class="modal-description">${escapeHtml(p.description || '')}</div>
             ${gallery}${variants}${pricing}
             <button class="btn-add-cart" id="btn-add" onclick="addToCart()" disabled>${t('btn_add_cart')}</button>

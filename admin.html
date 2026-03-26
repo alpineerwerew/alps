@@ -577,6 +577,7 @@
                     const ordered = Array.isArray(rv.ordered_items) && rv.ordered_items.length
                         ? escapeHtml(rv.ordered_items.join(', '))
                         : '—';
+                    const productName = rv.product_name ? escapeHtml(String(rv.product_name)) : '—';
                     const approveBtn = rv.approved
                         ? ''
                         : `<button type="button" class="btn" data-review-approve="${rv.id}">Approuver</button>`;
@@ -586,6 +587,7 @@
                         <td>${escapeHtml(stars)}</td>
                         <td>${escapeHtml(rv.title || '')}</td>
                         <td>${escapeHtml((rv.text || '').slice(0, 140))}${(rv.text || '').length > 140 ? '…' : ''}</td>
+                        <td>${productName}</td>
                         <td>${orderRef}</td>
                         <td>${ordered}</td>
                         <td>${date}</td>
@@ -595,7 +597,7 @@
                 });
                 reviewsAdminList.innerHTML = `
                     <table>
-                        <thead><tr><th>#</th><th>Auteur</th><th>Note</th><th>Titre</th><th>Texte</th><th>Réf commande</th><th>Articles</th><th>Date</th><th>Statut</th><th></th></tr></thead>
+                        <thead><tr><th>#</th><th>Auteur</th><th>Note</th><th>Titre</th><th>Texte</th><th>Produit</th><th>Réf commande</th><th>Articles</th><th>Date</th><th>Statut</th><th></th></tr></thead>
                         <tbody>${rows.join('')}</tbody>
                     </table>
                 `;
