@@ -57,6 +57,7 @@ const I18N = {
         cart_bot_followup: 'Le bot te demandera sur quel canal te recontacter (Signal ou Threema), puis ton identifiant pour confirmer.',
         cart_step_copy: 'Optionnel — copie du texte',
         cart_btn_copy: 'Copier la commande',
+        cart_btn_clear_saved: 'Vider le panier sauvegardé',
         cart_need_telegram: 'Ouvre le catalogue depuis Telegram pour envoyer la commande.',
         order_send_failed: 'Envoi impossible. Réessaie dans un instant.',
         open_signal: 'Signal',
@@ -110,6 +111,7 @@ Paiement en espèces : pas de cashback.`,
         cart_bot_followup: 'The bot will ask where to reach you (Signal or Threema), then your ID to confirm.',
         cart_step_copy: 'Optional — copy text',
         cart_btn_copy: 'Copy order',
+        cart_btn_clear_saved: 'Clear saved cart',
         cart_need_telegram: 'Open the catalog from Telegram to send your order.',
         order_send_failed: 'Could not send. Please try again.',
         open_signal: 'Signal',
@@ -163,6 +165,7 @@ Cash payments: no cashback.`,
         cart_bot_followup: 'Der Bot fragt, wie wir dich erreichen (Signal oder Threema), dann deine Kennung zur Bestätigung.',
         cart_step_copy: 'Optional — Text kopieren',
         cart_btn_copy: 'Bestellung kopieren',
+        cart_btn_clear_saved: 'Gespeicherten Warenkorb leeren',
         cart_need_telegram: 'Öffne den Katalog über Telegram, um die Bestellung zu senden.',
         order_send_failed: 'Senden fehlgeschlagen. Bitte erneut versuchen.',
         open_signal: 'Signal',
@@ -223,6 +226,50 @@ function setLang(lang) {
 function getInitData() {
     const tg = window.Telegram?.WebApp;
     return (tg && tg.initData) ? tg.initData : '';
+}
+
+function getTelegramUserIdFromInitData() {
+    try {
+        const initData = getInitData();
+        if (!initData) return null;
+        const params = new URLSearchParams(initData);
+        const userRaw = params.get('user');
+        if (!userRaw) return null;
+        const user = JSON.parse(decodeURIComponent(userRaw));
+        return user && user.id != null ? String(user.id) : null;
+    } catch (e) {
+        return null;
+    }
+}
+
+function getCartStorageKey() {
+    const userId = getTelegramUserIdFromInitData();
+    return `ac_cart_${userId || 'guest'}`;
+}
+
+function saveCartToStorage() {
+    try {
+        localStorage.setItem(getCartStorageKey(), JSON.stringify(Array.isArray(cart) ? cart : []));
+    } catch (e) {}
+}
+
+function loadCartFromStorage() {
+    try {
+        const raw = localStorage.getItem(getCartStorageKey());
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) return;
+        cart = parsed
+            .filter((item) => item && typeof item === 'object')
+            .map((item) => ({
+                name: String(item.name || ''),
+                unit_type: item.unit_type === 'gram' ? 'gram' : 'unit',
+                qty: Number(item.qty) || 0,
+                price: Number(item.price) || 0,
+                variant: item.variant ? String(item.variant) : null
+            }))
+            .filter((item) => item.name && item.qty > 0 && item.price >= 0);
+    } catch (e) {}
 }
 
 function isTelegramWebApp() {
@@ -892,6 +939,9 @@ function init() {
     }
     (async () => {
         if (isTelegramWebApp()) await waitForInitData();
+        loadCartFromStorage();
+        updateCartBadge();
+        scheduleCartActivitySync();
         const ageOk = await ensureAgeConfirmed();
         if (!ageOk) return;
         await loadCatalog();
@@ -1289,6 +1339,7 @@ function addToCart() {
         variant: v
     });
 
+    saveCartToStorage();
     updateCartBadge();
     scheduleCartActivitySync();
     closeProductModal();
@@ -1358,6 +1409,7 @@ function renderCart() {
             <span class="cart-total-amount">${totals.payable.toFixed(2)} ${CURRENCY}</span>
         </div>
         <button type="button" class="btn-checkout" onclick="checkout()">${t('cart_btn_submit')}</button>
+        <button type="button" class="btn-clear-cart" onclick="clearSavedCart()">${t('cart_btn_clear_saved')}</button>
     `;
     h += `</div>`;
     c.innerHTML = h;
@@ -1370,8 +1422,17 @@ function renderCart() {
     }
 }
 
+function clearSavedCart() {
+    cart = [];
+    saveCartToStorage();
+    updateCartBadge();
+    scheduleCartActivitySync();
+    renderCart();
+}
+
 function removeFromCart(i) {
     cart.splice(i, 1);
+    saveCartToStorage();
     updateCartBadge();
     scheduleCartActivitySync();
     renderCart();
@@ -1419,6 +1480,7 @@ async function checkout() {
                     if (balEl) balEl.textContent = formatChfAmount(myCashbackBalanceChf);
                 }
                 cart = [];
+                saveCartToStorage();
                 updateCartBadge();
                 scheduleCartActivitySync();
                 closeCart();
