@@ -4,13 +4,16 @@
   "description": "Telegram bot backend for Alpine Connexion order handling",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "db:bootstrap": "node scripts/bootstrap-supabase.js",
+    "db:import:json": "node scripts/import-json-to-supabase.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.21.0",
     "multer": "^1.4.5-lts.1",
-    "node-telegram-bot-api": "^0.66.0"
+    "node-telegram-bot-api": "^0.66.0",
+    "pg": "^8.20.0"
   }
 }
