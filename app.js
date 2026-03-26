@@ -68,14 +68,18 @@ const I18N = {
         age_gate_decline: 'Quitter',
         cashback_chip_short: 'Cashback',
         cashback_modal_title: 'Cashback crypto & crédit perso',
-        cashback_modal_body: `Un crédit en CHF est lié à ton compte Telegram (solde utilisable sur une prochaine commande).
+        cashback_modal_body: `Comment ça marche :
 
-• Commandes payées en crypto (ex. BTC) : après réception du paiement, le cashback est ajouté manuellement depuis notre admin.
-• Montant de la commande sous 1 000 CHF : 5 % du total en crédit.
-• Montant à partir de 1 000 CHF : 10 % du total en crédit.
-• Ce crédit s’utilise sur ta prochaine commande (déduction confirmée avec l’équipe).
+1) Cashback uniquement si tu paies en crypto (ex: BTC).
+2) Nous validons le paiement, puis nous ajoutons le crédit manuellement.
+3) Le crédit est lié à ton compte Telegram et s’utilise sur une prochaine commande.
 
-Paiement en espèces : pas de cashback.`,
+Taux cashback :
+• Commande < 1 000 CHF → 5 %
+• Commande >= 1 000 CHF → 10 %
+
+Important :
+• Paiement cash = 0 cashback`,
         cashback_modal_ok: 'Compris',
         cashback_auto_apply: 'Utiliser automatiquement mon crédit cashback',
         cashback_discount_label: 'Cashback appliqué',
@@ -124,14 +128,18 @@ Paiement en espèces : pas de cashback.`,
         age_gate_decline: 'Leave',
         cashback_chip_short: 'Cashback',
         cashback_modal_title: 'Crypto cashback & your balance',
-        cashback_modal_body: `A CHF credit balance is tied to your Telegram account (usable on a future order).
+        cashback_modal_body: `How it works:
 
-• Crypto-paid orders only (e.g. BTC): after payment is confirmed, cashback is added manually from our admin panel.
-• Order total under 1,000 CHF: 5% of the order as credit.
-• Order total from 1,000 CHF: 10% of the order as credit.
-• Credit applies to your next order (deduction arranged with the team).
+1) Cashback applies only to crypto payments (e.g. BTC).
+2) After payment is confirmed, we add the credit manually.
+3) Credit is linked to your Telegram account and used on a future order.
 
-Cash payments: no cashback.`,
+Cashback rates:
+• Order < 1,000 CHF -> 5%
+• Order >= 1,000 CHF -> 10%
+
+Important:
+• Cash payment = 0 cashback`,
         cashback_modal_ok: 'Got it',
         cashback_auto_apply: 'Automatically use my cashback credit',
         cashback_discount_label: 'Cashback applied',
@@ -180,14 +188,18 @@ Cash payments: no cashback.`,
         age_gate_decline: 'Verlassen',
         cashback_chip_short: 'Cashback',
         cashback_modal_title: 'Krypto-Cashback & Guthaben',
-        cashback_modal_body: `Ein CHF-Guthaben ist mit deinem Telegram-Konto verknüpft (für eine spätere Bestellung).
+        cashback_modal_body: `So funktioniert es:
 
-• Nur bei Zahlung mit Krypto (z. B. BTC): Nach Zahlungseingang wird der Cashback manuell im Admin gutgeschrieben.
-• Bestellsumme unter 1 000 CHF: 5 % als Guthaben.
-• Bestellsumme ab 1 000 CHF: 10 % als Guthaben.
-• Guthaben gilt für deine nächste Bestellung (Verrechnung mit dem Team).
+1) Cashback gilt nur bei Krypto-Zahlung (z. B. BTC).
+2) Nach bestätigtem Zahlungseingang schreiben wir das Guthaben manuell gut.
+3) Das Guthaben ist an dein Telegram-Konto gebunden und gilt für eine spätere Bestellung.
 
-Barzahlung: kein Cashback.`,
+Cashback-Saetze:
+• Bestellung < 1.000 CHF -> 5%
+• Bestellung >= 1.000 CHF -> 10%
+
+Wichtig:
+• Barzahlung = 0 Cashback`,
         cashback_modal_ok: 'Alles klar',
         cashback_auto_apply: 'Mein Cashback-Guthaben automatisch nutzen',
         cashback_discount_label: 'Cashback verwendet',
