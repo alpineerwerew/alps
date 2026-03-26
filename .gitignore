@@ -12,6 +12,7 @@ server/cashback_wallets.json
 server/order_queue.jsonl
 server/orders_history.json
 server/loyalty_points.json
+server/contacts.json
 server/uploads/
 .DS_Store
 Thumbs.db

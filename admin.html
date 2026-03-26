@@ -120,6 +120,16 @@
         </div>
 
         <div class="import-wrap">
+            <h2>Contacts clients</h2>
+            <p>Base centralisée des contacts collectés (Signal/Threema) par chat_id.</p>
+            <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:end;">
+                <button type="button" class="btn" id="btn-load-contacts">Voir les contacts</button>
+                <button type="button" class="btn" id="btn-export-contacts">Exporter CSV</button>
+            </div>
+            <div id="contacts-list" style="margin-top:0.75rem;font-size:0.85rem;"></div>
+        </div>
+
+        <div class="import-wrap">
             <h2>Activité panier</h2>
             <p>Suivi des paniers: vide/non vide, nombre d'articles et dernière activité.</p>
             <button type="button" class="btn" id="btn-load-cart-activity">Voir l'activité panier</button>
@@ -262,6 +272,9 @@
         const importJson = document.getElementById('import-json');
         const usersList = document.getElementById('users-list');
         const btnLoadUsers = document.getElementById('btn-load-users');
+        const contactsList = document.getElementById('contacts-list');
+        const btnLoadContacts = document.getElementById('btn-load-contacts');
+        const btnExportContacts = document.getElementById('btn-export-contacts');
         const cartActivityList = document.getElementById('cart-activity-list');
         const btnLoadCartActivity = document.getElementById('btn-load-cart-activity');
         const ordersHistoryList = document.getElementById('orders-history-list');
@@ -289,6 +302,7 @@
         let products = [];
         let currentBotEnabled = null;
         let allOrdersHistory = [];
+        let allContacts = [];
 
         async function checkAdmin() {
             const init = getInitData();
@@ -508,6 +522,117 @@
             }
         }
 
+        async function loadContactsList() {
+            if (!contactsList) return;
+            contactsList.innerHTML = '<p>Chargement...</p>';
+            try {
+                const r = await fetch(API_URL + '/api/admin/contacts?initData=' + encodeURIComponent(getInitData()));
+                const d = await r.json();
+                if (!r.ok || !d.ok) {
+                    contactsList.innerHTML = '<p class="msg err">Erreur lors du chargement des contacts.</p>';
+                    return;
+                }
+                allContacts = Array.isArray(d.contacts) ? d.contacts : [];
+                if (!allContacts.length) {
+                    contactsList.innerHTML = '<p>Aucun contact enregistré pour le moment.</p>';
+                    return;
+                }
+                const rows = allContacts.map((c, i) => {
+                    const label = c.username || [c.first_name, c.last_name].filter(Boolean).join(' ') || `ID ${c.user_id}`;
+                    const method = c.contact_method === 'signal' ? 'Signal' : (c.contact_method === 'threema' ? 'Threema' : '—');
+                    const updated = c.updated_at ? new Date(c.updated_at).toLocaleString() : '—';
+                    return `<tr>
+                        <td>${i + 1}</td>
+                        <td>${escapeHtml(String(label))}</td>
+                        <td>${escapeHtml(String(c.user_id || ''))}</td>
+                        <td>${method}</td>
+                        <td>${escapeHtml(String(c.contact_value || ''))}</td>
+                        <td>${c.is_adult ? 'Oui' : 'Non'}</td>
+                        <td>${escapeHtml(updated)}</td>
+                        <td>
+                            <button type="button" class="btn" data-contact-edit="${escapeHtml(String(c.user_id || ''))}">Modifier</button>
+                            <button type="button" class="btn danger" data-contact-delete="${escapeHtml(String(c.user_id || ''))}">Supprimer</button>
+                        </td>
+                    </tr>`;
+                });
+                contactsList.innerHTML = `
+                    <table>
+                        <thead><tr><th>#</th><th>Client</th><th>chat_id</th><th>Méthode</th><th>Contact</th><th>18+</th><th>Maj</th><th>Action</th></tr></thead>
+                        <tbody>${rows.join('')}</tbody>
+                    </table>
+                `;
+                contactsList.querySelectorAll('[data-contact-edit]').forEach((btn) => {
+                    btn.addEventListener('click', async () => {
+                        const chatId = String(btn.getAttribute('data-contact-edit') || '').trim();
+                        const current = allContacts.find((x) => String(x.user_id) === chatId);
+                        if (!current) return;
+                        const methodDefault = current.contact_method === 'threema' ? 'threema' : 'signal';
+                        const methodRaw = prompt('Méthode (signal ou threema):', methodDefault);
+                        if (methodRaw === null) return;
+                        const method = String(methodRaw || '').trim().toLowerCase();
+                        if (method !== 'signal' && method !== 'threema') {
+                            alert('Méthode invalide. Utilise: signal ou threema.');
+                            return;
+                        }
+                        const valueRaw = prompt('Contact:', String(current.contact_value || ''));
+                        if (valueRaw === null) return;
+                        const value = String(valueRaw || '').trim();
+                        if (value.length < 3) {
+                            alert('Contact invalide (min 3 caractères).');
+                            return;
+                        }
+                        const adultRaw = prompt('18+ ? (oui/non)', current.is_adult ? 'oui' : 'non');
+                        if (adultRaw === null) return;
+                        const isAdult = /^(1|y|yes|oui|true)$/i.test(String(adultRaw || '').trim());
+                        try {
+                            const rr = await fetch(API_URL + '/api/admin/contacts/' + encodeURIComponent(chatId), {
+                                method: 'PUT',
+                                headers: getAuthHeadersJson(),
+                                body: JSON.stringify({
+                                    ...getAuthBody(),
+                                    contact_method: method,
+                                    contact_value: value,
+                                    is_adult: isAdult
+                                })
+                            });
+                            const dd = await rr.json().catch(() => ({}));
+                            if (!rr.ok || !dd.ok) {
+                                alert(dd.error || 'Erreur');
+                                return;
+                            }
+                            loadContactsList();
+                        } catch (e) {
+                            alert('Erreur réseau');
+                        }
+                    });
+                });
+                contactsList.querySelectorAll('[data-contact-delete]').forEach((btn) => {
+                    btn.addEventListener('click', async () => {
+                        const chatId = String(btn.getAttribute('data-contact-delete') || '').trim();
+                        if (!chatId) return;
+                        if (!confirm(`Supprimer le contact pour chat_id ${chatId} ?`)) return;
+                        try {
+                            const rr = await fetch(API_URL + '/api/admin/contacts/' + encodeURIComponent(chatId), {
+                                method: 'DELETE',
+                                headers: getAuthHeadersJson(),
+                                body: JSON.stringify(getAuthBody())
+                            });
+                            const dd = await rr.json().catch(() => ({}));
+                            if (!rr.ok || !dd.ok) {
+                                alert(dd.error || 'Erreur');
+                                return;
+                            }
+                            loadContactsList();
+                        } catch (e) {
+                            alert('Erreur réseau');
+                        }
+                    });
+                });
+            } catch (e) {
+                contactsList.innerHTML = '<p class="msg err">Erreur réseau lors du chargement des contacts.</p>';
+            }
+        }
+
         async function loadCartActivityList() {
             cartActivityList.innerHTML = '<p>Chargement...</p>';
             try {
@@ -601,14 +726,76 @@
                     <td>${escapeHtml(total)}</td>
                     <td>${escapeHtml(String(o.status || 'confirmed'))}</td>
                     <td>${escapeHtml(dt)}</td>
+                    <td>
+                        <button type="button" class="btn" data-order-edit="${Number(o.id)}">Modifier</button>
+                        <button type="button" class="btn danger" data-order-delete="${Number(o.id)}">Supprimer</button>
+                    </td>
                 </tr>`;
             });
             ordersHistoryList.innerHTML = `
                 <table>
-                    <thead><tr><th>#</th><th>Client</th><th>chat_id</th><th>Réf</th><th>Articles</th><th>Total</th><th>Statut</th><th>Date</th></tr></thead>
+                    <thead><tr><th>#</th><th>Client</th><th>chat_id</th><th>Réf</th><th>Articles</th><th>Total</th><th>Statut</th><th>Date</th><th>Action</th></tr></thead>
                     <tbody>${rows.join('')}</tbody>
                 </table>
             `;
+            ordersHistoryList.querySelectorAll('[data-order-edit]').forEach((btn) => {
+                btn.addEventListener('click', async () => {
+                    const id = Number(btn.getAttribute('data-order-edit'));
+                    const current = allOrdersHistory.find((x) => Number(x.id) === id);
+                    if (!current) return;
+                    const nextRefRaw = prompt('Référence commande:', String(current.ref || ''));
+                    if (nextRefRaw === null) return;
+                    const nextItemsRaw = prompt('Articles (séparés par virgule):', Array.isArray(current.items) ? current.items.join(', ') : '');
+                    if (nextItemsRaw === null) return;
+                    const nextTotalRaw = prompt('Total CHF:', Number.isFinite(Number(current.total_chf)) ? Number(current.total_chf).toFixed(2) : '0');
+                    if (nextTotalRaw === null) return;
+                    const nextStatusRaw = prompt('Statut:', String(current.status || 'confirmed'));
+                    if (nextStatusRaw === null) return;
+                    try {
+                        const rr = await fetch(API_URL + '/api/admin/orders-history/' + id, {
+                            method: 'PUT',
+                            headers: getAuthHeadersJson(),
+                            body: JSON.stringify({
+                                ...getAuthBody(),
+                                ref: String(nextRefRaw || '').trim(),
+                                items_text: String(nextItemsRaw || ''),
+                                total_chf: Number(nextTotalRaw),
+                                status: String(nextStatusRaw || '').trim()
+                            })
+                        });
+                        const dd = await rr.json().catch(() => ({}));
+                        if (!rr.ok || !dd.ok) {
+                            alert(dd.error || 'Erreur');
+                            return;
+                        }
+                        loadOrdersHistoryList();
+                    } catch (e) {
+                        alert('Erreur réseau');
+                    }
+                });
+            });
+            ordersHistoryList.querySelectorAll('[data-order-delete]').forEach((btn) => {
+                btn.addEventListener('click', async () => {
+                    const id = Number(btn.getAttribute('data-order-delete'));
+                    if (!id) return;
+                    if (!confirm('Supprimer cette commande de l’historique ?')) return;
+                    try {
+                        const rr = await fetch(API_URL + '/api/admin/orders-history/' + id, {
+                            method: 'DELETE',
+                            headers: getAuthHeadersJson(),
+                            body: JSON.stringify(getAuthBody())
+                        });
+                        const dd = await rr.json().catch(() => ({}));
+                        if (!rr.ok || !dd.ok) {
+                            alert(dd.error || 'Erreur');
+                            return;
+                        }
+                        loadOrdersHistoryList();
+                    } catch (e) {
+                        alert('Erreur réseau');
+                    }
+                });
+            });
         }
 
         function escapeCsv(v) {
@@ -645,6 +832,38 @@
             const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
             a.href = url;
             a.download = `orders-history-${ts}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function exportContactsCsv() {
+            const rows = Array.isArray(allContacts) ? allContacts : [];
+            if (!rows.length) {
+                alert('Aucun contact à exporter.');
+                return;
+            }
+            const header = ['chat_id', 'client', 'method', 'contact', 'is_adult', 'updated_at'];
+            const lines = [header.join(';')];
+            rows.forEach((c) => {
+                const client = c.username || [c.first_name, c.last_name].filter(Boolean).join(' ') || '';
+                const vals = [
+                    c.user_id || '',
+                    client,
+                    c.contact_method || '',
+                    c.contact_value || '',
+                    c.is_adult ? '1' : '0',
+                    c.updated_at || ''
+                ];
+                lines.push(vals.map(escapeCsv).join(';'));
+            });
+            const blob = new Blob(["\uFEFF" + lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+            a.href = url;
+            a.download = `contacts-${ts}.csv`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -1248,6 +1467,12 @@
                 loadBotUsersList();
             });
         }
+        if (btnLoadContacts) {
+            btnLoadContacts.addEventListener('click', () => {
+                loadContactsList();
+            });
+        }
+        btnExportContacts?.addEventListener('click', () => exportContactsCsv());
         if (btnLoadCartActivity) {
             btnLoadCartActivity.addEventListener('click', () => {
                 loadCartActivityList();

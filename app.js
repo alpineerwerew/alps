@@ -1135,6 +1135,48 @@ function saveStoredOnboarding(data) {
     } catch (e) {}
 }
 
+async function syncContactProfileToServer(profile) {
+    if (!POINTS_API_URL || !getInitData()) return;
+    const p = profile || getStoredOnboarding();
+    if (!p || !p.contactMethod || !p.contactValue) return;
+    try {
+        await fetch(`${POINTS_API_URL}/api/contact-profile`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...catalogApiHeaders() },
+            body: JSON.stringify({
+                initData: getInitData(),
+                is_adult: !!p.isAdult,
+                contact_method: p.contactMethod,
+                contact_value: p.contactValue
+            })
+        });
+    } catch (e) {}
+}
+
+async function loadContactProfileFromServer() {
+    if (!POINTS_API_URL || !getInitData()) return null;
+    try {
+        const r = await fetch(`${POINTS_API_URL}/api/contact-profile/me`, {
+            headers: catalogApiHeaders(),
+            cache: 'no-store'
+        });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok || !d?.ok || !d.profile) return null;
+        const profile = {
+            isAdult: !!d.profile.is_adult,
+            contactMethod: d.profile.contact_method === 'signal' || d.profile.contact_method === 'threema' ? d.profile.contact_method : null,
+            contactValue: String(d.profile.contact_value || '').trim()
+        };
+        if (isOnboardingComplete(profile)) {
+            saveStoredOnboarding(profile);
+            return profile;
+        }
+        return null;
+    } catch (e) {
+        return null;
+    }
+}
+
 function isOnboardingComplete(data) {
     const d = data || getStoredOnboarding();
     return !!(d && d.isAdult && d.contactMethod && d.contactValue && d.contactValue.length >= 3);
@@ -1300,6 +1342,11 @@ function showAgeGate(forceEdit = false) {
                 return;
             }
             saveStoredOnboarding({
+                isAdult: true,
+                contactMethod: selectedMethod,
+                contactValue: v
+            });
+            syncContactProfileToServer({
                 isAdult: true,
                 contactMethod: selectedMethod,
                 contactValue: v
@@ -1597,6 +1644,7 @@ function init() {
     }
     (async () => {
         if (isTelegramWebApp()) await waitForInitData();
+        await loadContactProfileFromServer();
         loadCartFromStorage();
         updateCartBadge();
         scheduleCartActivitySync();
@@ -2150,6 +2198,7 @@ async function checkout() {
         const ok = await showAgeGate(false);
         if (!ok || !isOnboardingComplete()) return;
     }
+    await syncContactProfileToServer();
     const totals = computeCartTotals();
     const orderId = generateOrderId();
     const orderText = buildOrderText(totals, orderId);

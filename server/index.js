@@ -90,6 +90,7 @@ const CASHBACK_WALLETS_FILE = path.join(__dirname, 'cashback_wallets.json');
 const REVIEWS_FILE = path.join(__dirname, 'reviews.json');
 const ORDERS_HISTORY_FILE = path.join(__dirname, 'orders_history.json');
 const LOYALTY_POINTS_FILE = path.join(__dirname, 'loyalty_points.json');
+const CONTACTS_FILE = path.join(__dirname, 'contacts.json');
 const ORDER_QUEUE_FILE = path.join(__dirname, 'order_queue.jsonl');
 
 function loadBotUsers() {
@@ -335,6 +336,50 @@ function saveOrdersHistory(rows) {
     console.error('❌ Could not save orders_history.json:', e.message);
   }
   return list;
+}
+
+function loadContacts() {
+  try {
+    const raw = fs.readFileSync(CONTACTS_FILE, 'utf8');
+    const o = JSON.parse(raw);
+    const users = o && typeof o.users === 'object' && !Array.isArray(o.users) ? o.users : {};
+    return { users };
+  } catch {
+    return { users: {} };
+  }
+}
+
+function saveContacts(data) {
+  const users = data && typeof data.users === 'object' && !Array.isArray(data.users) ? data.users : {};
+  try {
+    fs.writeFileSync(CONTACTS_FILE, JSON.stringify({ users }, null, 2), 'utf8');
+  } catch (e) {
+    console.error('❌ Could not save contacts.json:', e.message);
+  }
+}
+
+function upsertUserContact(user, payload) {
+  if (!user || !user.id) return null;
+  const method = payload?.contact_method === 'signal' || payload?.contact_method === 'threema' ? payload.contact_method : null;
+  const value = String(payload?.contact_value || '').trim();
+  const isAdult = !!payload?.is_adult;
+  if (!method || value.length < 3) return null;
+  const data = loadContacts();
+  const id = String(user.id);
+  const prev = data.users[id] && typeof data.users[id] === 'object' ? data.users[id] : {};
+  data.users[id] = {
+    user_id: id,
+    username: user.username ? `@${user.username}` : (prev.username || null),
+    first_name: user.first_name || prev.first_name || null,
+    last_name: user.last_name || prev.last_name || null,
+    is_adult: isAdult,
+    contact_method: method,
+    contact_value: value,
+    updated_at: new Date().toISOString(),
+    created_at: prev.created_at || new Date().toISOString()
+  };
+  saveContacts(data);
+  return data.users[id];
 }
 
 function parseOrderForReference(orderText) {
@@ -1579,6 +1624,33 @@ app.get('/api/loyalty/me', requireTelegramInitForPublicApi, (req, res) => {
   res.json({ ok: true, ...snapshot });
 });
 
+app.get('/api/contact-profile/me', requireTelegramInitForPublicApi, (req, res) => {
+  const initData = req.get('X-Telegram-Init-Data') || req.query?.initData;
+  const user = getInitDataUser(initData);
+  if (!user || !user.id) return res.status(401).json({ error: 'Invalid initData' });
+  const row = loadContacts().users[String(user.id)];
+  if (!row) return res.json({ ok: true, profile: null });
+  res.json({
+    ok: true,
+    profile: {
+      is_adult: !!row.is_adult,
+      contact_method: row.contact_method || null,
+      contact_value: row.contact_value || '',
+      updated_at: row.updated_at || null
+    }
+  });
+});
+
+app.post('/api/contact-profile', requireTelegramInitForPublicApi, (req, res) => {
+  const initData = req.get('X-Telegram-Init-Data') || req.body?.initData || req.query?.initData;
+  const user = getInitDataUser(initData);
+  if (!user || !user.id) return res.status(401).json({ error: 'Invalid initData' });
+  addOrUpdateBotUserFromWebAppUser(user);
+  const row = upsertUserContact(user, req.body || {});
+  if (!row) return res.status(400).json({ error: 'invalid_contact_payload' });
+  res.json({ ok: true, profile: row });
+});
+
 app.get('/api/admin/loyalty', (req, res) => {
   if (!ensureOwner(req, res)) return;
   const loyaltyData = loadLoyaltyPoints();
@@ -1919,6 +1991,111 @@ app.get('/api/admin/orders-history', (req, res) => {
       };
     });
   res.json({ ok: true, orders: rows });
+});
+
+app.put('/api/admin/orders-history/:id', (req, res) => {
+  if (!ensureOwner(req, res)) return;
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id) || id <= 0) return res.status(400).json({ error: 'invalid_order_id' });
+  const rows = loadOrdersHistory();
+  const idx = rows.findIndex((o) => Number(o?.id) === id);
+  if (idx < 0) return res.status(404).json({ error: 'order_not_found' });
+  const patch = req.body || {};
+  const next = { ...rows[idx] };
+  if (typeof patch.ref === 'string' && patch.ref.trim()) next.ref = patch.ref.trim().slice(0, 80);
+  if (patch.total_chf !== undefined) {
+    const t = Number(patch.total_chf);
+    if (!Number.isFinite(t) || t < 0 || t > 1000000) return res.status(400).json({ error: 'invalid_total_chf' });
+    next.total_chf = t;
+  }
+  if (typeof patch.status === 'string' && patch.status.trim()) next.status = patch.status.trim().slice(0, 40);
+  if (typeof patch.items_text === 'string') {
+    next.items = patch.items_text
+      .split(',')
+      .map((s) => String(s || '').trim())
+      .filter(Boolean)
+      .slice(0, 20);
+  }
+  rows[idx] = next;
+  saveOrdersHistory(rows);
+  res.json({ ok: true, order: next });
+});
+
+app.delete('/api/admin/orders-history/:id', (req, res) => {
+  if (!ensureOwner(req, res)) return;
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id) || id <= 0) return res.status(400).json({ error: 'invalid_order_id' });
+  const rows = loadOrdersHistory();
+  const next = rows.filter((o) => Number(o?.id) !== id);
+  if (next.length === rows.length) return res.status(404).json({ error: 'order_not_found' });
+  saveOrdersHistory(next);
+  res.json({ ok: true });
+});
+
+app.get('/api/admin/contacts', (req, res) => {
+  if (!ensureOwner(req, res)) return;
+  const users = loadBotUsers().map((u) => (u && typeof u === 'object'
+    ? u
+    : { chat_id: u, username: null, first_name: null, last_name: null }));
+  const byChat = new Map(users.map((u) => [String(u.chat_id), u]));
+  const rows = Object.values(loadContacts().users || {})
+    .map((c) => {
+      const userId = String(c.user_id || '');
+      const u = byChat.get(userId) || {};
+      return {
+        user_id: userId,
+        username: c.username || u.username || null,
+        first_name: c.first_name || u.first_name || null,
+        last_name: c.last_name || u.last_name || null,
+        is_adult: !!c.is_adult,
+        contact_method: c.contact_method || null,
+        contact_value: c.contact_value || '',
+        updated_at: c.updated_at || null
+      };
+    })
+    .filter((c) => c.user_id && c.contact_method && c.contact_value)
+    .sort((a, b) => {
+      const ta = a.updated_at ? new Date(a.updated_at).getTime() : 0;
+      const tb = b.updated_at ? new Date(b.updated_at).getTime() : 0;
+      return tb - ta;
+    });
+  res.json({ ok: true, contacts: rows });
+});
+
+app.put('/api/admin/contacts/:chatId', (req, res) => {
+  if (!ensureOwner(req, res)) return;
+  const chatId = String(req.params.chatId || '').trim();
+  if (!chatId) return res.status(400).json({ error: 'invalid_chat_id' });
+  const method = req.body?.contact_method === 'signal' || req.body?.contact_method === 'threema' ? req.body.contact_method : null;
+  const value = String(req.body?.contact_value || '').trim();
+  if (!method || value.length < 3) return res.status(400).json({ error: 'invalid_contact_payload' });
+  const data = loadContacts();
+  const prev = data.users[chatId] && typeof data.users[chatId] === 'object' ? data.users[chatId] : {};
+  data.users[chatId] = {
+    ...prev,
+    user_id: chatId,
+    username: prev.username || null,
+    first_name: prev.first_name || null,
+    last_name: prev.last_name || null,
+    is_adult: req.body?.is_adult !== undefined ? !!req.body.is_adult : !!prev.is_adult,
+    contact_method: method,
+    contact_value: value,
+    updated_at: new Date().toISOString(),
+    created_at: prev.created_at || new Date().toISOString()
+  };
+  saveContacts(data);
+  res.json({ ok: true, contact: data.users[chatId] });
+});
+
+app.delete('/api/admin/contacts/:chatId', (req, res) => {
+  if (!ensureOwner(req, res)) return;
+  const chatId = String(req.params.chatId || '').trim();
+  if (!chatId) return res.status(400).json({ error: 'invalid_chat_id' });
+  const data = loadContacts();
+  if (!data.users || !data.users[chatId]) return res.status(404).json({ error: 'contact_not_found' });
+  delete data.users[chatId];
+  saveContacts(data);
+  res.json({ ok: true });
 });
 
 app.get('/api/admin/cashback-wallets', (req, res) => {
