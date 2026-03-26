@@ -1049,20 +1049,6 @@ const ADMIN_INLINE = {
   }
 };
 
-function getOrderContactKeyboard(lang) {
-  const L = BOT_STRINGS[lang] || BOT_STRINGS.fr;
-  return {
-    reply_markup: {
-      inline_keyboard: [
-        [
-          { text: L.order_btn_signal, callback_data: 'order_contact_signal' },
-          { text: L.order_btn_threema, callback_data: 'order_contact_threema' }
-        ]
-      ]
-    }
-  };
-}
-
 const KNOWN_CMD_RE = /^\/(start|menu|admin|help|broadcast|cancel)(\s|$)/i;
 const ORDER_PREFIXES = ['🛒 Nouvelle Commande', '🛒 New Order', '🛒 Neue Bestellung'];
 const lastOrderByChat = {};
@@ -1107,7 +1093,7 @@ async function deliverQueuedWebOrder(user, orderText) {
   const langOrd = getChatLang(userId) || 'fr';
   const L = BOT_STRINGS[langOrd];
   try {
-    await bot.sendMessage(userId, getOrderReceivedText(langOrd), getOrderContactKeyboard(langOrd));
+    await bot.sendMessage(userId, getOrderReceivedText(langOrd));
   } catch (err) {
     console.error('❌ Error sending confirmation to user:', err.message);
   }
@@ -1314,7 +1300,7 @@ bot.on('message', async (msg) => {
     const langOrd = getChatLang(chatId) || 'fr';
     const L = BOT_STRINGS[langOrd];
     try {
-      await bot.sendMessage(chatId, getOrderReceivedText(langOrd), getOrderContactKeyboard(langOrd));
+      await bot.sendMessage(chatId, getOrderReceivedText(langOrd));
     } catch (err) {
       console.error('❌ Error sending confirmation:', err.message);
     }
@@ -2294,7 +2280,7 @@ app.post('/api/order', (req, res) => {
 
   const langOrd = getChatLang(userId) || 'fr';
   const L = BOT_STRINGS[langOrd];
-  bot.sendMessage(userId, getOrderReceivedText(langOrd), getOrderContactKeyboard(langOrd)).catch((err) => {
+  bot.sendMessage(userId, getOrderReceivedText(langOrd)).catch((err) => {
     console.error('❌ Error sending confirmation to user:', err.message);
   });
 
