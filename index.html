@@ -72,6 +72,26 @@
                 <option value="" id="filter-all-option">📂 Toutes les catégories</option>
             </select>
         </nav>
+        <section class="loyalty-section" aria-labelledby="loyalty-title">
+            <div class="loyalty-card">
+                <div class="loyalty-head">
+                    <h3 id="loyalty-title">Loyalty Program</h3>
+                    <span id="loyalty-level-badge" class="loyalty-level-badge">Bronze</span>
+                </div>
+                <div class="loyalty-points-row">
+                    <span>Points</span>
+                    <strong id="loyalty-points">0</strong>
+                </div>
+                <div class="loyalty-progress-track" aria-label="Loyalty progress">
+                    <div id="loyalty-progress-fill" class="loyalty-progress-fill" style="width:0%"></div>
+                </div>
+                <div class="loyalty-meta">
+                    <span id="loyalty-progress-label">0% to next level</span>
+                    <span id="loyalty-next-label">0 points to Silver</span>
+                </div>
+                <div id="loyalty-rewards" class="loyalty-rewards"></div>
+            </div>
+        </section>
         <main class="products-wrap">
             <div class="products-grid" id="products-grid"></div>
         </main>
@@ -194,7 +214,7 @@
 <!-- #endregion -->
 
 <!-- #region Scripts -->
-<script src="app.js?v=20260326-per-product-reviews"></script>
+<script src="app.js?v=20260326-loyalty-levels"></script>
 <!-- #endregion -->
 </body>
 </html>

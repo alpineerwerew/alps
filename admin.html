@@ -166,6 +166,25 @@
         </div>
 
         <div class="import-wrap">
+            <h2>Fidélité (points & niveaux)</h2>
+            <p>Suivi des points cumulés, niveau actuel et progression vers le niveau suivant.</p>
+            <button type="button" class="btn primary" id="btn-load-loyalty">Charger la fidélité</button>
+            <div id="loyalty-list" style="margin-top:0.75rem;font-size:0.85rem;"></div>
+            <form id="loyalty-adjust-form" style="margin-top:1rem;">
+                <h3 style="font-size:1rem;">Ajustement manuel des points</h3>
+                <label>Client (chat_id)</label>
+                <select id="loyalty-chat"></select>
+                <label>Delta points (ex: +150 ou -80)</label>
+                <input type="number" id="loyalty-delta" step="1" placeholder="ex: 150 ou -80" required>
+                <label>Note (optionnel)</label>
+                <input type="text" id="loyalty-note" placeholder="ex: bonus fidélité / correction">
+                <div class="form-actions">
+                    <button type="submit" class="btn primary">Appliquer</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="import-wrap">
             <h2>Avis clients (modération)</h2>
             <p>Chaque avis doit être validé avant publication sur le catalogue.</p>
             <button type="button" class="btn primary" id="btn-load-reviews">Charger les avis</button>
@@ -217,6 +236,12 @@
         const btnLoadCartActivity = document.getElementById('btn-load-cart-activity');
         const reviewsAdminList = document.getElementById('reviews-admin-list');
         const btnLoadReviews = document.getElementById('btn-load-reviews');
+        const loyaltyList = document.getElementById('loyalty-list');
+        const btnLoadLoyalty = document.getElementById('btn-load-loyalty');
+        const loyaltyAdjustForm = document.getElementById('loyalty-adjust-form');
+        const loyaltyChat = document.getElementById('loyalty-chat');
+        const loyaltyDelta = document.getElementById('loyalty-delta');
+        const loyaltyNote = document.getElementById('loyalty-note');
         const botStatusEl = document.getElementById('bot-status');
         const btnBotToggle = document.getElementById('btn-bot-toggle');
         const categoryForm = document.getElementById('category-form');
@@ -647,6 +672,52 @@
             }
         }
 
+        async function loadLoyaltyList() {
+            if (!loyaltyList) return;
+            loyaltyList.innerHTML = '<p>Chargement...</p>';
+            try {
+                const r = await fetch(API_URL + '/api/admin/loyalty?initData=' + encodeURIComponent(getInitData()));
+                const d = await r.json();
+                if (!r.ok || !d.ok) {
+                    loyaltyList.innerHTML = '<p class="msg err">Erreur lors du chargement de la fidélité.</p>';
+                    return;
+                }
+                const list = Array.isArray(d.users) ? d.users : [];
+                if (!list.length) {
+                    loyaltyList.innerHTML = '<p>Aucun utilisateur fidélité pour le moment.</p>';
+                    return;
+                }
+                const rows = list.map((u, i) => {
+                    const userLabel = u.username || [u.first_name, u.last_name].filter(Boolean).join(' ') || `ID ${u.chat_id}`;
+                    const pct = Math.round(Math.max(0, Math.min(1, Number(u.progress) || 0)) * 100);
+                    const next = u.next_tier_label ? `${u.points_to_next} pts → ${u.next_tier_label}` : 'Niveau max';
+                    return `<tr>
+                        <td>${i + 1}</td>
+                        <td>${escapeHtml(String(userLabel))}</td>
+                        <td>${escapeHtml(String(u.chat_id))}</td>
+                        <td>${Number(u.points) || 0}</td>
+                        <td>${escapeHtml(String(u.tier_label || 'Bronze'))}</td>
+                        <td>${pct}%</td>
+                        <td>${escapeHtml(next)}</td>
+                    </tr>`;
+                });
+                loyaltyList.innerHTML = `
+                    <table>
+                        <thead><tr><th>#</th><th>Utilisateur</th><th>chat_id</th><th>Points</th><th>Niveau</th><th>Progression</th><th>Suivant</th></tr></thead>
+                        <tbody>${rows.join('')}</tbody>
+                    </table>
+                `;
+                if (loyaltyChat) {
+                    loyaltyChat.innerHTML = '<option value="">— Choisir —</option>' + list.map((u) => {
+                        const userLabel = u.username || [u.first_name, u.last_name].filter(Boolean).join(' ') || `ID ${u.chat_id}`;
+                        return `<option value="${escapeHtml(String(u.chat_id))}">${escapeHtml(String(userLabel))} (${u.chat_id})</option>`;
+                    }).join('');
+                }
+            } catch (e) {
+                loyaltyList.innerHTML = '<p class="msg err">Erreur réseau lors du chargement de la fidélité.</p>';
+            }
+        }
+
         function escapeHtml(s) {
             const div = document.createElement('div');
             div.textContent = s;
@@ -953,6 +1024,48 @@
         if (btnLoadCashback) {
             btnLoadCashback.addEventListener('click', () => loadCashbackWalletsList());
         }
+        if (btnLoadLoyalty) {
+            btnLoadLoyalty.addEventListener('click', () => loadLoyaltyList());
+        }
+        if (loyaltyAdjustForm) {
+            loyaltyAdjustForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const chat_id = loyaltyChat?.value;
+                const delta_points = Math.trunc(Number(loyaltyDelta?.value) || 0);
+                const note = loyaltyNote?.value?.trim();
+                if (!chat_id) {
+                    alert('Choisis un client.');
+                    return;
+                }
+                if (!delta_points) {
+                    alert('Delta points invalide.');
+                    return;
+                }
+                try {
+                    const r = await fetch(API_URL + '/api/admin/loyalty/adjust', {
+                        method: 'POST',
+                        headers: getAuthHeadersJson(),
+                        body: JSON.stringify({
+                            ...getAuthBody(),
+                            chat_id,
+                            delta_points,
+                            note: note || undefined
+                        })
+                    });
+                    const d = await r.json().catch(() => ({}));
+                    if (!r.ok || !d.ok) {
+                        alert(d.error || 'Erreur');
+                        return;
+                    }
+                    alert('Ajustement fidélité appliqué.');
+                    if (loyaltyDelta) loyaltyDelta.value = '';
+                    if (loyaltyNote) loyaltyNote.value = '';
+                    loadLoyaltyList();
+                } catch (err) {
+                    alert('Erreur réseau');
+                }
+            });
+        }
         if (btnLoadReviews) {
             btnLoadReviews.addEventListener('click', () => loadReviewsAdminList());
         }
@@ -1063,6 +1176,7 @@
             if (await checkAdmin()) {
                 load();
                 loadBotEnabled();
+                loadLoyaltyList();
                 loadReviewsAdminList();
             }
         })();

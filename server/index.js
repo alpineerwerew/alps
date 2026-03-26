@@ -89,6 +89,7 @@ const CART_REMINDERS_FILE = path.join(__dirname, 'cart_reminders.json');
 const CASHBACK_WALLETS_FILE = path.join(__dirname, 'cashback_wallets.json');
 const REVIEWS_FILE = path.join(__dirname, 'reviews.json');
 const ORDERS_HISTORY_FILE = path.join(__dirname, 'orders_history.json');
+const LOYALTY_POINTS_FILE = path.join(__dirname, 'loyalty_points.json');
 const ORDER_QUEUE_FILE = path.join(__dirname, 'order_queue.jsonl');
 
 function loadBotUsers() {
@@ -419,6 +420,122 @@ function getOrderProducts(order) {
   const list = Array.isArray(order.products) ? order.products.filter((p) => p && p.id != null) : [];
   if (list.length) return list;
   return findMatchedProductsFromItems(Array.isArray(order.items) ? order.items : []);
+}
+
+const LOYALTY_TIERS = [
+  { key: 'bronze', label: 'Bronze', min_points: 0, rewards: ['Member pricing access'] },
+  { key: 'silver', label: 'Silver', min_points: 1000, rewards: ['2% member discount', 'Priority support'] },
+  { key: 'gold', label: 'Gold', min_points: 2500, rewards: ['5% member discount', 'Priority handling', 'Early drops'] },
+  { key: 'platinum', label: 'Platinum', min_points: 10000, rewards: ['8% member discount', 'Free shipping', 'VIP offers'] }
+];
+
+function loadLoyaltyPoints() {
+  try {
+    const raw = fs.readFileSync(LOYALTY_POINTS_FILE, 'utf8');
+    const o = JSON.parse(raw);
+    const users = o && typeof o.users === 'object' && !Array.isArray(o.users) ? o.users : {};
+    return { users };
+  } catch {
+    return { users: {} };
+  }
+}
+
+function saveLoyaltyPoints(data) {
+  const users = data && typeof data.users === 'object' && !Array.isArray(data.users) ? data.users : {};
+  try {
+    fs.writeFileSync(LOYALTY_POINTS_FILE, JSON.stringify({ users }, null, 2), 'utf8');
+  } catch (e) {
+    console.error('❌ Could not save loyalty_points.json:', e.message);
+  }
+}
+
+function getTierForPoints(points) {
+  const p = Math.max(0, Number(points) || 0);
+  let tier = LOYALTY_TIERS[0];
+  for (const t of LOYALTY_TIERS) {
+    if (p >= t.min_points) tier = t;
+  }
+  return tier;
+}
+
+function buildLoyaltySnapshot(points) {
+  const p = Math.max(0, Math.floor(Number(points) || 0));
+  const tier = getTierForPoints(p);
+  const idx = LOYALTY_TIERS.findIndex((t) => t.key === tier.key);
+  const next = idx >= 0 && idx < LOYALTY_TIERS.length - 1 ? LOYALTY_TIERS[idx + 1] : null;
+  const base = tier.min_points;
+  const top = next ? next.min_points : p;
+  const range = Math.max(1, top - base);
+  const progress = next ? Math.max(0, Math.min(1, (p - base) / range)) : 1;
+  const remaining = next ? Math.max(0, next.min_points - p) : 0;
+  const rewards = LOYALTY_TIERS.map((t) => ({
+    tier: t.key,
+    label: t.label,
+    unlocked: p >= t.min_points,
+    items: t.rewards
+  }));
+  return {
+    points: p,
+    tier_key: tier.key,
+    tier_label: tier.label,
+    current_min: base,
+    next_tier_key: next ? next.key : null,
+    next_tier_label: next ? next.label : null,
+    next_tier_min: next ? next.min_points : null,
+    points_to_next: remaining,
+    progress,
+    rewards
+  };
+}
+
+function addLoyaltyPoints(chatId, pointsToAdd, meta) {
+  const id = String(chatId);
+  const add = Math.max(0, Math.floor(Number(pointsToAdd) || 0));
+  if (!add) return buildLoyaltySnapshot(0);
+  const data = loadLoyaltyPoints();
+  if (!data.users[id]) data.users[id] = { total_points: 0, history: [] };
+  const row = data.users[id];
+  row.total_points = Math.max(0, Math.floor(Number(row.total_points) || 0));
+  row.history = Array.isArray(row.history) ? row.history : [];
+  row.total_points += add;
+  row.history.unshift({
+    at: new Date().toISOString(),
+    points: add,
+    kind: 'order',
+    order_ref: meta?.order_ref || null,
+    order_total_chf: Number(meta?.order_total_chf) || null
+  });
+  if (row.history.length > 120) row.history = row.history.slice(0, 120);
+  saveLoyaltyPoints(data);
+  return buildLoyaltySnapshot(row.total_points);
+}
+
+function adjustLoyaltyPoints(chatId, deltaPoints, meta) {
+  const id = String(chatId);
+  const delta = Math.trunc(Number(deltaPoints) || 0);
+  if (!delta) return getLoyaltySnapshot(id);
+  const data = loadLoyaltyPoints();
+  if (!data.users[id]) data.users[id] = { total_points: 0, history: [] };
+  const row = data.users[id];
+  row.total_points = Math.max(0, Math.floor(Number(row.total_points) || 0));
+  row.history = Array.isArray(row.history) ? row.history : [];
+  row.total_points = Math.max(0, row.total_points + delta);
+  row.history.unshift({
+    at: new Date().toISOString(),
+    points: delta,
+    kind: 'admin_adjustment',
+    note: meta?.note ? String(meta.note).slice(0, 300) : null
+  });
+  if (row.history.length > 120) row.history = row.history.slice(0, 120);
+  saveLoyaltyPoints(data);
+  return buildLoyaltySnapshot(row.total_points);
+}
+
+function getLoyaltySnapshot(chatId) {
+  const data = loadLoyaltyPoints();
+  const row = data.users[String(chatId)];
+  const points = row ? Math.max(0, Math.floor(Number(row.total_points) || 0)) : 0;
+  return buildLoyaltySnapshot(points);
 }
 
 function upsertCartActivity(user, payload) {
@@ -1382,6 +1499,53 @@ app.get('/api/my-cashback', requireTelegramInitForPublicApi, (req, res) => {
   res.json({ ok: true, balance_chf, currency: 'CHF' });
 });
 
+app.get('/api/loyalty/me', requireTelegramInitForPublicApi, (req, res) => {
+  const initData = req.get('X-Telegram-Init-Data') || req.query?.initData;
+  const user = getInitDataUser(initData);
+  if (!user || !user.id) {
+    return res.status(401).json({ error: 'Invalid initData' });
+  }
+  const snapshot = getLoyaltySnapshot(user.id);
+  res.json({ ok: true, ...snapshot });
+});
+
+app.get('/api/admin/loyalty', (req, res) => {
+  if (!ensureOwner(req, res)) return;
+  const users = loadBotUsers().map((u) => (u && typeof u === 'object'
+    ? u
+    : { chat_id: u, username: null, first_name: null, last_name: null }));
+  const out = users.map((u) => {
+    const snap = getLoyaltySnapshot(u.chat_id);
+    return {
+      chat_id: u.chat_id,
+      username: u.username || null,
+      first_name: u.first_name || null,
+      last_name: u.last_name || null,
+      points: snap.points,
+      tier_label: snap.tier_label,
+      next_tier_label: snap.next_tier_label,
+      points_to_next: snap.points_to_next,
+      progress: snap.progress
+    };
+  }).sort((a, b) => b.points - a.points);
+  res.json({ ok: true, users: out, tiers: LOYALTY_TIERS });
+});
+
+app.post('/api/admin/loyalty/adjust', (req, res) => {
+  if (!ensureOwner(req, res)) return;
+  const chatId = req.body?.chat_id;
+  const delta = Math.trunc(Number(req.body?.delta_points) || 0);
+  const note = req.body?.note;
+  if (chatId == null || String(chatId) === '' || String(chatId) === String(OWNER_CHAT_ID)) {
+    return res.status(400).json({ error: 'invalid_chat_id' });
+  }
+  if (!delta || !Number.isFinite(delta) || Math.abs(delta) > 100000) {
+    return res.status(400).json({ error: 'invalid_delta_points' });
+  }
+  const snapshot = adjustLoyaltyPoints(chatId, delta, { note });
+  res.json({ ok: true, snapshot });
+});
+
 app.get('/api/reviews', requireTelegramInitForPublicApi, (_req, res) => {
   const rows = loadReviews()
     .filter((r) => !!r.approved)
@@ -1904,6 +2068,7 @@ app.post('/api/order', (req, res) => {
   const userId = user.id;
   addOrUpdateBotUserFromWebAppUser(user);
   const orderHist = appendOrderHistory(user, orderText);
+  const pointsEarned = Math.max(0, Math.floor(Number(orderHist?.total_chf) || 0)); // 1 point per 1 CHF spent
   const cashbackUseChf = roundMoneyChf(Number(cashbackUseRaw) || 0);
   let cashbackDebited = false;
   if (cashbackUseChf < 0) {
@@ -1942,7 +2107,18 @@ app.post('/api/order', (req, res) => {
       console.error('❌ order_queue:', e.message);
       return res.status(500).json({ error: 'queue_failed' });
     }
-    return res.json({ ok: true, queued: true, cashback_balance_chf: getCashbackBalance(userId), order_ref: orderHist?.ref || null });
+    const loyalty = addLoyaltyPoints(userId, pointsEarned, {
+      order_ref: orderHist?.ref || null,
+      order_total_chf: orderHist?.total_chf || null
+    });
+    return res.json({
+      ok: true,
+      queued: true,
+      cashback_balance_chf: getCashbackBalance(userId),
+      order_ref: orderHist?.ref || null,
+      loyalty_points_earned: pointsEarned,
+      loyalty
+    });
   }
 
   const fromLabel = user.username ? `@${user.username}` : [user.first_name, user.last_name].filter(Boolean).join(' ') || `ID ${userId}`;
@@ -1962,7 +2138,17 @@ app.post('/api/order', (req, res) => {
     console.error('❌ Error sending confirmation to user:', err.message);
   });
 
-  res.json({ ok: true, cashback_balance_chf: getCashbackBalance(userId), order_ref: orderHist?.ref || null });
+  const loyalty = addLoyaltyPoints(userId, pointsEarned, {
+    order_ref: orderHist?.ref || null,
+    order_total_chf: orderHist?.total_chf || null
+  });
+  res.json({
+    ok: true,
+    cashback_balance_chf: getCashbackBalance(userId),
+    order_ref: orderHist?.ref || null,
+    loyalty_points_earned: pointsEarned,
+    loyalty
+  });
 });
 
 app.post('/api/cart-activity', (req, res) => {

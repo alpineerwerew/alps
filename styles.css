@@ -585,6 +585,121 @@ body {
     margin: 0 auto;
 }
 
+.loyalty-section {
+    padding: 0.6rem 1rem 0.3rem;
+    max-width: 980px;
+    margin: 0 auto;
+}
+
+.loyalty-card {
+    background: linear-gradient(180deg, rgba(22, 22, 36, 0.96), rgba(13, 13, 24, 0.96));
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    padding: 0.9rem;
+    box-shadow: 0 10px 26px rgba(0, 0, 0, 0.35);
+}
+
+.loyalty-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.7rem;
+}
+
+.loyalty-head h3 {
+    font-size: 0.98rem;
+    font-weight: 700;
+}
+
+.loyalty-level-badge {
+    font-size: 0.72rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    border-radius: 999px;
+    padding: 0.26rem 0.55rem;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    color: #d1d5db;
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.loyalty-level-badge.tier-silver { color: #e2e8f0; background: rgba(148, 163, 184, 0.22); }
+.loyalty-level-badge.tier-gold { color: #fde68a; background: rgba(217, 119, 6, 0.22); border-color: rgba(251, 191, 36, 0.45); }
+.loyalty-level-badge.tier-platinum { color: #e0e7ff; background: rgba(99, 102, 241, 0.25); border-color: rgba(129, 140, 248, 0.4); }
+
+.loyalty-points-row {
+    margin-top: 0.6rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    color: var(--text-secondary);
+    font-size: 0.84rem;
+}
+
+.loyalty-points-row strong {
+    font-size: 1.35rem;
+    font-family: var(--font-display);
+    color: #fff;
+}
+
+.loyalty-progress-track {
+    margin-top: 0.55rem;
+    height: 10px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.12);
+    overflow: hidden;
+}
+
+.loyalty-progress-fill {
+    height: 100%;
+    width: 0;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #d4af37, #f5d98f);
+    transition: width 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.loyalty-meta {
+    margin-top: 0.45rem;
+    display: flex;
+    justify-content: space-between;
+    gap: 0.55rem;
+    font-size: 0.76rem;
+    color: var(--text-secondary);
+}
+
+.loyalty-rewards {
+    margin-top: 0.75rem;
+    display: grid;
+    gap: 0.44rem;
+}
+
+.loyalty-reward {
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    padding: 0.5rem 0.58rem;
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.loyalty-reward.unlocked {
+    border-color: rgba(74, 222, 128, 0.5);
+    background: rgba(34, 197, 94, 0.12);
+}
+
+.loyalty-reward.locked {
+    opacity: 0.62;
+}
+
+.loyalty-reward-tier {
+    font-size: 0.74rem;
+    font-weight: 700;
+}
+
+.loyalty-reward-items {
+    margin-top: 0.18rem;
+    font-size: 0.74rem;
+    color: var(--text-secondary);
+}
+
 .reviews-section {
     padding: 0.4rem 1rem 2.2rem;
 }

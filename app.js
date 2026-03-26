@@ -1187,6 +1187,8 @@ function computeCartTotals() {
 }
 
 let cashbackLoadInFlight = null;
+let loyaltyLoadInFlight = null;
+let loyaltySnapshot = null;
 async function loadMyCashback() {
     if (!POINTS_API_URL || !getInitData()) return;
     if (cashbackLoadInFlight) return cashbackLoadInFlight;
@@ -1211,6 +1213,60 @@ async function loadMyCashback() {
     return cashbackLoadInFlight;
 }
 
+function renderLoyalty(snapshot) {
+    const levelBadge = document.getElementById('loyalty-level-badge');
+    const pointsEl = document.getElementById('loyalty-points');
+    const fillEl = document.getElementById('loyalty-progress-fill');
+    const progressLabel = document.getElementById('loyalty-progress-label');
+    const nextLabel = document.getElementById('loyalty-next-label');
+    const rewardsEl = document.getElementById('loyalty-rewards');
+    if (!levelBadge || !pointsEl || !fillEl || !progressLabel || !nextLabel || !rewardsEl) return;
+    const snap = snapshot || {
+        points: 0,
+        tier_label: 'Bronze',
+        progress: 0,
+        points_to_next: 0,
+        next_tier_label: 'Silver',
+        rewards: []
+    };
+    loyaltySnapshot = snap;
+    levelBadge.textContent = snap.tier_label || 'Bronze';
+    levelBadge.className = `loyalty-level-badge tier-${String(snap.tier_key || 'bronze').toLowerCase()}`;
+    pointsEl.textContent = String(Number(snap.points) || 0);
+    const pct = Math.round(Math.max(0, Math.min(1, Number(snap.progress) || 0)) * 100);
+    fillEl.style.width = `${pct}%`;
+    progressLabel.textContent = snap.next_tier_label ? `${pct}% to ${snap.next_tier_label}` : 'Max level reached';
+    nextLabel.textContent = snap.next_tier_label
+        ? `${Number(snap.points_to_next) || 0} points to ${snap.next_tier_label}`
+        : 'You are at the highest tier';
+    const rewards = Array.isArray(snap.rewards) ? snap.rewards : [];
+    rewardsEl.innerHTML = rewards.map((r) => `
+        <div class="loyalty-reward ${r.unlocked ? 'unlocked' : 'locked'}">
+            <div class="loyalty-reward-tier">${escapeHtml(r.label || '')}</div>
+            <div class="loyalty-reward-items">${escapeHtml((Array.isArray(r.items) ? r.items.join(' • ') : ''))}</div>
+        </div>
+    `).join('');
+}
+
+async function loadLoyaltyStatus() {
+    if (!POINTS_API_URL || !getInitData()) return;
+    if (loyaltyLoadInFlight) return loyaltyLoadInFlight;
+    loyaltyLoadInFlight = (async () => {
+        try {
+            const r = await fetch(`${POINTS_API_URL}/api/loyalty/me`, {
+                headers: catalogApiHeaders(),
+                cache: 'no-store'
+            });
+            if (r.status === 401) return;
+            const d = await r.json();
+            if (d?.ok) renderLoyalty(d);
+        } catch (e) {}
+    })().finally(() => {
+        loyaltyLoadInFlight = null;
+    });
+    return loyaltyLoadInFlight;
+}
+
 function wireCashbackUi() {
     const overlay = document.getElementById('cashback-info-modal');
     const btn = document.getElementById('btn-cashback-info');
@@ -1228,6 +1284,7 @@ function wireCashbackUi() {
 function init() {
     document.title = "Alpine Connexion";
     autoUseCashback = getAutoUseCashbackPref();
+    renderLoyalty(null);
     wireCashbackUi();
     initReviewsSection();
     const tg = window.Telegram?.WebApp;
@@ -1252,6 +1309,7 @@ function init() {
         applyTranslations();
         renderProducts();
         loadMyCashback();
+        loadLoyaltyStatus();
     })();
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') refreshCatalog();
@@ -1299,6 +1357,7 @@ async function refreshCatalog() {
     refreshCategoryFilter();
     renderProducts();
     loadMyCashback();
+    loadLoyaltyStatus();
 }
 
 function getPrimaryMedia(product) {
@@ -1788,6 +1847,11 @@ async function checkout() {
                     myCashbackBalanceChf = Number(data.cashback_balance_chf) || 0;
                     const balEl = document.getElementById('cashback-chip-balance');
                     if (balEl) balEl.textContent = formatChfAmount(myCashbackBalanceChf);
+                }
+                if (data.loyalty && data.loyalty.points != null) {
+                    renderLoyalty(data.loyalty);
+                } else {
+                    loadLoyaltyStatus();
                 }
                 cart = [];
                 saveCartToStorage();
