@@ -12,6 +12,15 @@
 </head>
 <body>
 
+<div id="cashback-info-modal" class="cashback-info-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="cashback-modal-title">
+    <div class="cashback-info-card" onclick="event.stopPropagation()">
+        <button type="button" class="cashback-info-close" id="cashback-modal-close" aria-label="Close">✕</button>
+        <h2 id="cashback-modal-title"></h2>
+        <p id="cashback-modal-body" class="cashback-modal-body"></p>
+        <button type="button" class="age-gate-btn age-gate-btn-primary cashback-info-ok" id="cashback-modal-ok"></button>
+    </div>
+</div>
+
 <div id="age-gate" class="age-gate hidden" role="dialog" aria-modal="true" aria-labelledby="age-gate-title">
     <div class="age-gate-card">
         <h2 id="age-gate-title"></h2>
@@ -54,6 +63,10 @@
                     <option value="en">EN</option>
                     <option value="de">DE</option>
                 </select>
+                <button type="button" class="points-badge" id="btn-cashback-info" aria-haspopup="dialog">
+                    <span id="cashback-chip-label">Cashback</span>
+                    <span id="cashback-chip-balance">—</span>
+                </button>
             </div>
             <select class="filter-select" id="filter-category">
                 <option value="" id="filter-all-option">📂 Toutes les catégories</option>
@@ -106,7 +119,7 @@
 <!-- #endregion -->
 
 <!-- #region Scripts -->
-<script src="app.js?v=20260326-age-gate-every-open"></script>
+<script src="app.js?v=20260326-cashback-auto-use"></script>
 <!-- #endregion -->
 </body>
 </html>

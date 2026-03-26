@@ -86,6 +86,7 @@ const BOT_USERS_FILE = path.join(__dirname, 'bot_users.json');
 const CART_ACTIVITY_FILE = path.join(__dirname, 'cart_activity.json');
 const BOT_CHAT_LANG_FILE = path.join(__dirname, 'bot_chat_lang.json');
 const CART_REMINDERS_FILE = path.join(__dirname, 'cart_reminders.json');
+const CASHBACK_WALLETS_FILE = path.join(__dirname, 'cashback_wallets.json');
 const ORDER_QUEUE_FILE = path.join(__dirname, 'order_queue.jsonl');
 
 function loadBotUsers() {
@@ -206,6 +207,74 @@ function saveCartReminders(map) {
   } catch (e) {
     console.error('❌ Could not save cart_reminders.json:', e.message);
   }
+}
+
+function roundMoneyChf(n) {
+  const x = Number(n);
+  if (!Number.isFinite(x)) return 0;
+  return Math.round(x * 100) / 100;
+}
+
+function loadCashbackWallets() {
+  try {
+    const raw = fs.readFileSync(CASHBACK_WALLETS_FILE, 'utf8');
+    const o = JSON.parse(raw);
+    if (!o || typeof o !== 'object') return { users: {} };
+    const users = o.users && typeof o.users === 'object' && !Array.isArray(o.users) ? o.users : {};
+    return { users };
+  } catch {
+    return { users: {} };
+  }
+}
+
+function saveCashbackWallets(data) {
+  const users = data && data.users && typeof data.users === 'object' ? data.users : {};
+  try {
+    fs.writeFileSync(CASHBACK_WALLETS_FILE, JSON.stringify({ users }, null, 2), 'utf8');
+  } catch (err) {
+    console.error('❌ Could not save cashback_wallets.json:', err.message);
+  }
+}
+
+function appendCashbackTransaction(chatId, { delta_chf, kind, note, payment_method }) {
+  const id = String(chatId);
+  const data = loadCashbackWallets();
+  if (!data.users) data.users = {};
+  let wallet = data.users[id];
+  if (!wallet) {
+    wallet = { balance_chf: 0, transactions: [] };
+    data.users[id] = wallet;
+  }
+  if (typeof wallet.balance_chf !== 'number' || Number.isNaN(wallet.balance_chf)) wallet.balance_chf = 0;
+  if (!Array.isArray(wallet.transactions)) wallet.transactions = [];
+
+  const newBal = roundMoneyChf(wallet.balance_chf + delta_chf);
+  if (newBal < -0.001) {
+    const err = new Error('INSUFFICIENT_BALANCE');
+    err.code = 'INSUFFICIENT_BALANCE';
+    throw err;
+  }
+  const tx = {
+    id: crypto.randomUUID ? crypto.randomUUID() : `tx_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`,
+    at: new Date().toISOString(),
+    delta_chf: roundMoneyChf(delta_chf),
+    balance_after: newBal,
+    kind: String(kind || 'adjustment').slice(0, 64),
+    note: note ? String(note).slice(0, 500) : null,
+    payment_method: payment_method ? String(payment_method).slice(0, 32) : null
+  };
+  wallet.balance_chf = newBal;
+  wallet.transactions.unshift(tx);
+  if (wallet.transactions.length > 100) wallet.transactions = wallet.transactions.slice(0, 100);
+  saveCashbackWallets(data);
+  return { wallet, tx };
+}
+
+function getCashbackBalance(chatId) {
+  const data = loadCashbackWallets();
+  const wallet = data.users[String(chatId)];
+  const bal = wallet && typeof wallet.balance_chf === 'number' ? wallet.balance_chf : 0;
+  return roundMoneyChf(bal);
 }
 
 function upsertCartActivity(user, payload) {
@@ -1156,6 +1225,19 @@ app.get('/api/config', requireTelegramInitForPublicApi, (req, res) => {
   });
 });
 
+app.get('/api/my-cashback', requireTelegramInitForPublicApi, (req, res) => {
+  const initData = req.get('X-Telegram-Init-Data') || req.query?.initData;
+  const user = getInitDataUser(initData);
+  if (!user || !user.id) {
+    return res.status(401).json({ error: 'Invalid initData' });
+  }
+  const id = String(user.id);
+  const data = loadCashbackWallets();
+  const w = data.users[id];
+  const balance_chf = w && typeof w.balance_chf === 'number' ? roundMoneyChf(w.balance_chf) : 0;
+  res.json({ ok: true, balance_chf, currency: 'CHF' });
+});
+
 // Public media proxy: browser only sees your domain (blocks SSRF via host allowlist)
 app.get('/api/media', async (req, res) => {
   const raw = req.query.u;
@@ -1246,6 +1328,106 @@ app.get('/api/admin/cart-activity', (req, res) => {
     return tb - ta;
   });
   res.json({ ok: true, users: rows });
+});
+
+app.get('/api/admin/cashback-wallets', (req, res) => {
+  if (!ensureOwner(req, res)) return;
+  const botUsers = loadBotUsers();
+  const data = loadCashbackWallets();
+  const byId = new Map();
+
+  botUsers.forEach((u) => {
+    if (!u || u.chat_id == null) return;
+    const id = String(u.chat_id);
+    const w = data.users[id];
+    const balance_chf = w && typeof w.balance_chf === 'number' ? roundMoneyChf(w.balance_chf) : 0;
+    const transactions = w && Array.isArray(w.transactions) ? w.transactions.slice(0, 15) : [];
+    byId.set(id, {
+      chat_id: u.chat_id,
+      username: u.username || null,
+      first_name: u.first_name || null,
+      last_name: u.last_name || null,
+      balance_chf,
+      transactions
+    });
+  });
+
+  Object.keys(data.users || {}).forEach((kid) => {
+    if (byId.has(kid)) return;
+    const w = data.users[kid];
+    byId.set(kid, {
+      chat_id: kid,
+      username: null,
+      first_name: null,
+      last_name: null,
+      balance_chf: w && typeof w.balance_chf === 'number' ? roundMoneyChf(w.balance_chf) : 0,
+      transactions: w && Array.isArray(w.transactions) ? w.transactions.slice(0, 15) : []
+    });
+  });
+
+  const wallets = [...byId.values()].sort((a, b) => b.balance_chf - a.balance_chf);
+  res.json({ ok: true, wallets });
+});
+
+app.post('/api/admin/cashback-credit', (req, res) => {
+  if (!ensureOwner(req, res)) return;
+  const chat_id = req.body?.chat_id;
+  const amount = Number(req.body?.amount_chf);
+  const payment_method = String(req.body?.payment_method || '').toLowerCase().trim();
+  const note = req.body?.note;
+  if (chat_id == null || String(chat_id) === '' || String(chat_id) === String(OWNER_CHAT_ID)) {
+    return res.status(400).json({ error: 'Invalid chat_id' });
+  }
+  if (payment_method !== 'crypto') {
+    return res.status(400).json({
+      error: 'cashback_crypto_only',
+      message:
+        'Le cashback en CHF ne s’applique qu’aux commandes payées en crypto. Pour un paiement cash, ne crédite pas de cashback.'
+    });
+  }
+  if (!amount || amount <= 0 || !Number.isFinite(amount)) {
+    return res.status(400).json({ error: 'Invalid amount' });
+  }
+  if (amount > 100000) return res.status(400).json({ error: 'Amount too large' });
+  try {
+    const { wallet, tx } = appendCashbackTransaction(chat_id, {
+      delta_chf: amount,
+      kind: 'crypto_cashback',
+      note,
+      payment_method: 'crypto'
+    });
+    res.json({ ok: true, balance_chf: wallet.balance_chf, transaction: tx });
+  } catch (e) {
+    if (e.code === 'INSUFFICIENT_BALANCE') return res.status(400).json({ error: 'insufficient_balance' });
+    console.error('cashback-credit:', e.message);
+    res.status(500).json({ error: 'save_failed' });
+  }
+});
+
+app.post('/api/admin/cashback-debit', (req, res) => {
+  if (!ensureOwner(req, res)) return;
+  const chat_id = req.body?.chat_id;
+  const amount = Number(req.body?.amount_chf);
+  const note = req.body?.note;
+  if (chat_id == null || String(chat_id) === '' || String(chat_id) === String(OWNER_CHAT_ID)) {
+    return res.status(400).json({ error: 'Invalid chat_id' });
+  }
+  if (!amount || amount <= 0 || !Number.isFinite(amount)) {
+    return res.status(400).json({ error: 'Invalid amount' });
+  }
+  if (amount > 100000) return res.status(400).json({ error: 'Amount too large' });
+  try {
+    const { wallet, tx } = appendCashbackTransaction(chat_id, {
+      delta_chf: -amount,
+      kind: 'redeemed_on_order',
+      note
+    });
+    res.json({ ok: true, balance_chf: wallet.balance_chf, transaction: tx });
+  } catch (e) {
+    if (e.code === 'INSUFFICIENT_BALANCE') return res.status(400).json({ error: 'insufficient_balance' });
+    console.error('cashback-debit:', e.message);
+    res.status(500).json({ error: 'save_failed' });
+  }
 });
 
 // ---- Admin: enable/disable Telegram bot ----
@@ -1428,6 +1610,7 @@ app.post('/api/order', (req, res) => {
   }
   const initData = req.body?.initData;
   const orderText = req.body?.orderText;
+  const cashbackUseRaw = req.body?.cashback_use_chf;
   const user = getInitDataUser(initData);
   if (!user || !user.id) {
     return res.status(401).json({ error: 'Invalid initData' });
@@ -1437,15 +1620,45 @@ app.post('/api/order', (req, res) => {
   }
   const userId = user.id;
   addOrUpdateBotUserFromWebAppUser(user);
+  const cashbackUseChf = roundMoneyChf(Number(cashbackUseRaw) || 0);
+  let cashbackDebited = false;
+  if (cashbackUseChf < 0) {
+    return res.status(400).json({ error: 'invalid_cashback' });
+  }
+  if (cashbackUseChf > 0) {
+    try {
+      appendCashbackTransaction(userId, {
+        delta_chf: -cashbackUseChf,
+        kind: 'auto_used_on_order',
+        note: `Order checkout API at ${new Date().toISOString()}`
+      });
+      cashbackDebited = true;
+    } catch (e) {
+      if (e.code === 'INSUFFICIENT_BALANCE') {
+        return res.status(400).json({ error: 'insufficient_cashback' });
+      }
+      console.error('❌ cashback-on-order:', e.message);
+      return res.status(500).json({ error: 'cashback_save_failed' });
+    }
+  }
 
   if (PROCESS_ROLE === 'web') {
     try {
       enqueueWebOrderSync(user, orderText);
     } catch (e) {
+      if (cashbackDebited) {
+        try {
+          appendCashbackTransaction(userId, {
+            delta_chf: cashbackUseChf,
+            kind: 'rollback_on_queue_error',
+            note: 'Rollback cashback after queue_failed'
+          });
+        } catch (_) {}
+      }
       console.error('❌ order_queue:', e.message);
       return res.status(500).json({ error: 'queue_failed' });
     }
-    return res.json({ ok: true, queued: true });
+    return res.json({ ok: true, queued: true, cashback_balance_chf: getCashbackBalance(userId) });
   }
 
   const fromLabel = user.username ? `@${user.username}` : [user.first_name, user.last_name].filter(Boolean).join(' ') || `ID ${userId}`;
@@ -1465,7 +1678,7 @@ app.post('/api/order', (req, res) => {
     console.error('❌ Error sending confirmation to user:', err.message);
   });
 
-  res.json({ ok: true });
+  res.json({ ok: true, cashback_balance_chf: getCashbackBalance(userId) });
 });
 
 app.post('/api/cart-activity', (req, res) => {

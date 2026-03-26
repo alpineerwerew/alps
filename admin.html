@@ -125,6 +125,45 @@
             <button type="button" class="btn" id="btn-load-cart-activity">Voir l'activité panier</button>
             <div id="cart-activity-list" style="margin-top:0.75rem;font-size:0.85rem;"></div>
         </div>
+
+        <div class="import-wrap">
+            <h2>Cashback (CHF par compte)</h2>
+            <p>Crédite uniquement après une commande payée en <strong>crypto</strong>. Paiement cash : ne pas créditer. Déduis le solde quand le client l’utilise sur la commande suivante.</p>
+            <button type="button" class="btn primary" id="btn-load-cashback">Charger les soldes</button>
+            <div id="cashback-wallets-list" style="margin-top:0.75rem;font-size:0.85rem;"></div>
+            <form id="cashback-credit-form" style="margin-top:1rem;">
+                <h3 style="font-size:1rem;">Ajouter du cashback (crypto)</h3>
+                <label>Client (chat_id)</label>
+                <select id="cb-credit-chat"></select>
+                <label>Montant de la commande (CHF) — indicatif 5 % / 10 %</label>
+                <input type="number" id="cb-order-total" step="0.01" min="0" placeholder="ex: 850">
+                <label>Méthode de paiement (rappel)</label>
+                <select id="cb-payment">
+                    <option value="crypto">Crypto → cashback autorisé</option>
+                    <option value="cash">Cash → ne pas créditer</option>
+                </select>
+                <p id="cb-hint" style="font-size:0.85rem;color:#666;margin-top:0.25rem;"></p>
+                <label>Montant à créditer (CHF)</label>
+                <input type="number" id="cb-credit-amount" step="0.01" min="0" placeholder="ex: 42.50" required>
+                <label>Note (optionnel)</label>
+                <input type="text" id="cb-credit-note" placeholder="ex: commande / hash tx">
+                <div class="form-actions">
+                    <button type="submit" class="btn primary">Créditer</button>
+                </div>
+            </form>
+            <form id="cashback-debit-form" style="margin-top:1.25rem;">
+                <h3 style="font-size:1rem;">Déduire (crédit utilisé sur une commande)</h3>
+                <label>Client (chat_id)</label>
+                <select id="cb-debit-chat"></select>
+                <label>Montant (CHF)</label>
+                <input type="number" id="cb-debit-amount" step="0.01" min="0" required>
+                <label>Note (optionnel)</label>
+                <input type="text" id="cb-debit-note" placeholder="ex: appliqué sur commande …">
+                <div class="form-actions">
+                    <button type="submit" class="btn primary">Déduire du solde</button>
+                </div>
+            </form>
+        </div>
     </div>
 
     <script>
@@ -432,6 +471,79 @@
             }
         }
 
+        function suggestCashbackChf(orderChf) {
+            const o = Number(orderChf);
+            if (!o || o <= 0 || !Number.isFinite(o)) return null;
+            const pct = o < 1000 ? 0.05 : 0.10;
+            return Math.round(o * pct * 100) / 100;
+        }
+
+        function updateCashbackCreditHint() {
+            const hint = document.getElementById('cb-hint');
+            const pay = document.getElementById('cb-payment')?.value;
+            const order = Number(document.getElementById('cb-order-total')?.value);
+            if (pay === 'cash') {
+                if (hint) hint.textContent = 'Paiement cash : pas de cashback — n’utilise pas « Créditer ».';
+                return;
+            }
+            const sug = suggestCashbackChf(order);
+            if (sug != null && hint) {
+                const tier = order < 1000 ? '5 %' : '10 %';
+                hint.textContent = `Indicatif ${tier} sur ${order} CHF → ${sug} CHF (à saisir dans « Montant à créditer »).`;
+            } else if (hint) {
+                hint.textContent = 'Saisis le montant de la commande pour l’indicatif 5 % / 10 %, puis le montant à créditer.';
+            }
+        }
+
+        function fillCashbackChatSelects(list) {
+            const cred = document.getElementById('cb-credit-chat');
+            const deb = document.getElementById('cb-debit-chat');
+            if (!cred || !deb) return;
+            const opts = (Array.isArray(list) ? list : []).map((w) => {
+                const chatId = w.chat_id;
+                const label = (w.username || [w.first_name, w.last_name].filter(Boolean).join(' ') || chatId);
+                const bal = typeof w.balance_chf === 'number' ? w.balance_chf.toFixed(2) : '0.00';
+                const safeVal = String(chatId).replace(/"/g, '&quot;');
+                return `<option value="${safeVal}">${escapeHtml(String(label))} (${chatId}) — ${bal} CHF</option>`;
+            }).join('');
+            const html = '<option value="">— Choisir —</option>' + opts;
+            cred.innerHTML = html;
+            deb.innerHTML = html;
+        }
+
+        async function loadCashbackWalletsList() {
+            const el = document.getElementById('cashback-wallets-list');
+            if (!el) return;
+            el.innerHTML = '<p>Chargement...</p>';
+            try {
+                const r = await fetch(API_URL + '/api/admin/cashback-wallets?initData=' + encodeURIComponent(getInitData()));
+                const d = await r.json();
+                if (!r.ok || !d.ok) {
+                    el.innerHTML = '<p class="msg err">Erreur chargement cashback.</p>';
+                    return;
+                }
+                const list = Array.isArray(d.wallets) ? d.wallets : [];
+                fillCashbackChatSelects(list);
+                if (!list.length) {
+                    el.innerHTML = '<p>Aucun client avec solde pour le moment.</p>';
+                    return;
+                }
+                const rows = list.map((w, i) => {
+                    const chatId = w.chat_id;
+                    const label = (w.username || [w.first_name, w.last_name].filter(Boolean).join(' ') || '—');
+                    const bal = typeof w.balance_chf === 'number' ? w.balance_chf.toFixed(2) : '0.00';
+                    return `<tr><td>${i + 1}</td><td>${escapeHtml(String(label))}</td><td>${escapeHtml(String(chatId))}</td><td>${bal}</td></tr>`;
+                });
+                el.innerHTML = `
+                    <table>
+                        <thead><tr><th>#</th><th>Client</th><th>chat_id</th><th>Solde CHF</th></tr></thead>
+                        <tbody>${rows.join('')}</tbody>
+                    </table>`;
+            } catch (e) {
+                el.innerHTML = '<p class="msg err">Erreur réseau.</p>';
+            }
+        }
+
         function escapeHtml(s) {
             const div = document.createElement('div');
             div.textContent = s;
@@ -731,6 +843,106 @@
         if (btnLoadCartActivity) {
             btnLoadCartActivity.addEventListener('click', () => {
                 loadCartActivityList();
+            });
+        }
+
+        const btnLoadCashback = document.getElementById('btn-load-cashback');
+        if (btnLoadCashback) {
+            btnLoadCashback.addEventListener('click', () => loadCashbackWalletsList());
+        }
+        const cbOrderTotal = document.getElementById('cb-order-total');
+        const cbPayment = document.getElementById('cb-payment');
+        if (cbOrderTotal) cbOrderTotal.addEventListener('input', updateCashbackCreditHint);
+        if (cbPayment) cbPayment.addEventListener('change', updateCashbackCreditHint);
+        updateCashbackCreditHint();
+
+        const cashbackCreditForm = document.getElementById('cashback-credit-form');
+        if (cashbackCreditForm) {
+            cashbackCreditForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const chat_id = document.getElementById('cb-credit-chat').value;
+                const amount = Number(document.getElementById('cb-credit-amount').value);
+                const payment_method = document.getElementById('cb-payment').value;
+                const note = document.getElementById('cb-credit-note').value.trim();
+                if (!chat_id) {
+                    alert('Choisis un client.');
+                    return;
+                }
+                if (payment_method === 'cash') {
+                    alert('Paiement cash : pas de cashback — ne pas créditer.');
+                    return;
+                }
+                if (!amount || amount <= 0) {
+                    alert('Montant invalide.');
+                    return;
+                }
+                try {
+                    const r = await fetch(API_URL + '/api/admin/cashback-credit', {
+                        method: 'POST',
+                        headers: getAuthHeadersJson(),
+                        body: JSON.stringify({
+                            ...getAuthBody(),
+                            chat_id,
+                            amount_chf: amount,
+                            payment_method: 'crypto',
+                            note: note || undefined
+                        })
+                    });
+                    const d = await r.json().catch(() => ({}));
+                    if (!r.ok) {
+                        alert(d.message || d.error || 'Erreur');
+                        return;
+                    }
+                    alert('Crédité. Nouveau solde : ' + (d.balance_chf != null ? d.balance_chf + ' CHF' : 'OK'));
+                    document.getElementById('cb-credit-amount').value = '';
+                    document.getElementById('cb-order-total').value = '';
+                    document.getElementById('cb-credit-note').value = '';
+                    updateCashbackCreditHint();
+                    loadCashbackWalletsList();
+                } catch (err) {
+                    alert('Erreur réseau');
+                }
+            });
+        }
+
+        const cashbackDebitForm = document.getElementById('cashback-debit-form');
+        if (cashbackDebitForm) {
+            cashbackDebitForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const chat_id = document.getElementById('cb-debit-chat').value;
+                const amount = Number(document.getElementById('cb-debit-amount').value);
+                const note = document.getElementById('cb-debit-note').value.trim();
+                if (!chat_id) {
+                    alert('Choisis un client.');
+                    return;
+                }
+                if (!amount || amount <= 0) {
+                    alert('Montant invalide.');
+                    return;
+                }
+                try {
+                    const r = await fetch(API_URL + '/api/admin/cashback-debit', {
+                        method: 'POST',
+                        headers: getAuthHeadersJson(),
+                        body: JSON.stringify({
+                            ...getAuthBody(),
+                            chat_id,
+                            amount_chf: amount,
+                            note: note || undefined
+                        })
+                    });
+                    const d = await r.json().catch(() => ({}));
+                    if (!r.ok) {
+                        alert(d.error === 'insufficient_balance' ? 'Solde insuffisant.' : (d.error || 'Erreur'));
+                        return;
+                    }
+                    alert('Déduit. Nouveau solde : ' + (d.balance_chf != null ? d.balance_chf + ' CHF' : 'OK'));
+                    document.getElementById('cb-debit-amount').value = '';
+                    document.getElementById('cb-debit-note').value = '';
+                    loadCashbackWalletsList();
+                } catch (err) {
+                    alert('Erreur réseau');
+                }
             });
         }
 

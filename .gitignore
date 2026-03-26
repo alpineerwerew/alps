@@ -8,6 +8,7 @@ server/bot_users.json
 server/bot_chat_lang.json
 server/cart_activity.json
 server/cart_reminders.json
+server/cashback_wallets.json
 server/order_queue.jsonl
 server/uploads/
 .DS_Store

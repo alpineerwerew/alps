@@ -113,6 +113,69 @@ body {
     color: #d1d5db;
 }
 
+.cashback-info-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.78);
+    z-index: 8500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.cashback-info-overlay.hidden {
+    display: none !important;
+}
+
+.cashback-info-card {
+    position: relative;
+    width: 100%;
+    max-width: 420px;
+    background: #121220;
+    border: 1px solid rgba(232, 198, 116, 0.25);
+    border-radius: 14px;
+    padding: 1.15rem 1rem 1rem;
+    box-shadow: var(--shadow-gold);
+}
+
+.cashback-info-close {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    border: 0;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+    line-height: 1;
+    padding: 0.35rem;
+    cursor: pointer;
+    border-radius: 8px;
+}
+
+.cashback-info-close:hover {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.cashback-info-card h2 {
+    font-size: 1.05rem;
+    margin-bottom: 0.65rem;
+    padding-right: 2rem;
+}
+
+.cashback-modal-body {
+    color: var(--text-secondary);
+    font-size: 0.88rem;
+    line-height: 1.55;
+    white-space: pre-line;
+}
+
+.cashback-info-ok {
+    width: 100%;
+    margin-top: 1rem;
+}
+
 .catalog-access-error {
     min-height: 60vh;
     display: flex;
@@ -1318,6 +1381,36 @@ body {
     font-size: 1.5rem;
     font-weight: 700;
     color: #ffffff;
+}
+
+.cart-total-amount-small {
+    font-size: 1.05rem;
+    font-family: var(--font-body);
+    color: var(--text-secondary);
+}
+
+.cart-cashback-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    font-size: 0.84rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.8rem;
+}
+
+.cart-cashback-toggle input {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--gold);
+}
+
+.cart-total-discount-row {
+    margin-bottom: 0.6rem;
+}
+
+.cart-total-discount {
+    font-weight: 700;
+    color: #22c55e;
 }
 
 .checkout-hint {

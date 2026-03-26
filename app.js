@@ -64,7 +64,24 @@ const I18N = {
         age_gate_title: '🔞 Accès réservé aux 18 ans et +',
         age_gate_text: 'En entrant, tu confirmes avoir 18 ans ou plus et accepter du contenu pour adultes.',
         age_gate_accept: 'J’ai 18 ans ou plus',
-        age_gate_decline: 'Quitter'
+        age_gate_decline: 'Quitter',
+        cashback_chip_short: 'Cashback',
+        cashback_modal_title: 'Cashback crypto & crédit perso',
+        cashback_modal_body: `Un crédit en CHF est lié à ton compte Telegram (solde utilisable sur une prochaine commande).
+
+• Commandes payées en crypto (ex. BTC) : après réception du paiement, le cashback est ajouté manuellement depuis notre admin.
+• Montant de la commande sous 1 000 CHF : 5 % du total en crédit.
+• Montant à partir de 1 000 CHF : 10 % du total en crédit.
+• Ce crédit s’utilise sur ta prochaine commande (déduction confirmée avec l’équipe).
+
+Paiement en espèces : pas de cashback.`,
+        cashback_modal_ok: 'Compris',
+        cashback_auto_apply: 'Utiliser automatiquement mon crédit cashback',
+        cashback_discount_label: 'Cashback appliqué',
+        cashback_subtotal_label: 'Sous-total',
+        cashback_payable_label: 'Total à payer',
+        cashback_insufficient: 'Solde cashback insuffisant.',
+        cashback_applied_to_order: 'Cashback appliqué'
     },
     en: {
         filter_all: '📂 All categories',
@@ -100,7 +117,24 @@ const I18N = {
         age_gate_title: '🔞 Access is restricted to 18+',
         age_gate_text: 'By entering, you confirm that you are 18 years old or above and accept adult content.',
         age_gate_accept: 'I am 18+',
-        age_gate_decline: 'Leave'
+        age_gate_decline: 'Leave',
+        cashback_chip_short: 'Cashback',
+        cashback_modal_title: 'Crypto cashback & your balance',
+        cashback_modal_body: `A CHF credit balance is tied to your Telegram account (usable on a future order).
+
+• Crypto-paid orders only (e.g. BTC): after payment is confirmed, cashback is added manually from our admin panel.
+• Order total under 1,000 CHF: 5% of the order as credit.
+• Order total from 1,000 CHF: 10% of the order as credit.
+• Credit applies to your next order (deduction arranged with the team).
+
+Cash payments: no cashback.`,
+        cashback_modal_ok: 'Got it',
+        cashback_auto_apply: 'Automatically use my cashback credit',
+        cashback_discount_label: 'Cashback applied',
+        cashback_subtotal_label: 'Subtotal',
+        cashback_payable_label: 'Total to pay',
+        cashback_insufficient: 'Cashback balance is insufficient.',
+        cashback_applied_to_order: 'Cashback used'
     },
     de: {
         filter_all: '📂 Alle Kategorien',
@@ -136,7 +170,24 @@ const I18N = {
         age_gate_title: '🔞 Zugang nur für Personen ab 18',
         age_gate_text: 'Mit dem Eintritt bestätigst du, dass du mindestens 18 Jahre alt bist und Inhalte für Erwachsene akzeptierst.',
         age_gate_accept: 'Ich bin 18+',
-        age_gate_decline: 'Verlassen'
+        age_gate_decline: 'Verlassen',
+        cashback_chip_short: 'Cashback',
+        cashback_modal_title: 'Krypto-Cashback & Guthaben',
+        cashback_modal_body: `Ein CHF-Guthaben ist mit deinem Telegram-Konto verknüpft (für eine spätere Bestellung).
+
+• Nur bei Zahlung mit Krypto (z. B. BTC): Nach Zahlungseingang wird der Cashback manuell im Admin gutgeschrieben.
+• Bestellsumme unter 1 000 CHF: 5 % als Guthaben.
+• Bestellsumme ab 1 000 CHF: 10 % als Guthaben.
+• Guthaben gilt für deine nächste Bestellung (Verrechnung mit dem Team).
+
+Barzahlung: kein Cashback.`,
+        cashback_modal_ok: 'Alles klar',
+        cashback_auto_apply: 'Mein Cashback-Guthaben automatisch nutzen',
+        cashback_discount_label: 'Cashback verwendet',
+        cashback_subtotal_label: 'Zwischensumme',
+        cashback_payable_label: 'Zu zahlen',
+        cashback_insufficient: 'Cashback-Guthaben ist nicht ausreichend.',
+        cashback_applied_to_order: 'Cashback genutzt'
     }
 };
 
@@ -238,6 +289,15 @@ function applyTranslations() {
     }
     const navCatalogLabel = document.getElementById('nav-catalog-label');
     if (navCatalogLabel) navCatalogLabel.textContent = t('nav_catalog');
+
+    const chip = document.getElementById('cashback-chip-label');
+    if (chip) chip.textContent = t('cashback_chip_short');
+    const cmt = document.getElementById('cashback-modal-title');
+    const cmb = document.getElementById('cashback-modal-body');
+    const cmok = document.getElementById('cashback-modal-ok');
+    if (cmt) cmt.textContent = t('cashback_modal_title');
+    if (cmb) cmb.textContent = t('cashback_modal_body');
+    if (cmok) cmok.textContent = t('cashback_modal_ok');
 }
 
 function getTelegramDestination() {
@@ -593,6 +653,8 @@ const PRODUCTS = [
 // 🔒 CODE APP — NE PAS MODIFIER
 // =============================================
 let cart = [];
+let myCashbackBalanceChf = 0;
+let autoUseCashback = true;
 let selectedPricingIdx = null;
 let selectedVariantIdxs = [];
 let currentProduct = null;
@@ -749,8 +811,78 @@ async function loadContactUrls() {
     return contactUrlsLoadInFlight;
 }
 
+function formatChfAmount(n) {
+    const x = Number(n);
+    if (!Number.isFinite(x)) return '—';
+    return `${x.toFixed(2)} ${CURRENCY}`;
+}
+
+function getAutoUseCashbackPref() {
+    try {
+        const v = localStorage.getItem('ac_auto_cashback');
+        if (v === '0') return false;
+        if (v === '1') return true;
+    } catch (e) {}
+    return true;
+}
+
+function setAutoUseCashbackPref(v) {
+    autoUseCashback = !!v;
+    try {
+        localStorage.setItem('ac_auto_cashback', autoUseCashback ? '1' : '0');
+    } catch (e) {}
+}
+
+function computeCartTotals() {
+    const subtotal = cart.reduce((sum, item) => sum + (Number(item?.price) || 0), 0);
+    const discount = autoUseCashback ? Math.min(subtotal, Math.max(0, Number(myCashbackBalanceChf) || 0)) : 0;
+    const payable = Math.max(0, subtotal - discount);
+    return { subtotal, discount, payable };
+}
+
+let cashbackLoadInFlight = null;
+async function loadMyCashback() {
+    if (!POINTS_API_URL || !getInitData()) return;
+    if (cashbackLoadInFlight) return cashbackLoadInFlight;
+    cashbackLoadInFlight = (async () => {
+        try {
+            const r = await fetch(`${POINTS_API_URL}/api/my-cashback`, {
+                headers: catalogApiHeaders(),
+                cache: 'no-store'
+            });
+            if (r.status === 401) return;
+            const d = await r.json();
+            if (d.ok && typeof d.balance_chf === 'number') {
+                myCashbackBalanceChf = Number(d.balance_chf) || 0;
+                const balEl = document.getElementById('cashback-chip-balance');
+                if (balEl) balEl.textContent = formatChfAmount(myCashbackBalanceChf);
+                if (document.getElementById('cart-overlay')?.classList.contains('active')) renderCart();
+            }
+        } catch (e) {}
+    })().finally(() => {
+        cashbackLoadInFlight = null;
+    });
+    return cashbackLoadInFlight;
+}
+
+function wireCashbackUi() {
+    const overlay = document.getElementById('cashback-info-modal');
+    const btn = document.getElementById('btn-cashback-info');
+    const closeBtn = document.getElementById('cashback-modal-close');
+    const okBtn = document.getElementById('cashback-modal-ok');
+    const close = () => overlay?.classList.add('hidden');
+    btn?.addEventListener('click', () => overlay?.classList.remove('hidden'));
+    closeBtn?.addEventListener('click', close);
+    okBtn?.addEventListener('click', close);
+    overlay?.addEventListener('click', (e) => {
+        if (e.target === overlay) close();
+    });
+}
+
 function init() {
     document.title = "Alpine Connexion";
+    autoUseCashback = getAutoUseCashbackPref();
+    wireCashbackUi();
     const tg = window.Telegram?.WebApp;
     if (tg) {
         try {
@@ -769,6 +901,7 @@ function init() {
         buildFilters();
         applyTranslations();
         renderProducts();
+        loadMyCashback();
     })();
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') refreshCatalog();
@@ -815,6 +948,7 @@ async function refreshCatalog() {
     await loadCatalog();
     refreshCategoryFilter();
     renderProducts();
+    loadMyCashback();
 }
 
 function getPrimaryMedia(product) {
@@ -1191,10 +1325,9 @@ function renderCart() {
         return;
     }
 
-    let total = 0;
+    const totals = computeCartTotals();
     let h = '';
     cart.forEach((item, i) => {
-        total += item.price;
         const u = item.unit_type === 'gram' ? 'g' : 'unité(s)';
         h += `<div class="cart-item">
             <div class="cart-item-top">
@@ -1209,13 +1342,32 @@ function renderCart() {
 
     h += `<div class="cart-footer">
         <div class="cart-total-row">
-            <span class="cart-total-label">${t('total_label')}</span>
-            <span class="cart-total-amount">${total.toFixed(2)} ${CURRENCY}</span>
+            <span class="cart-total-label">${t('cashback_subtotal_label')}</span>
+            <span class="cart-total-amount cart-total-amount-small">${totals.subtotal.toFixed(2)} ${CURRENCY}</span>
+        </div>
+        <label class="cart-cashback-toggle">
+            <input type="checkbox" id="cart-auto-cashback" ${autoUseCashback ? 'checked' : ''}>
+            <span>${t('cashback_auto_apply')} (${formatChfAmount(myCashbackBalanceChf)})</span>
+        </label>
+        <div class="cart-total-row cart-total-discount-row">
+            <span class="cart-total-label">${t('cashback_discount_label')}</span>
+            <span class="cart-total-discount">- ${totals.discount.toFixed(2)} ${CURRENCY}</span>
+        </div>
+        <div class="cart-total-row">
+            <span class="cart-total-label">${t('cashback_payable_label')}</span>
+            <span class="cart-total-amount">${totals.payable.toFixed(2)} ${CURRENCY}</span>
         </div>
         <button type="button" class="btn-checkout" onclick="checkout()">${t('cart_btn_submit')}</button>
     `;
     h += `</div>`;
     c.innerHTML = h;
+    const autoCb = document.getElementById('cart-auto-cashback');
+    if (autoCb) {
+        autoCb.addEventListener('change', (e) => {
+            setAutoUseCashbackPref(!!e.target.checked);
+            renderCart();
+        });
+    }
 }
 
 function removeFromCart(i) {
@@ -1225,8 +1377,8 @@ function removeFromCart(i) {
     renderCart();
 }
 
-function buildOrderText() {
-    let total = 0;
+function buildOrderText(totals) {
+    const tvals = totals || computeCartTotals();
     let msg = `${t('order_header')}\n\n`;
     cart.forEach((item, i) => {
         const u = item.unit_type === 'gram'
@@ -1235,31 +1387,48 @@ function buildOrderText() {
         msg += `${i+1}. ${item.name}`;
         if (item.variant) msg += ` (${item.variant})`;
         msg += `\n   📦 ${item.qty} ${u} — ${item.price} ${CURRENCY}\n\n`;
-        total += item.price;
     });
-    msg += `${t('order_total')} : ${total.toFixed(2)} ${CURRENCY}`;
+    if (tvals.discount > 0) {
+        msg += `${t('cashback_applied_to_order')} : -${tvals.discount.toFixed(2)} ${CURRENCY}\n`;
+    }
+    msg += `${t('order_total')} : ${tvals.payable.toFixed(2)} ${CURRENCY}`;
     return msg;
 }
 
 async function checkout() {
     if (!cart.length) return;
-    const orderText = buildOrderText();
+    const totals = computeCartTotals();
+    const orderText = buildOrderText(totals);
 
     if (POINTS_API_URL && getInitData()) {
         try {
             const res = await fetch(`${POINTS_API_URL}/api/order`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ initData: getInitData(), orderText })
+                body: JSON.stringify({
+                    initData: getInitData(),
+                    orderText,
+                    cashback_use_chf: totals.discount
+                })
             });
             const data = await res.json().catch(() => ({}));
             if (res.ok && data.ok) {
+                if (typeof data.cashback_balance_chf === 'number') {
+                    myCashbackBalanceChf = Number(data.cashback_balance_chf) || 0;
+                    const balEl = document.getElementById('cashback-chip-balance');
+                    if (balEl) balEl.textContent = formatChfAmount(myCashbackBalanceChf);
+                }
                 cart = [];
                 updateCartBadge();
                 scheduleCartActivitySync();
                 closeCart();
                 showToast(t('order_sent'));
                 if (window.Telegram?.WebApp) window.Telegram.WebApp.close();
+                return;
+            } else if (data.error === 'insufficient_cashback') {
+                showToast(t('cashback_insufficient'));
+                await loadMyCashback();
+                renderCart();
                 return;
             }
         } catch (e) {}
