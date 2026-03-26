@@ -434,16 +434,18 @@ function loadLoyaltyPoints() {
     const raw = fs.readFileSync(LOYALTY_POINTS_FILE, 'utf8');
     const o = JSON.parse(raw);
     const users = o && typeof o.users === 'object' && !Array.isArray(o.users) ? o.users : {};
-    return { users };
+    const pending = Array.isArray(o?.pending) ? o.pending : [];
+    return { users, pending };
   } catch {
-    return { users: {} };
+    return { users: {}, pending: [] };
   }
 }
 
 function saveLoyaltyPoints(data) {
   const users = data && typeof data.users === 'object' && !Array.isArray(data.users) ? data.users : {};
+  const pending = Array.isArray(data?.pending) ? data.pending : [];
   try {
-    fs.writeFileSync(LOYALTY_POINTS_FILE, JSON.stringify({ users }, null, 2), 'utf8');
+    fs.writeFileSync(LOYALTY_POINTS_FILE, JSON.stringify({ users, pending }, null, 2), 'utf8');
   } catch (e) {
     console.error('❌ Could not save loyalty_points.json:', e.message);
   }
@@ -509,6 +511,88 @@ function addLoyaltyPoints(chatId, pointsToAdd, meta) {
   if (row.history.length > 120) row.history = row.history.slice(0, 120);
   saveLoyaltyPoints(data);
   return buildLoyaltySnapshot(row.total_points);
+}
+
+function enqueueLoyaltyPending(chatId, pointsToAdd, meta) {
+  const id = String(chatId);
+  const add = Math.max(0, Math.floor(Number(pointsToAdd) || 0));
+  if (!add) return null;
+  const data = loadLoyaltyPoints();
+  data.pending = Array.isArray(data.pending) ? data.pending : [];
+  const orderRef = meta?.order_ref ? String(meta.order_ref) : null;
+  const existing = data.pending.find((p) =>
+    p &&
+    p.status === 'pending' &&
+    String(p.chat_id) === id &&
+    String(p.order_ref || '') === String(orderRef || '')
+  );
+  if (existing) return existing;
+  const reqRow = {
+    id: Date.now() + Math.floor(Math.random() * 1000),
+    chat_id: id,
+    points: add,
+    order_ref: orderRef,
+    order_total_chf: Number(meta?.order_total_chf) || null,
+    created_at: new Date().toISOString(),
+    status: 'pending'
+  };
+  data.pending.unshift(reqRow);
+  if (data.pending.length > 5000) data.pending = data.pending.slice(0, 5000);
+  saveLoyaltyPoints(data);
+  return reqRow;
+}
+
+function approveLoyaltyPendingRequest(requestId, ownerId) {
+  const data = loadLoyaltyPoints();
+  data.pending = Array.isArray(data.pending) ? data.pending : [];
+  const idx = data.pending.findIndex((p) => Number(p?.id) === Number(requestId) && p?.status === 'pending');
+  if (idx < 0) return null;
+  const req = data.pending[idx];
+  const userId = String(req.chat_id);
+  const add = Math.max(0, Math.floor(Number(req.points) || 0));
+  if (!add) return null;
+  if (!data.users[userId]) data.users[userId] = { total_points: 0, history: [] };
+  const row = data.users[userId];
+  row.total_points = Math.max(0, Math.floor(Number(row.total_points) || 0));
+  row.history = Array.isArray(row.history) ? row.history : [];
+  row.total_points += add;
+  row.history.unshift({
+    at: new Date().toISOString(),
+    points: add,
+    kind: 'order_approved_by_admin',
+    order_ref: req.order_ref || null,
+    order_total_chf: Number(req.order_total_chf) || null,
+    approved_by: ownerId != null ? String(ownerId) : null
+  });
+  if (row.history.length > 120) row.history = row.history.slice(0, 120);
+  data.pending[idx] = {
+    ...req,
+    status: 'approved',
+    approved_at: new Date().toISOString(),
+    approved_by: ownerId != null ? String(ownerId) : null
+  };
+  saveLoyaltyPoints(data);
+  return {
+    request: data.pending[idx],
+    snapshot: buildLoyaltySnapshot(row.total_points)
+  };
+}
+
+function rejectLoyaltyPendingRequest(requestId, ownerId, note) {
+  const data = loadLoyaltyPoints();
+  data.pending = Array.isArray(data.pending) ? data.pending : [];
+  const idx = data.pending.findIndex((p) => Number(p?.id) === Number(requestId) && p?.status === 'pending');
+  if (idx < 0) return null;
+  const req = data.pending[idx];
+  data.pending[idx] = {
+    ...req,
+    status: 'rejected',
+    rejected_at: new Date().toISOString(),
+    rejected_by: ownerId != null ? String(ownerId) : null,
+    rejected_note: note ? String(note).slice(0, 300) : null
+  };
+  saveLoyaltyPoints(data);
+  return data.pending[idx];
 }
 
 function adjustLoyaltyPoints(chatId, deltaPoints, meta) {
@@ -973,8 +1057,7 @@ function getOrderContactKeyboard(lang) {
         [
           { text: L.order_btn_signal, callback_data: 'order_contact_signal' },
           { text: L.order_btn_threema, callback_data: 'order_contact_threema' }
-        ],
-        [{ text: L.order_question_btn, callback_data: 'order_question_help' }]
+        ]
       ]
     }
   };
@@ -1512,24 +1595,71 @@ app.get('/api/loyalty/me', requireTelegramInitForPublicApi, (req, res) => {
 
 app.get('/api/admin/loyalty', (req, res) => {
   if (!ensureOwner(req, res)) return;
+  const loyaltyData = loadLoyaltyPoints();
+  const pendingRows = Array.isArray(loyaltyData.pending) ? loyaltyData.pending.filter((p) => p && p.status === 'pending') : [];
   const users = loadBotUsers().map((u) => (u && typeof u === 'object'
     ? u
     : { chat_id: u, username: null, first_name: null, last_name: null }));
   const out = users.map((u) => {
     const snap = getLoyaltySnapshot(u.chat_id);
+    const pendingPoints = pendingRows
+      .filter((p) => String(p.chat_id) === String(u.chat_id))
+      .reduce((sum, p) => sum + (Math.max(0, Math.floor(Number(p.points) || 0))), 0);
     return {
       chat_id: u.chat_id,
       username: u.username || null,
       first_name: u.first_name || null,
       last_name: u.last_name || null,
       points: snap.points,
+      pending_points: pendingPoints,
       tier_label: snap.tier_label,
       next_tier_label: snap.next_tier_label,
       points_to_next: snap.points_to_next,
       progress: snap.progress
     };
   }).sort((a, b) => b.points - a.points);
-  res.json({ ok: true, users: out, tiers: LOYALTY_TIERS });
+  const pending = pendingRows
+    .map((p) => {
+      const u = users.find((x) => String(x.chat_id) === String(p.chat_id));
+      return {
+        id: p.id,
+        chat_id: p.chat_id,
+        username: u?.username || null,
+        first_name: u?.first_name || null,
+        last_name: u?.last_name || null,
+        points: Math.max(0, Math.floor(Number(p.points) || 0)),
+        order_ref: p.order_ref || null,
+        order_total_chf: Number(p.order_total_chf) || null,
+        created_at: p.created_at || null
+      };
+    })
+    .sort((a, b) => {
+      const ta = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const tb = b.created_at ? new Date(b.created_at).getTime() : 0;
+      return tb - ta;
+    });
+  res.json({ ok: true, users: out, pending, tiers: LOYALTY_TIERS });
+});
+
+app.post('/api/admin/loyalty/pending/:id/approve', (req, res) => {
+  const ownerId = ensureOwner(req, res);
+  if (!ownerId) return;
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id) || id <= 0) return res.status(400).json({ error: 'invalid_pending_id' });
+  const result = approveLoyaltyPendingRequest(id, ownerId);
+  if (!result) return res.status(404).json({ error: 'pending_request_not_found' });
+  res.json({ ok: true, request: result.request, snapshot: result.snapshot });
+});
+
+app.post('/api/admin/loyalty/pending/:id/reject', (req, res) => {
+  const ownerId = ensureOwner(req, res);
+  if (!ownerId) return;
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id) || id <= 0) return res.status(400).json({ error: 'invalid_pending_id' });
+  const note = req.body?.note;
+  const request = rejectLoyaltyPendingRequest(id, ownerId, note);
+  if (!request) return res.status(404).json({ error: 'pending_request_not_found' });
+  res.json({ ok: true, request });
 });
 
 app.post('/api/admin/loyalty/adjust', (req, res) => {
@@ -1776,6 +1906,33 @@ app.get('/api/admin/cart-activity', (req, res) => {
     return tb - ta;
   });
   res.json({ ok: true, users: rows });
+});
+
+app.get('/api/admin/orders-history', (req, res) => {
+  if (!ensureOwner(req, res)) return;
+  const users = loadBotUsers().map((u) => (u && typeof u === 'object'
+    ? u
+    : { chat_id: u, username: null, first_name: null, last_name: null }));
+  const byChat = new Map(users.map((u) => [String(u.chat_id), u]));
+  const limit = Math.max(10, Math.min(500, Number(req.query?.limit) || 120));
+  const rows = loadOrdersHistory()
+    .slice(0, limit)
+    .map((o) => {
+      const u = byChat.get(String(o.user_id)) || {};
+      return {
+        id: o.id,
+        ref: o.ref || null,
+        user_id: o.user_id,
+        username: o.username || u.username || null,
+        first_name: o.first_name || u.first_name || null,
+        last_name: o.last_name || u.last_name || null,
+        items: Array.isArray(o.items) ? o.items : [],
+        total_chf: Number(o.total_chf) || 0,
+        status: o.status || 'confirmed',
+        created_at: o.created_at || null
+      };
+    });
+  res.json({ ok: true, orders: rows });
 });
 
 app.get('/api/admin/cashback-wallets', (req, res) => {
@@ -2108,16 +2265,18 @@ app.post('/api/order', (req, res) => {
       console.error('❌ order_queue:', e.message);
       return res.status(500).json({ error: 'queue_failed' });
     }
-    const loyalty = addLoyaltyPoints(userId, pointsEarned, {
+    enqueueLoyaltyPending(userId, pointsEarned, {
       order_ref: orderHist?.ref || null,
       order_total_chf: orderHist?.total_chf || null
     });
+    const loyalty = getLoyaltySnapshot(userId);
     return res.json({
       ok: true,
       queued: true,
       cashback_balance_chf: getCashbackBalance(userId),
       order_ref: orderHist?.ref || null,
-      loyalty_points_earned: pointsEarned,
+      loyalty_points_earned: 0,
+      loyalty_points_pending: pointsEarned,
       loyalty
     });
   }
@@ -2139,15 +2298,17 @@ app.post('/api/order', (req, res) => {
     console.error('❌ Error sending confirmation to user:', err.message);
   });
 
-  const loyalty = addLoyaltyPoints(userId, pointsEarned, {
+  enqueueLoyaltyPending(userId, pointsEarned, {
     order_ref: orderHist?.ref || null,
     order_total_chf: orderHist?.total_chf || null
   });
+  const loyalty = getLoyaltySnapshot(userId);
   res.json({
     ok: true,
     cashback_balance_chf: getCashbackBalance(userId),
     order_ref: orderHist?.ref || null,
-    loyalty_points_earned: pointsEarned,
+    loyalty_points_earned: 0,
+    loyalty_points_pending: pointsEarned,
     loyalty
   });
 });

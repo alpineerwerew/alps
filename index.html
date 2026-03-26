@@ -23,11 +23,49 @@
 
 <div id="age-gate" class="age-gate hidden" role="dialog" aria-modal="true" aria-labelledby="age-gate-title">
     <div class="age-gate-card">
-        <h2 id="age-gate-title"></h2>
-        <p id="age-gate-text"></p>
-        <div class="age-gate-actions">
-            <button id="age-gate-accept" type="button" class="age-gate-btn age-gate-btn-primary"></button>
-            <button id="age-gate-decline" type="button" class="age-gate-btn age-gate-btn-secondary"></button>
+        <div class="age-gate-progress">
+            <span id="onboarding-step-pill-1" class="onboarding-step-pill active">1</span>
+            <span id="onboarding-step-pill-2" class="onboarding-step-pill">2</span>
+            <span id="onboarding-step-pill-3" class="onboarding-step-pill">3</span>
+        </div>
+        <p id="onboarding-progress-label" class="onboarding-progress-label"></p>
+
+        <div id="onboarding-step-1">
+            <h2 id="age-gate-title"></h2>
+            <p id="age-gate-text"></p>
+            <div class="age-gate-actions">
+                <button id="age-gate-accept" type="button" class="age-gate-btn age-gate-btn-primary"></button>
+                <button id="age-gate-decline" type="button" class="age-gate-btn age-gate-btn-secondary"></button>
+            </div>
+        </div>
+
+        <div id="onboarding-step-2" class="hidden">
+            <h2 id="contact-method-title"></h2>
+            <p id="contact-method-text"></p>
+            <div class="contact-method-grid">
+                <button id="contact-method-signal" type="button" class="contact-method-card">
+                    <span class="contact-method-name">Signal</span>
+                </button>
+                <button id="contact-method-threema" type="button" class="contact-method-card">
+                    <span class="contact-method-name">Threema</span>
+                </button>
+            </div>
+            <div class="age-gate-actions">
+                <button id="contact-method-back" type="button" class="age-gate-btn age-gate-btn-secondary"></button>
+                <button id="contact-method-next" type="button" class="age-gate-btn age-gate-btn-primary"></button>
+            </div>
+        </div>
+
+        <div id="onboarding-step-3" class="hidden">
+            <h2 id="contact-input-title"></h2>
+            <p id="contact-input-text"></p>
+            <label for="contact-input-value" id="contact-input-label" class="onboarding-input-label"></label>
+            <input id="contact-input-value" type="text" class="onboarding-input" />
+            <p id="contact-input-error" class="onboarding-input-error hidden"></p>
+            <div class="age-gate-actions">
+                <button id="contact-input-back" type="button" class="age-gate-btn age-gate-btn-secondary"></button>
+                <button id="contact-input-save" type="button" class="age-gate-btn age-gate-btn-primary"></button>
+            </div>
         </div>
     </div>
 </div>
@@ -63,6 +101,7 @@
                     <option value="en">EN</option>
                     <option value="de">DE</option>
                 </select>
+                <button type="button" class="contact-edit-btn" id="btn-edit-contact"></button>
                 <button type="button" class="points-badge" id="btn-cashback-info" aria-haspopup="dialog">
                     <span id="cashback-chip-label">Cashback</span>
                     <span id="cashback-chip-balance">—</span>
@@ -219,7 +258,7 @@
 <!-- #endregion -->
 
 <!-- #region Scripts -->
-<script src="app.js?v=20260326-loyalty-levels"></script>
+<script src="app.js?v=20260326-onboarding-contact-gate"></script>
 <!-- #endregion -->
 </body>
 </html>

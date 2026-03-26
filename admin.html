@@ -127,6 +127,28 @@
         </div>
 
         <div class="import-wrap">
+            <h2>Historique des commandes</h2>
+            <p>Dernières commandes confirmées avec client, référence, articles, total et date.</p>
+            <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:end;">
+                <div style="min-width:180px;">
+                    <label for="orders-history-chat-filter">Filtre chat_id</label>
+                    <input type="text" id="orders-history-chat-filter" placeholder="ex: 6934544739">
+                </div>
+                <div style="min-width:170px;">
+                    <label for="orders-history-period-filter">Période</label>
+                    <select id="orders-history-period-filter">
+                        <option value="all">Toutes</option>
+                        <option value="7d">7 jours</option>
+                        <option value="30d">30 jours</option>
+                    </select>
+                </div>
+                <button type="button" class="btn" id="btn-load-orders-history">Charger l'historique</button>
+                <button type="button" class="btn" id="btn-export-orders-history">Exporter CSV</button>
+            </div>
+            <div id="orders-history-list" style="margin-top:0.75rem;font-size:0.85rem;"></div>
+        </div>
+
+        <div class="import-wrap">
             <h2>Cashback (CHF par compte)</h2>
             <p>Crédite uniquement après une commande payée en <strong>crypto</strong>. Paiement cash : ne pas créditer. Déduis le solde quand le client l’utilise sur la commande suivante.</p>
             <button type="button" class="btn primary" id="btn-load-cashback">Charger les soldes</button>
@@ -171,9 +193,11 @@
 
         <div class="import-wrap">
             <h2>Fidélité (points & niveaux)</h2>
-            <p>Suivi des points cumulés, niveau actuel et progression vers le niveau suivant.</p>
+            <p>Suivi des points cumulés, niveau actuel et progression vers le niveau suivant. Les points de commande sont d’abord en attente puis validés ici.</p>
             <button type="button" class="btn primary" id="btn-load-loyalty">Charger la fidélité</button>
             <div id="loyalty-list" style="margin-top:0.75rem;font-size:0.85rem;"></div>
+            <h3 style="font-size:1rem;margin-top:1rem;">Demandes de points en attente</h3>
+            <div id="loyalty-pending-list" style="margin-top:0.5rem;font-size:0.85rem;"></div>
             <form id="loyalty-adjust-form" style="margin-top:1rem;">
                 <h3 style="font-size:1rem;">Ajustement manuel des points</h3>
                 <label>Client (chat_id)</label>
@@ -240,9 +264,15 @@
         const btnLoadUsers = document.getElementById('btn-load-users');
         const cartActivityList = document.getElementById('cart-activity-list');
         const btnLoadCartActivity = document.getElementById('btn-load-cart-activity');
+        const ordersHistoryList = document.getElementById('orders-history-list');
+        const btnLoadOrdersHistory = document.getElementById('btn-load-orders-history');
+        const btnExportOrdersHistory = document.getElementById('btn-export-orders-history');
+        const ordersHistoryChatFilter = document.getElementById('orders-history-chat-filter');
+        const ordersHistoryPeriodFilter = document.getElementById('orders-history-period-filter');
         const reviewsAdminList = document.getElementById('reviews-admin-list');
         const btnLoadReviews = document.getElementById('btn-load-reviews');
         const loyaltyList = document.getElementById('loyalty-list');
+        const loyaltyPendingList = document.getElementById('loyalty-pending-list');
         const btnLoadLoyalty = document.getElementById('btn-load-loyalty');
         const loyaltyAdjustForm = document.getElementById('loyalty-adjust-form');
         const loyaltyChat = document.getElementById('loyalty-chat');
@@ -258,6 +288,7 @@
         let categories = [];
         let products = [];
         let currentBotEnabled = null;
+        let allOrdersHistory = [];
 
         async function checkAdmin() {
             const init = getInitData();
@@ -512,6 +543,114 @@
             }
         }
 
+        async function loadOrdersHistoryList() {
+            if (!ordersHistoryList) return;
+            ordersHistoryList.innerHTML = '<p>Chargement...</p>';
+            try {
+                const r = await fetch(API_URL + '/api/admin/orders-history?limit=200&initData=' + encodeURIComponent(getInitData()));
+                const d = await r.json();
+                if (!r.ok || !d.ok) {
+                    ordersHistoryList.innerHTML = '<p class="msg err">Erreur lors du chargement de l’historique des commandes.</p>';
+                    return;
+                }
+                allOrdersHistory = Array.isArray(d.orders) ? d.orders : [];
+                renderOrdersHistoryList();
+            } catch (e) {
+                ordersHistoryList.innerHTML = '<p class="msg err">Erreur réseau lors du chargement de l’historique des commandes.</p>';
+            }
+        }
+
+        function getFilteredOrdersHistory() {
+            const list = Array.isArray(allOrdersHistory) ? allOrdersHistory.slice() : [];
+            const chatFilter = (ordersHistoryChatFilter?.value || '').trim().toLowerCase();
+            const period = (ordersHistoryPeriodFilter?.value || 'all').trim();
+            const now = Date.now();
+            const minTs = period === '7d'
+                ? now - (7 * 24 * 60 * 60 * 1000)
+                : period === '30d'
+                    ? now - (30 * 24 * 60 * 60 * 1000)
+                    : 0;
+            return list.filter((o) => {
+                if (chatFilter && !String(o.user_id || '').toLowerCase().includes(chatFilter)) return false;
+                if (minTs > 0) {
+                    const t = o.created_at ? new Date(o.created_at).getTime() : 0;
+                    if (!t || Number.isNaN(t) || t < minTs) return false;
+                }
+                return true;
+            });
+        }
+
+        function renderOrdersHistoryList() {
+            if (!ordersHistoryList) return;
+            const list = getFilteredOrdersHistory();
+            if (!list.length) {
+                ordersHistoryList.innerHTML = '<p>Aucune commande pour ce filtre.</p>';
+                return;
+            }
+            const rows = list.map((o, i) => {
+                const userLabel = o.username || [o.first_name, o.last_name].filter(Boolean).join(' ') || `ID ${o.user_id}`;
+                const items = Array.isArray(o.items) ? o.items.filter(Boolean).join(', ') : '';
+                const total = Number.isFinite(Number(o.total_chf)) ? `${Number(o.total_chf).toFixed(2)} CHF` : '—';
+                const dt = o.created_at ? new Date(o.created_at).toLocaleString() : '—';
+                return `<tr>
+                    <td>${i + 1}</td>
+                    <td>${escapeHtml(String(userLabel))}</td>
+                    <td>${escapeHtml(String(o.user_id || ''))}</td>
+                    <td>${escapeHtml(String(o.ref || '—'))}</td>
+                    <td>${escapeHtml(items || '—')}</td>
+                    <td>${escapeHtml(total)}</td>
+                    <td>${escapeHtml(String(o.status || 'confirmed'))}</td>
+                    <td>${escapeHtml(dt)}</td>
+                </tr>`;
+            });
+            ordersHistoryList.innerHTML = `
+                <table>
+                    <thead><tr><th>#</th><th>Client</th><th>chat_id</th><th>Réf</th><th>Articles</th><th>Total</th><th>Statut</th><th>Date</th></tr></thead>
+                    <tbody>${rows.join('')}</tbody>
+                </table>
+            `;
+        }
+
+        function escapeCsv(v) {
+            const s = String(v == null ? '' : v);
+            if (/[",\n;]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+            return s;
+        }
+
+        function exportOrdersHistoryCsv() {
+            const rows = getFilteredOrdersHistory();
+            if (!rows.length) {
+                alert('Aucune ligne à exporter.');
+                return;
+            }
+            const header = ['ref', 'chat_id', 'client', 'items', 'total_chf', 'status', 'created_at'];
+            const lines = [header.join(';')];
+            rows.forEach((o) => {
+                const client = o.username || [o.first_name, o.last_name].filter(Boolean).join(' ') || '';
+                const items = Array.isArray(o.items) ? o.items.filter(Boolean).join(', ') : '';
+                const vals = [
+                    o.ref || '',
+                    o.user_id || '',
+                    client,
+                    items,
+                    Number.isFinite(Number(o.total_chf)) ? Number(o.total_chf).toFixed(2) : '',
+                    o.status || 'confirmed',
+                    o.created_at || ''
+                ];
+                lines.push(vals.map(escapeCsv).join(';'));
+            });
+            const blob = new Blob(["\uFEFF" + lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+            a.href = url;
+            a.download = `orders-history-${ts}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
         function suggestCashbackChf(orderChf) {
             const o = Number(orderChf);
             if (!o || o <= 0 || !Number.isFinite(o)) return null;
@@ -688,38 +827,119 @@
         async function loadLoyaltyList() {
             if (!loyaltyList) return;
             loyaltyList.innerHTML = '<p>Chargement...</p>';
+            if (loyaltyPendingList) loyaltyPendingList.innerHTML = '<p>Chargement...</p>';
             try {
                 const r = await fetch(API_URL + '/api/admin/loyalty?initData=' + encodeURIComponent(getInitData()));
                 const d = await r.json();
                 if (!r.ok || !d.ok) {
                     loyaltyList.innerHTML = '<p class="msg err">Erreur lors du chargement de la fidélité.</p>';
+                    if (loyaltyPendingList) loyaltyPendingList.innerHTML = '<p class="msg err">Erreur lors du chargement des demandes.</p>';
                     return;
                 }
                 const list = Array.isArray(d.users) ? d.users : [];
                 if (!list.length) {
                     loyaltyList.innerHTML = '<p>Aucun utilisateur fidélité pour le moment.</p>';
-                    return;
+                } else {
+                    const rows = list.map((u, i) => {
+                        const userLabel = u.username || [u.first_name, u.last_name].filter(Boolean).join(' ') || `ID ${u.chat_id}`;
+                        const pct = Math.round(Math.max(0, Math.min(1, Number(u.progress) || 0)) * 100);
+                        const next = u.next_tier_label ? `${u.points_to_next} pts → ${u.next_tier_label}` : 'Niveau max';
+                        const pendingPts = Math.max(0, Math.floor(Number(u.pending_points) || 0));
+                        return `<tr>
+                            <td>${i + 1}</td>
+                            <td>${escapeHtml(String(userLabel))}</td>
+                            <td>${escapeHtml(String(u.chat_id))}</td>
+                            <td>${Number(u.points) || 0}</td>
+                            <td>${pendingPts}</td>
+                            <td>${escapeHtml(String(u.tier_label || 'Bronze'))}</td>
+                            <td>${pct}%</td>
+                            <td>${escapeHtml(next)}</td>
+                        </tr>`;
+                    });
+                    loyaltyList.innerHTML = `
+                        <table>
+                            <thead><tr><th>#</th><th>Utilisateur</th><th>chat_id</th><th>Points</th><th>En attente</th><th>Niveau</th><th>Progression</th><th>Suivant</th></tr></thead>
+                            <tbody>${rows.join('')}</tbody>
+                        </table>
+                    `;
                 }
-                const rows = list.map((u, i) => {
-                    const userLabel = u.username || [u.first_name, u.last_name].filter(Boolean).join(' ') || `ID ${u.chat_id}`;
-                    const pct = Math.round(Math.max(0, Math.min(1, Number(u.progress) || 0)) * 100);
-                    const next = u.next_tier_label ? `${u.points_to_next} pts → ${u.next_tier_label}` : 'Niveau max';
-                    return `<tr>
-                        <td>${i + 1}</td>
-                        <td>${escapeHtml(String(userLabel))}</td>
-                        <td>${escapeHtml(String(u.chat_id))}</td>
-                        <td>${Number(u.points) || 0}</td>
-                        <td>${escapeHtml(String(u.tier_label || 'Bronze'))}</td>
-                        <td>${pct}%</td>
-                        <td>${escapeHtml(next)}</td>
-                    </tr>`;
-                });
-                loyaltyList.innerHTML = `
-                    <table>
-                        <thead><tr><th>#</th><th>Utilisateur</th><th>chat_id</th><th>Points</th><th>Niveau</th><th>Progression</th><th>Suivant</th></tr></thead>
-                        <tbody>${rows.join('')}</tbody>
-                    </table>
-                `;
+                const pending = Array.isArray(d.pending) ? d.pending : [];
+                if (!pending.length) {
+                    if (loyaltyPendingList) loyaltyPendingList.innerHTML = '<p>Aucune demande en attente.</p>';
+                } else if (loyaltyPendingList) {
+                    const rowsPending = pending.map((p, i) => {
+                        const userLabel = p.username || [p.first_name, p.last_name].filter(Boolean).join(' ') || `ID ${p.chat_id}`;
+                        const orderPart = p.order_ref ? escapeHtml(String(p.order_ref)) : '—';
+                        const totalPart = Number.isFinite(Number(p.order_total_chf)) && Number(p.order_total_chf) > 0 ? `${Number(p.order_total_chf).toFixed(2)} CHF` : '—';
+                        return `<tr>
+                            <td>${i + 1}</td>
+                            <td>${escapeHtml(String(userLabel))}</td>
+                            <td>${escapeHtml(String(p.chat_id))}</td>
+                            <td>${Math.max(0, Math.floor(Number(p.points) || 0))}</td>
+                            <td>${orderPart}</td>
+                            <td>${totalPart}</td>
+                            <td>
+                                <button type="button" class="btn primary" data-loyalty-approve="${Number(p.id)}">Approuver</button>
+                                <button type="button" class="btn danger" data-loyalty-reject="${Number(p.id)}" style="margin-left:0.35rem;">Refuser</button>
+                            </td>
+                        </tr>`;
+                    });
+                    loyaltyPendingList.innerHTML = `
+                        <table>
+                            <thead><tr><th>#</th><th>Utilisateur</th><th>chat_id</th><th>Points</th><th>Réf commande</th><th>Total</th><th>Action</th></tr></thead>
+                            <tbody>${rowsPending.join('')}</tbody>
+                        </table>
+                    `;
+                    loyaltyPendingList.querySelectorAll('[data-loyalty-approve]').forEach((btn) => {
+                        btn.addEventListener('click', async () => {
+                            const id = Number(btn.getAttribute('data-loyalty-approve'));
+                            if (!id) return;
+                            btn.disabled = true;
+                            try {
+                                const rr = await fetch(API_URL + '/api/admin/loyalty/pending/' + id + '/approve', {
+                                    method: 'POST',
+                                    headers: getAuthHeadersJson(),
+                                    body: JSON.stringify(getAuthBody())
+                                });
+                                const dd = await rr.json().catch(() => ({}));
+                                if (!rr.ok || !dd.ok) {
+                                    alert(dd.error || 'Erreur');
+                                    btn.disabled = false;
+                                    return;
+                                }
+                                loadLoyaltyList();
+                            } catch (e) {
+                                alert('Erreur réseau');
+                                btn.disabled = false;
+                            }
+                        });
+                    });
+                    loyaltyPendingList.querySelectorAll('[data-loyalty-reject]').forEach((btn) => {
+                        btn.addEventListener('click', async () => {
+                            const id = Number(btn.getAttribute('data-loyalty-reject'));
+                            if (!id) return;
+                            if (!confirm('Refuser cette demande de points ?')) return;
+                            btn.disabled = true;
+                            try {
+                                const rr = await fetch(API_URL + '/api/admin/loyalty/pending/' + id + '/reject', {
+                                    method: 'POST',
+                                    headers: getAuthHeadersJson(),
+                                    body: JSON.stringify(getAuthBody())
+                                });
+                                const dd = await rr.json().catch(() => ({}));
+                                if (!rr.ok || !dd.ok) {
+                                    alert(dd.error || 'Erreur');
+                                    btn.disabled = false;
+                                    return;
+                                }
+                                loadLoyaltyList();
+                            } catch (e) {
+                                alert('Erreur réseau');
+                                btn.disabled = false;
+                            }
+                        });
+                    });
+                }
                 if (loyaltyChat) {
                     loyaltyChat.innerHTML = '<option value="">— Choisir —</option>' + list.map((u) => {
                         const userLabel = u.username || [u.first_name, u.last_name].filter(Boolean).join(' ') || `ID ${u.chat_id}`;
@@ -728,6 +948,7 @@
                 }
             } catch (e) {
                 loyaltyList.innerHTML = '<p class="msg err">Erreur réseau lors du chargement de la fidélité.</p>';
+                if (loyaltyPendingList) loyaltyPendingList.innerHTML = '<p class="msg err">Erreur réseau lors du chargement des demandes.</p>';
             }
         }
 
@@ -1032,6 +1253,14 @@
                 loadCartActivityList();
             });
         }
+        if (btnLoadOrdersHistory) {
+            btnLoadOrdersHistory.addEventListener('click', () => {
+                loadOrdersHistoryList();
+            });
+        }
+        ordersHistoryChatFilter?.addEventListener('input', () => renderOrdersHistoryList());
+        ordersHistoryPeriodFilter?.addEventListener('change', () => renderOrdersHistoryList());
+        btnExportOrdersHistory?.addEventListener('click', () => exportOrdersHistoryCsv());
 
         const btnLoadCashback = document.getElementById('btn-load-cashback');
         if (btnLoadCashback) {

@@ -88,7 +88,27 @@ Important :
         cashback_payable_label: 'Total à payer',
         rounded_total_note: 'Total final arrondi au CHF le plus proche',
         cashback_insufficient: 'Solde cashback insuffisant.',
-        cashback_applied_to_order: 'Cashback appliqué'
+        cashback_applied_to_order: 'Cashback appliqué',
+        contact_edit_btn: 'Contact',
+        onboarding_progress_step_1: 'Étape 1 sur 3',
+        onboarding_progress_step_2: 'Étape 2 sur 3',
+        onboarding_progress_step_3: 'Étape 3 sur 3',
+        contact_method_title: 'Choisis ton canal de contact',
+        contact_method_text: 'Sélectionne le moyen de contact préféré pour la confirmation de commande.',
+        contact_method_next: 'Continuer',
+        contact_method_back: 'Retour',
+        contact_input_title: 'Ajoute ton contact',
+        contact_input_text: 'Ce contact sera ajouté automatiquement à chaque commande.',
+        contact_input_label_signal: 'Numéro Signal',
+        contact_input_label_threema: 'ID Threema',
+        contact_input_placeholder_signal: 'Enter your Signal number',
+        contact_input_placeholder_threema: 'Enter your Threema ID',
+        contact_input_save: 'Valider l’accès',
+        contact_input_error_required: 'Champ requis (3 caractères minimum).',
+        contact_input_error_method: 'Choisis d’abord Signal ou Threema.',
+        order_id_label: '🧾 Référence',
+        order_customer_contact: '📞 Contact client',
+        order_contact_missing: 'non fourni'
     },
     en: {
         filter_all: '📂 All categories',
@@ -148,7 +168,27 @@ Important:
         cashback_payable_label: 'Total to pay',
         rounded_total_note: 'Final total rounded to nearest CHF',
         cashback_insufficient: 'Cashback balance is insufficient.',
-        cashback_applied_to_order: 'Cashback used'
+        cashback_applied_to_order: 'Cashback used',
+        contact_edit_btn: 'Contact',
+        onboarding_progress_step_1: 'Step 1 of 3',
+        onboarding_progress_step_2: 'Step 2 of 3',
+        onboarding_progress_step_3: 'Step 3 of 3',
+        contact_method_title: 'Choose your contact method',
+        contact_method_text: 'Select your preferred channel for order confirmation.',
+        contact_method_next: 'Continue',
+        contact_method_back: 'Back',
+        contact_input_title: 'Add your contact',
+        contact_input_text: 'This contact is automatically attached to each order.',
+        contact_input_label_signal: 'Signal number',
+        contact_input_label_threema: 'Threema ID',
+        contact_input_placeholder_signal: 'Enter your Signal number',
+        contact_input_placeholder_threema: 'Enter your Threema ID',
+        contact_input_save: 'Unlock catalog',
+        contact_input_error_required: 'Required field (minimum 3 characters).',
+        contact_input_error_method: 'Please choose Signal or Threema first.',
+        order_id_label: '🧾 Order ID',
+        order_customer_contact: '📞 Customer contact',
+        order_contact_missing: 'not provided'
     },
     de: {
         filter_all: '📂 Alle Kategorien',
@@ -208,7 +248,27 @@ Wichtig:
         cashback_payable_label: 'Zu zahlen',
         rounded_total_note: 'Endbetrag auf den naechsten CHF gerundet',
         cashback_insufficient: 'Cashback-Guthaben ist nicht ausreichend.',
-        cashback_applied_to_order: 'Cashback genutzt'
+        cashback_applied_to_order: 'Cashback genutzt',
+        contact_edit_btn: 'Kontakt',
+        onboarding_progress_step_1: 'Schritt 1 von 3',
+        onboarding_progress_step_2: 'Schritt 2 von 3',
+        onboarding_progress_step_3: 'Schritt 3 von 3',
+        contact_method_title: 'Kontaktmethode waehlen',
+        contact_method_text: 'Waehle deinen bevorzugten Kanal fuer die Bestellbestaetigung.',
+        contact_method_next: 'Weiter',
+        contact_method_back: 'Zurueck',
+        contact_input_title: 'Kontakt eingeben',
+        contact_input_text: 'Dieser Kontakt wird automatisch zu jeder Bestellung hinzugefuegt.',
+        contact_input_label_signal: 'Signal-Nummer',
+        contact_input_label_threema: 'Threema-ID',
+        contact_input_placeholder_signal: 'Enter your Signal number',
+        contact_input_placeholder_threema: 'Enter your Threema ID',
+        contact_input_save: 'Katalog freischalten',
+        contact_input_error_required: 'Pflichtfeld (mindestens 3 Zeichen).',
+        contact_input_error_method: 'Bitte zuerst Signal oder Threema waehlen.',
+        order_id_label: '🧾 Bestell-ID',
+        order_customer_contact: '📞 Kundenkontakt',
+        order_contact_missing: 'nicht angegeben'
     }
 };
 
@@ -363,6 +423,16 @@ function applyTranslations() {
     if (cmt) cmt.textContent = t('cashback_modal_title');
     if (cmb) cmb.textContent = t('cashback_modal_body');
     if (cmok) cmok.textContent = t('cashback_modal_ok');
+
+    const editContactBtn = document.getElementById('btn-edit-contact');
+    if (editContactBtn) editContactBtn.textContent = t('contact_edit_btn');
+
+    const gate = document.getElementById('age-gate');
+    if (gate && !gate.classList.contains('hidden')) {
+        const stored = getStoredOnboarding();
+        refreshOnboardingTexts(stored?.contactMethod || 'signal');
+        setOnboardingStepUi(currentOnboardingStep || 1);
+    }
 }
 
 function getTelegramDestination() {
@@ -729,6 +799,7 @@ let cartSyncTimer = null;
 let catalogLoadInFlight = null;
 let contactUrlsLoadInFlight = null;
 let ageGateInFlight = null;
+const ONBOARDING_STORAGE_KEY = 'ac_onboarding_v1';
 let organicReviews = [];
 let reviewFilter = 'all';
 let reviewSort = 'recent';
@@ -736,6 +807,7 @@ let visibleReviewsCount = 6;
 let reviewEligibility = null;
 let productRatingMap = new Map();
 let reviewsLoadInFlight = null;
+let currentOnboardingStep = 1;
 
 async function loadOrganicReviews() {
     if (!POINTS_API_URL || !getInitData()) return [];
@@ -1034,25 +1106,146 @@ function closeAgeGate() {
     if (gate) gate.classList.add('hidden');
 }
 
-function showAgeGate() {
-    const gate = document.getElementById('age-gate');
-    if (!gate) return Promise.resolve(true);
+function getStoredOnboarding() {
+    try {
+        const raw = localStorage.getItem(ONBOARDING_STORAGE_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed !== 'object') return null;
+        const method = parsed.contactMethod === 'signal' || parsed.contactMethod === 'threema' ? parsed.contactMethod : null;
+        const value = String(parsed.contactValue || '').trim();
+        return {
+            isAdult: !!parsed.isAdult,
+            contactMethod: method,
+            contactValue: value
+        };
+    } catch (e) {
+        return null;
+    }
+}
+
+function saveStoredOnboarding(data) {
+    const payload = {
+        isAdult: !!data?.isAdult,
+        contactMethod: data?.contactMethod === 'signal' || data?.contactMethod === 'threema' ? data.contactMethod : null,
+        contactValue: String(data?.contactValue || '').trim()
+    };
+    try {
+        localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify(payload));
+    } catch (e) {}
+}
+
+function isOnboardingComplete(data) {
+    const d = data || getStoredOnboarding();
+    return !!(d && d.isAdult && d.contactMethod && d.contactValue && d.contactValue.length >= 3);
+}
+
+function getContactMethodLabel(method) {
+    if (method === 'signal') return 'Signal';
+    if (method === 'threema') return 'Threema';
+    return '';
+}
+
+function getCustomerContactSummary() {
+    const d = getStoredOnboarding();
+    if (!d || !d.contactMethod || !d.contactValue) return null;
+    return `${getContactMethodLabel(d.contactMethod)}: ${d.contactValue}`;
+}
+
+function setOnboardingStepUi(step) {
+    currentOnboardingStep = step;
+    const step1 = document.getElementById('onboarding-step-1');
+    const step2 = document.getElementById('onboarding-step-2');
+    const step3 = document.getElementById('onboarding-step-3');
+    step1?.classList.toggle('hidden', step !== 1);
+    step2?.classList.toggle('hidden', step !== 2);
+    step3?.classList.toggle('hidden', step !== 3);
+
+    [1, 2, 3].forEach((i) => {
+        const pill = document.getElementById(`onboarding-step-pill-${i}`);
+        if (!pill) return;
+        pill.classList.toggle('active', i === step);
+        pill.classList.toggle('done', i < step);
+    });
+
+    const progress = document.getElementById('onboarding-progress-label');
+    if (progress) progress.textContent = t(`onboarding_progress_step_${step}`);
+}
+
+function updateContactMethodCards(method) {
+    const signalBtn = document.getElementById('contact-method-signal');
+    const threemaBtn = document.getElementById('contact-method-threema');
+    signalBtn?.classList.toggle('active', method === 'signal');
+    threemaBtn?.classList.toggle('active', method === 'threema');
+}
+
+function refreshOnboardingTexts(selectedMethod) {
     const title = document.getElementById('age-gate-title');
     const text = document.getElementById('age-gate-text');
     const ok = document.getElementById('age-gate-accept');
     const no = document.getElementById('age-gate-decline');
-
     if (title) title.textContent = t('age_gate_title');
     if (text) text.textContent = t('age_gate_text');
     if (ok) ok.textContent = t('age_gate_accept');
     if (no) no.textContent = t('age_gate_decline');
+
+    const methodTitle = document.getElementById('contact-method-title');
+    const methodText = document.getElementById('contact-method-text');
+    const methodBack = document.getElementById('contact-method-back');
+    const methodNext = document.getElementById('contact-method-next');
+    if (methodTitle) methodTitle.textContent = t('contact_method_title');
+    if (methodText) methodText.textContent = t('contact_method_text');
+    if (methodBack) methodBack.textContent = t('contact_method_back');
+    if (methodNext) methodNext.textContent = t('contact_method_next');
+
+    const inputTitle = document.getElementById('contact-input-title');
+    const inputText = document.getElementById('contact-input-text');
+    const inputLabel = document.getElementById('contact-input-label');
+    const inputEl = document.getElementById('contact-input-value');
+    const inputSave = document.getElementById('contact-input-save');
+    const inputBack = document.getElementById('contact-input-back');
+    if (inputTitle) inputTitle.textContent = t('contact_input_title');
+    if (inputText) inputText.textContent = t('contact_input_text');
+    if (inputSave) inputSave.textContent = t('contact_input_save');
+    if (inputBack) inputBack.textContent = t('contact_method_back');
+    if (inputLabel) inputLabel.textContent = selectedMethod === 'threema' ? t('contact_input_label_threema') : t('contact_input_label_signal');
+    if (inputEl) inputEl.placeholder = selectedMethod === 'threema' ? t('contact_input_placeholder_threema') : t('contact_input_placeholder_signal');
+}
+
+function showAgeGate(forceEdit = false) {
+    const gate = document.getElementById('age-gate');
+    if (!gate) return Promise.resolve(true);
+    const stored = getStoredOnboarding();
+    if (!forceEdit && isOnboardingComplete(stored)) return Promise.resolve(true);
+
+    const ok = document.getElementById('age-gate-accept');
+    const no = document.getElementById('age-gate-decline');
+    const signalBtn = document.getElementById('contact-method-signal');
+    const threemaBtn = document.getElementById('contact-method-threema');
+    const methodBack = document.getElementById('contact-method-back');
+    const methodNext = document.getElementById('contact-method-next');
+    const inputEl = document.getElementById('contact-input-value');
+    const inputBack = document.getElementById('contact-input-back');
+    const inputSave = document.getElementById('contact-input-save');
+    const inputError = document.getElementById('contact-input-error');
+
+    let selectedMethod = stored?.contactMethod || null;
+    let ageAccepted = !!stored?.isAdult;
+    if (forceEdit && !ageAccepted) ageAccepted = true;
+    refreshOnboardingTexts(selectedMethod || 'signal');
+    setOnboardingStepUi(forceEdit || ageAccepted ? 2 : 1);
+    updateContactMethodCards(selectedMethod);
+    if (inputEl) inputEl.value = String(stored?.contactValue || '');
+    if (inputError) {
+        inputError.textContent = '';
+        inputError.classList.add('hidden');
+    }
     gate.classList.remove('hidden');
 
     return new Promise((resolve) => {
         const onAccept = () => {
-            cleanup();
-            closeAgeGate();
-            resolve(true);
+            ageAccepted = true;
+            setOnboardingStepUi(2);
         };
         const onDecline = () => {
             cleanup();
@@ -1060,12 +1253,79 @@ function showAgeGate() {
             showCatalogAccessError('open_in_telegram');
             resolve(false);
         };
+        const onSelectSignal = () => {
+            selectedMethod = 'signal';
+            updateContactMethodCards(selectedMethod);
+            refreshOnboardingTexts(selectedMethod);
+        };
+        const onSelectThreema = () => {
+            selectedMethod = 'threema';
+            updateContactMethodCards(selectedMethod);
+            refreshOnboardingTexts(selectedMethod);
+        };
+        const onMethodBack = () => {
+            if (forceEdit) {
+                cleanup();
+                closeAgeGate();
+                resolve(true);
+                return;
+            }
+            setOnboardingStepUi(1);
+        };
+        const onMethodNext = () => {
+            if (!selectedMethod) {
+                showToast(t('contact_input_error_method'));
+                return;
+            }
+            setOnboardingStepUi(3);
+            if (inputEl) inputEl.focus();
+        };
+        const onInputBack = () => {
+            setOnboardingStepUi(2);
+        };
+        const onInputSave = () => {
+            const v = String(inputEl?.value || '').trim();
+            if (!selectedMethod) {
+                if (inputError) {
+                    inputError.textContent = t('contact_input_error_method');
+                    inputError.classList.remove('hidden');
+                }
+                return;
+            }
+            if (v.length < 3) {
+                if (inputError) {
+                    inputError.textContent = t('contact_input_error_required');
+                    inputError.classList.remove('hidden');
+                }
+                return;
+            }
+            saveStoredOnboarding({
+                isAdult: true,
+                contactMethod: selectedMethod,
+                contactValue: v
+            });
+            cleanup();
+            closeAgeGate();
+            resolve(true);
+        };
         const cleanup = () => {
             ok?.removeEventListener('click', onAccept);
             no?.removeEventListener('click', onDecline);
+            signalBtn?.removeEventListener('click', onSelectSignal);
+            threemaBtn?.removeEventListener('click', onSelectThreema);
+            methodBack?.removeEventListener('click', onMethodBack);
+            methodNext?.removeEventListener('click', onMethodNext);
+            inputBack?.removeEventListener('click', onInputBack);
+            inputSave?.removeEventListener('click', onInputSave);
         };
         ok?.addEventListener('click', onAccept);
         no?.addEventListener('click', onDecline);
+        signalBtn?.addEventListener('click', onSelectSignal);
+        threemaBtn?.addEventListener('click', onSelectThreema);
+        methodBack?.addEventListener('click', onMethodBack);
+        methodNext?.addEventListener('click', onMethodNext);
+        inputBack?.addEventListener('click', onInputBack);
+        inputSave?.addEventListener('click', onInputSave);
     });
 }
 
@@ -1322,6 +1582,11 @@ function init() {
         });
     }
     wireCashbackUi();
+    const editContactBtn = document.getElementById('btn-edit-contact');
+    editContactBtn?.addEventListener('click', async () => {
+        await showAgeGate(true);
+        applyTranslations();
+    });
     initReviewsSection();
     const tg = window.Telegram?.WebApp;
     if (tg) {
@@ -1848,9 +2113,19 @@ function removeFromCart(i) {
     renderCart();
 }
 
-function buildOrderText(totals) {
+function generateOrderId() {
+    const now = new Date();
+    const datePart = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+    const rand = Math.floor(1000 + Math.random() * 9000);
+    return `AC-${datePart}-${rand}`;
+}
+
+function buildOrderText(totals, orderId) {
     const tvals = totals || computeCartTotals();
+    const contactSummary = getCustomerContactSummary() || t('order_contact_missing');
     let msg = `${t('order_header')}\n\n`;
+    if (orderId) msg += `${t('order_id_label')} : ${orderId}\n`;
+    msg += `${t('order_customer_contact')} : ${contactSummary}\n\n`;
     cart.forEach((item, i) => {
         const u = item.unit_type === 'gram'
             ? 'g'
@@ -1871,8 +2146,13 @@ function buildOrderText(totals) {
 
 async function checkout() {
     if (!cart.length) return;
+    if (!isOnboardingComplete()) {
+        const ok = await showAgeGate(false);
+        if (!ok || !isOnboardingComplete()) return;
+    }
     const totals = computeCartTotals();
-    const orderText = buildOrderText(totals);
+    const orderId = generateOrderId();
+    const orderText = buildOrderText(totals, orderId);
 
     if (POINTS_API_URL && getInitData()) {
         try {
@@ -1882,6 +2162,8 @@ async function checkout() {
                 body: JSON.stringify({
                     initData: getInitData(),
                     orderText,
+                    order_id: orderId,
+                    customer_contact: getCustomerContactSummary(),
                     cashback_use_chf: totals.cashbackDiscount
                 })
             });
