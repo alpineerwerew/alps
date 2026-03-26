@@ -1077,7 +1077,7 @@ function updateBtn() {
 
 function addToCart() {
     if (!currentProduct || selectedPricingIdx === null) return;
-    const t = currentProduct.pricing[selectedPricingIdx];
+    const tier = currentProduct.pricing[selectedPricingIdx];
     let v = null;
     if (currentProduct.variants && Array.isArray(selectedVariantIdxs) && selectedVariantIdxs.length) {
         v = selectedVariantIdxs
@@ -1089,8 +1089,8 @@ function addToCart() {
     cart.push({
         name: currentProduct.name,
         unit_type: currentProduct.unit_type,
-        qty: t.qty,
-        price: t.price,
+        qty: tier.qty,
+        price: tier.price,
         variant: v
     });
 
@@ -1099,8 +1099,12 @@ function addToCart() {
     closeProductModal();
     showToast(t('toast_added'));
     const fab = document.getElementById('cart-fab');
-    fab.style.transform = 'scale(1.25)';
-    setTimeout(() => fab.style.transform = '', 300);
+    if (fab) {
+        fab.classList.remove('cart-fab-pulse');
+        void fab.offsetWidth;
+        fab.classList.add('cart-fab-pulse');
+        setTimeout(() => fab.classList.remove('cart-fab-pulse'), 500);
+    }
 }
 
 function updateCartBadge() {
@@ -1208,10 +1212,13 @@ async function checkout() {
 }
 
 function showToast(text) {
-    const t = document.getElementById('toast');
-    t.textContent = text;
-    t.classList.add('show');
-    setTimeout(() => t.classList.remove('show'), 2000);
+    const el = document.getElementById('toast');
+    if (!el) return;
+    el.textContent = text;
+    el.classList.remove('show');
+    void el.offsetWidth;
+    el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), 2400);
 }
 
 document.addEventListener('DOMContentLoaded', init);

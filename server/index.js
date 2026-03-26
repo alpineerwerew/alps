@@ -357,21 +357,33 @@ const WELCOME_IMAGE_URL = process.env.WELCOME_IMAGE_URL || 'https://res.cloudina
 
 const BOT_STRINGS = {
   fr: {
-    choose_lang: '👋 Bienvenue ! Choisis ta langue :\n🇫🇷 Français · 🇬🇧 English · 🇩🇪 Deutsch',
-    after_lang: '✅ Parfait ! Utilise MENU pour ouvrir le catalogue, ou AIDE pour l’aide.',
+    choose_lang:
+      '👋 Bienvenue !\n\n1️⃣ Choisis ta langue ci-dessous\n2️⃣ Appuie sur MENU\n3️⃣ Ouvre le catalogue\n\n🇫🇷 Français · 🇬🇧 English · 🇩🇪 Deutsch',
+    after_lang:
+      '✅ Parfait ! Appuie sur MENU → puis sur « Ouvrir le catalogue ».\n\n💡 AIDE = comment commander en 3 étapes.',
     menu_btn: 'MENU',
     help_btn: 'AIDE',
     catalog_prompt: 'Clique pour ouvrir le catalogue :',
     catalog_btn: '🌿 Ouvrir le catalogue',
     order_received: '✅ Commande bien reçue !\n\nPour te recontacter et confirmer, choisis le canal sur lequel tu veux qu’on t’écrive :',
+    order_sla_line: '⏱ En général, nous te répondons sous {hours} h.',
     order_btn_signal: 'Signal',
     order_btn_threema: 'Threema',
+    order_question_btn: '❓ Question sur ma commande',
+    order_question_prompt:
+      'Pour une question liée à ta commande, envoie un message ici en t’inspirant de ce modèle :\n\n• Date / heure (approx.)\n• Ton @pseudo ou prénom\n• Ta question\n\nOn te répond dès que possible.',
     order_ask_contact_id: 'Envoie maintenant ton identifiant {channel} (numéro, pseudo ou ID Threema) pour qu’on puisse te joindre.',
     order_contact_saved: 'Merci ! Nous te contacterons sur {channel} pour confirmer ta commande.',
     need_lang: 'Choisis d’abord ta langue avec /start.',
     contact_thanks: 'Merci, nous te recontacterons sur {channel} avec ces coordonnées.',
-    cart_reminder: 'Tu as un panier en attente. Quand tu es prêt(e), valide ta commande via Telegram.\n\nOuvre le catalogue ci-dessous, puis envoie ta commande au bot.',
-    cart_reminder_cta: 'Tu as une question ? Pose-la ici, on te répondra au plus vite.',
+    menu_contact_reply: 'Pour nous contacter, envoie un message ici. Nous te répondrons au plus vite !',
+    menu_infos_reply:
+      'Alpine Connexion — Catalogue et commande via Telegram.\n\nAjoute des produits au panier, valide : ta commande est envoyée automatiquement.',
+    help_how_to:
+      '📖 Commander en 3 étapes :\n1) MENU → ouvrir le catalogue\n2) Ajouter au panier dans la boutique\n3) Envoyer la commande au bot (bouton dans le panier)',
+    cart_reminder:
+      'Coucou 👋 ton panier t’attend encore. Quand tu veux, ouvre le catalogue et envoie ta commande au bot — sans pression.',
+    cart_reminder_cta: 'Une question ? Écris-nous ici, on te répond vite.',
     cart_reminder_question_btn: '❓ Poser une question',
     help_detail: `🌱 Bienvenue sur notre bot !
 
@@ -391,21 +403,33 @@ Pour plus d'informations, contactez-nous !
 @Alpine710`
   },
   en: {
-    choose_lang: '👋 Welcome! Choose your language:\n🇫🇷 Français · 🇬🇧 English · 🇩🇪 Deutsch',
-    after_lang: '✅ Great! Tap MENU to open the catalog, or HELP for assistance.',
+    choose_lang:
+      '👋 Welcome!\n\n1️⃣ Pick your language below\n2️⃣ Tap MENU\n3️⃣ Open the catalog\n\n🇫🇷 Français · 🇬🇧 English · 🇩🇪 Deutsch',
+    after_lang:
+      '✅ Great! Tap MENU → then « Open catalog ».\n\n💡 HELP = how to order in 3 steps.',
     menu_btn: 'MENU',
     help_btn: 'HELP',
     catalog_prompt: 'Tap below to open the catalog:',
     catalog_btn: '🌿 Open catalog',
     order_received: '✅ Order received!\n\nChoose how you want us to contact you to confirm:',
+    order_sla_line: '⏱ We usually reply within {hours} h.',
     order_btn_signal: 'Signal',
     order_btn_threema: 'Threema',
+    order_question_btn: '❓ Question about my order',
+    order_question_prompt:
+      'For a question about your order, send a message here using this template:\n\n• Date / time (approx.)\n• Your @username or first name\n• Your question\n\nWe’ll get back to you as soon as we can.',
     order_ask_contact_id: 'Send your {channel} identifier now (number, username, or Threema ID) so we can reach you.',
     order_contact_saved: 'Thanks! We’ll contact you on {channel} to confirm your order.',
     need_lang: 'Please choose your language first with /start.',
     contact_thanks: 'Thanks, we will reach you on {channel} with these details.',
-    cart_reminder: 'You have an order draft waiting in your cart. When you are ready, confirm it via Telegram.\n\nOpen the catalog below, then send your order to the bot.',
-    cart_reminder_cta: 'Have a question? Message the bot here and we will get back to you ASAP.',
+    menu_contact_reply: 'Message us here — we’ll reply as soon as we can!',
+    menu_infos_reply:
+      'Alpine Connexion — catalog and orders via Telegram.\n\nAdd items to your cart, confirm: your order is sent to the bot automatically.',
+    help_how_to:
+      '📖 Order in 3 steps:\n1) MENU → open catalog\n2) Add to cart in the shop\n3) Send the order to the bot (button in the cart)',
+    cart_reminder:
+      'Hi 👋 your cart is still waiting. Whenever you’re ready, open the catalog and send your order to the bot — no rush.',
+    cart_reminder_cta: 'Questions? Message us here, we reply quickly.',
     cart_reminder_question_btn: '❓ Ask a question',
     help_detail: `🌱 Welcome to our bot!
 
@@ -425,21 +449,33 @@ For more information, contact us!
 @Alpine710`
   },
   de: {
-    choose_lang: '👋 Willkommen! Wähle deine Sprache:\n🇫🇷 Français · 🇬🇧 English · 🇩🇪 Deutsch',
-    after_lang: '✅ Super! Tippe MENU für den Katalog oder HILFE für Hilfe.',
+    choose_lang:
+      '👋 Willkommen!\n\n1️⃣ Wähle unten deine Sprache\n2️⃣ Tippe auf MENU\n3️⃣ Öffne den Katalog\n\n🇫🇷 Français · 🇬🇧 English · 🇩🇪 Deutsch',
+    after_lang:
+      '✅ Super! MENU → dann « Katalog öffnen ».\n\n💡 HILFE = Bestellen in 3 Schritten.',
     menu_btn: 'MENU',
     help_btn: 'HILFE',
     catalog_prompt: 'Tippe unten, um den Katalog zu öffnen:',
     catalog_btn: '🌿 Katalog öffnen',
     order_received: '✅ Bestellung erhalten!\n\nWähle, wie wir dich zur Bestätigung erreichen sollen:',
+    order_sla_line: '⏱ Wir antworten in der Regel innerhalb von {hours} Std.',
     order_btn_signal: 'Signal',
     order_btn_threema: 'Threema',
+    order_question_btn: '❓ Frage zu meiner Bestellung',
+    order_question_prompt:
+      'Bei einer Frage zu deiner Bestellung schreib uns hier, z. B. nach dieser Vorlage:\n\n• Datum / Uhrzeit (ca.)\n• Dein @Name oder Vorname\n• Deine Frage\n\nWir melden uns sobald wie möglich.',
     order_ask_contact_id: 'Sende jetzt deinen {channel}-Identifikator (Nummer, Nutzername oder Threema-ID).',
     order_contact_saved: 'Danke! Wir melden uns bei dir über {channel}, um die Bestellung zu bestätigen.',
     need_lang: 'Bitte wähle zuerst deine Sprache mit /start.',
     contact_thanks: 'Danke, wir melden uns bei dir über {channel} mit diesen Angaben.',
-    cart_reminder: 'Du hast einen Warenkorb in der Warteschlange. Wenn du bereit bist, bestätige deine Bestellung über Telegram.\n\nÖffne den Katalog unten und sende dann deine Bestellung an den Bot.',
-    cart_reminder_cta: 'Hast du eine Frage? Schreib uns einfach hier, wir melden uns schnell zurück.',
+    menu_contact_reply: 'Schreib uns hier — wir antworten schnellstmöglich!',
+    menu_infos_reply:
+      'Alpine Connexion — Katalog und Bestellung per Telegram.\n\nProdukte in den Warenkorb, bestätigen: die Bestellung geht automatisch an den Bot.',
+    help_how_to:
+      '📖 Bestellen in 3 Schritten:\n1) MENU → Katalog öffnen\n2) Im Shop in den Warenkorb legen\n3) Bestellung an den Bot senden (Button im Warenkorb)',
+    cart_reminder:
+      'Hey 👋 dein Warenkorb wartet noch. Wenn du soweit bist: Katalog öffnen und Bestellung an den Bot senden — ganz ohne Druck.',
+    cart_reminder_cta: 'Fragen? Schreib uns hier, wir melden uns schnell.',
     cart_reminder_question_btn: '❓ Frage stellen',
     help_detail: `🌱 Willkommen bei unserem Bot!
 
@@ -469,6 +505,28 @@ const LANG_PICK_INLINE = {
     ]]
   }
 };
+
+function getWelcomeCaption() {
+  let c = BOT_STRINGS.fr.choose_lang;
+  const promo = (process.env.WELCOME_PROMO_LINE || '').trim();
+  if (promo) c += `\n\n${promo}`;
+  return c;
+}
+
+function getOrderReceivedText(lang) {
+  const L = BOT_STRINGS[lang] || BOT_STRINGS.fr;
+  const base = L.order_received;
+  const h = Number(process.env.ORDER_RESPONSE_SLA_HOURS);
+  if (!Number.isFinite(h) || h <= 0) return base;
+  const line = (L.order_sla_line || '').replace(/\{hours\}/g, String(Math.floor(h)));
+  return line ? `${base}\n\n${line}` : base;
+}
+
+function getThankYouFollowupLine(lang) {
+  const pick = (k) => String(process.env[k] || '').trim();
+  const by = { fr: pick('THANK_YOU_LINE_FR'), en: pick('THANK_YOU_LINE_EN'), de: pick('THANK_YOU_LINE_DE') };
+  return by[lang] || by.fr || pick('THANK_YOU_LINE');
+}
 
 function strLang(chatId) {
   return BOT_STRINGS[getChatLang(chatId) || 'fr'];
@@ -513,7 +571,7 @@ function startCartReminderScheduler() {
   if (!enabled) return;
 
   const afterMin = Number(process.env.CART_REMINDER_AFTER_MINUTES ?? 15);
-  const repeatHours = Number(process.env.CART_REMINDER_REPEAT_HOURS ?? 6);
+  const repeatHours = Number(process.env.CART_REMINDER_REPEAT_HOURS ?? 24);
   const checkSeconds = Number(process.env.CART_REMINDER_CHECK_EVERY_SECONDS ?? 120);
 
   const afterMs = Math.max(1, afterMin) * 60 * 1000;
@@ -580,10 +638,13 @@ function getOrderContactKeyboard(lang) {
   const L = BOT_STRINGS[lang] || BOT_STRINGS.fr;
   return {
     reply_markup: {
-      inline_keyboard: [[
-        { text: L.order_btn_signal, callback_data: 'order_contact_signal' },
-        { text: L.order_btn_threema, callback_data: 'order_contact_threema' }
-      ]]
+      inline_keyboard: [
+        [
+          { text: L.order_btn_signal, callback_data: 'order_contact_signal' },
+          { text: L.order_btn_threema, callback_data: 'order_contact_threema' }
+        ],
+        [{ text: L.order_question_btn, callback_data: 'order_question_help' }]
+      ]
     }
   };
 }
@@ -600,7 +661,7 @@ function looksLikeOrder(text) {
 
 function buildHelpMessage(isOwner, lang) {
   const L = BOT_STRINGS[lang] || BOT_STRINGS.fr;
-  let s = L.help_detail;
+  let s = `${L.help_how_to}\n\n${L.help_detail}`;
   if (isOwner) {
     const adminLines = {
       fr: '/admin — Admin produits\n/broadcast — Message à tous les utilisateurs',
@@ -632,7 +693,7 @@ async function deliverQueuedWebOrder(user, orderText) {
   const langOrd = getChatLang(userId) || 'fr';
   const L = BOT_STRINGS[langOrd];
   try {
-    await bot.sendMessage(userId, L.order_received, getOrderContactKeyboard(langOrd));
+    await bot.sendMessage(userId, getOrderReceivedText(langOrd), getOrderContactKeyboard(langOrd));
   } catch (err) {
     console.error('❌ Error sending confirmation to user:', err.message);
   }
@@ -694,7 +755,7 @@ bot.onText(/\/start(?:\s+(.+))?/, async (msg) => {
   if (!isBotEnabled() && !isOwner) return;
   addBotUserFromMsg(msg);
   delete contactState[chatId];
-  const caption = BOT_STRINGS.fr.choose_lang;
+  const caption = getWelcomeCaption();
   try {
     await bot.sendPhoto(chatId, WELCOME_IMAGE_URL, { caption, ...LANG_PICK_INLINE });
   } catch (err) {
@@ -716,7 +777,10 @@ bot.on('message', async (msg) => {
     const st = contactState[chatId];
     delete contactState[chatId];
     const Lc = strLang(chatId);
+    const langOrd = getChatLang(chatId) || 'fr';
     await bot.sendMessage(chatId, Lc.order_contact_saved.replace('{channel}', st.channel));
+    const ty = getThankYouFollowupLine(langOrd);
+    if (ty) await bot.sendMessage(chatId, ty).catch(() => {});
     const orderSnap = lastOrderByChat[chatId] || '';
     if (OWNER_CHAT_ID) {
       const lines = [];
@@ -836,7 +900,7 @@ bot.on('message', async (msg) => {
     const langOrd = getChatLang(chatId) || 'fr';
     const L = BOT_STRINGS[langOrd];
     try {
-      await bot.sendMessage(chatId, L.order_received, getOrderContactKeyboard(langOrd));
+      await bot.sendMessage(chatId, getOrderReceivedText(langOrd), getOrderContactKeyboard(langOrd));
     } catch (err) {
       console.error('❌ Error sending confirmation:', err.message);
     }
@@ -874,6 +938,17 @@ bot.on('callback_query', async (query) => {
     return;
   }
 
+  if (data === 'order_question_help') {
+    try {
+      await bot.answerCallbackQuery(query.id);
+    } catch (e) {}
+    if (!chatId) return;
+    const lang = getChatLang(chatId) || 'fr';
+    const L = BOT_STRINGS[lang] || BOT_STRINGS.fr;
+    await bot.sendMessage(chatId, L.order_question_prompt);
+    return;
+  }
+
   if (data === 'order_contact_signal' || data === 'order_contact_threema') {
     try {
       await bot.answerCallbackQuery(query.id);
@@ -889,12 +964,18 @@ bot.on('callback_query', async (query) => {
 
   if (data === 'menu_contact') {
     await bot.answerCallbackQuery(query.id);
-    await bot.sendMessage(chatId, 'Pour nous contacter, envoie un message ici. Nous te repondrons au plus vite !');
+    if (!chatId) return;
+    const lang = getChatLang(chatId) || 'fr';
+    const L = BOT_STRINGS[lang] || BOT_STRINGS.fr;
+    await bot.sendMessage(chatId, L.menu_contact_reply);
     return;
   }
   if (data === 'menu_infos') {
     await bot.answerCallbackQuery(query.id);
-    await bot.sendMessage(chatId, 'Alpine Connexion — Catalogue et commande via Telegram.\n\nAjoute des produits au panier, valide : ta commande est envoyée automatiquement.');
+    if (!chatId) return;
+    const lang = getChatLang(chatId) || 'fr';
+    const L = BOT_STRINGS[lang] || BOT_STRINGS.fr;
+    await bot.sendMessage(chatId, L.menu_infos_reply);
     return;
   }
   if (!isOwner) return;
@@ -1380,7 +1461,7 @@ app.post('/api/order', (req, res) => {
 
   const langOrd = getChatLang(userId) || 'fr';
   const L = BOT_STRINGS[langOrd];
-  bot.sendMessage(userId, L.order_received, getOrderContactKeyboard(langOrd)).catch((err) => {
+  bot.sendMessage(userId, getOrderReceivedText(langOrd), getOrderContactKeyboard(langOrd)).catch((err) => {
     console.error('❌ Error sending confirmation to user:', err.message);
   });
 
