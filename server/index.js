@@ -1355,6 +1355,36 @@ app.get('/api/reviews', requireTelegramInitForPublicApi, (_req, res) => {
   res.json({ ok: true, reviews: rows });
 });
 
+app.get('/api/reviews/eligibility', requireTelegramInitForPublicApi, (req, res) => {
+  const initData = req.get('X-Telegram-Init-Data') || req.query?.initData;
+  const user = getInitDataUser(initData);
+  if (!user || !user.id) return res.status(401).json({ error: 'Invalid initData' });
+  const latestOrder = getLatestConfirmedOrderForUser(user.id);
+  if (!latestOrder) {
+    return res.json({ ok: true, can_review: false, reason: 'review_requires_confirmed_order' });
+  }
+  const rows = loadReviews();
+  const alreadyReviewed = rows.some((r) =>
+    String(r.user_id || '') === String(user.id) &&
+    String(r.order_ref || '') === String(latestOrder.ref || '')
+  );
+  if (alreadyReviewed) {
+    return res.json({
+      ok: true,
+      can_review: false,
+      reason: 'review_already_exists_for_order',
+      order_ref: latestOrder.ref || null,
+      ordered_items: Array.isArray(latestOrder.items) ? latestOrder.items.slice(0, 5) : []
+    });
+  }
+  return res.json({
+    ok: true,
+    can_review: true,
+    order_ref: latestOrder.ref || null,
+    ordered_items: Array.isArray(latestOrder.items) ? latestOrder.items.slice(0, 5) : []
+  });
+});
+
 app.post('/api/reviews', requireTelegramInitForPublicApi, (req, res) => {
   const initData = req.get('X-Telegram-Init-Data') || req.body?.initData;
   const user = getInitDataUser(initData);

@@ -715,6 +715,7 @@ let organicReviews = [];
 let reviewFilter = 'all';
 let reviewSort = 'recent';
 let visibleReviewsCount = 6;
+let reviewEligibility = null;
 let reviewsLoadInFlight = null;
 
 async function loadOrganicReviews() {
@@ -736,6 +737,21 @@ async function loadOrganicReviews() {
         }
     })();
     return reviewsLoadInFlight;
+}
+
+async function loadReviewEligibility() {
+    if (!POINTS_API_URL || !getInitData()) return null;
+    try {
+        const r = await fetch(`${POINTS_API_URL}/api/reviews/eligibility`, {
+            headers: catalogApiHeaders(),
+            cache: 'no-store'
+        });
+        if (!r.ok) return null;
+        const d = await r.json();
+        return d && d.ok ? d : null;
+    } catch (e) {
+        return null;
+    }
 }
 
 function formatReviewDate(value) {
@@ -839,6 +855,7 @@ async function initReviewsSection() {
     const modal = document.getElementById('review-modal');
     const closeBtn = document.getElementById('review-modal-close');
     const form = document.getElementById('review-form');
+    const refHint = document.getElementById('review-order-ref-hint');
     if (!filterEl || !sortEl || !loadMoreBtn || !addBtn || !modal || !closeBtn || !form) return;
     organicReviews = await loadOrganicReviews();
     if (organicReviews.length === 0) {
@@ -859,7 +876,25 @@ async function initReviewsSection() {
         visibleReviewsCount += 4;
         renderReviewsList();
     });
-    const openModal = () => modal.classList.remove('hidden');
+    const openModal = async () => {
+        modal.classList.remove('hidden');
+        if (refHint) refHint.textContent = 'Checking order reference...';
+        reviewEligibility = await loadReviewEligibility();
+        if (!reviewEligibility) {
+            if (refHint) refHint.textContent = 'Unable to check order reference right now.';
+            return;
+        }
+        const items = Array.isArray(reviewEligibility.ordered_items) && reviewEligibility.ordered_items.length
+            ? ` (${reviewEligibility.ordered_items.join(', ')})`
+            : '';
+        if (reviewEligibility.order_ref) {
+            if (refHint) refHint.textContent = `Order reference: ${reviewEligibility.order_ref}${items}`;
+        } else if (reviewEligibility.reason === 'review_requires_confirmed_order') {
+            if (refHint) refHint.textContent = 'No confirmed order found yet for your account.';
+        } else {
+            if (refHint) refHint.textContent = 'Order reference unavailable.';
+        }
+    };
     const closeModal = () => modal.classList.add('hidden');
     addBtn.addEventListener('click', openModal);
     closeBtn.addEventListener('click', closeModal);
@@ -873,6 +908,14 @@ async function initReviewsSection() {
         const title = document.getElementById('review-title-input')?.value?.trim();
         const text = document.getElementById('review-text')?.value?.trim();
         if (!name || !title || !text) return;
+        if (reviewEligibility && reviewEligibility.can_review === false) {
+            if (reviewEligibility.reason === 'review_already_exists_for_order') {
+                showToast('You already reviewed this order reference.');
+            } else {
+                showToast('Only customers with a confirmed order can post a review.');
+            }
+            return;
+        }
         try {
             const r = await fetch(`${POINTS_API_URL}/api/reviews`, {
                 method: 'POST',

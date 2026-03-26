@@ -886,6 +886,15 @@ body {
     gap: 0.62rem;
 }
 
+.review-order-ref-hint {
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    padding: 0.55rem 0.62rem;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.03);
+}
+
 .review-form label {
     display: grid;
     gap: 0.3rem;
