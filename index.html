@@ -102,6 +102,10 @@
                             <option value="low">Lowest rating</option>
                         </select>
                     </label>
+                    <div class="reviews-control reviews-control-action">
+                        <span>Share</span>
+                        <button id="reviews-add-btn" class="reviews-add-btn" type="button">Write a review</button>
+                    </div>
                 </div>
                 <div id="reviews-list" class="reviews-list"></div>
                 <div class="reviews-footer">
@@ -122,6 +126,38 @@
     <!-- #endregion -->
 </div>
 <!-- #endregion -->
+
+<div id="review-modal" class="review-modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="review-modal-title">
+    <div class="review-modal-card" onclick="event.stopPropagation()">
+        <button id="review-modal-close" class="review-modal-close" type="button" aria-label="Close">✕</button>
+        <h3 id="review-modal-title">Write a review</h3>
+        <form id="review-form" class="review-form">
+            <label>
+                Name
+                <input id="review-name" type="text" maxlength="60" required>
+            </label>
+            <label>
+                Rating
+                <select id="review-rating" required>
+                    <option value="5">5★</option>
+                    <option value="4">4★</option>
+                    <option value="3">3★</option>
+                    <option value="2">2★</option>
+                    <option value="1">1★</option>
+                </select>
+            </label>
+            <label>
+                Title
+                <input id="review-title-input" type="text" maxlength="90" required>
+            </label>
+            <label>
+                Review
+                <textarea id="review-text" rows="4" maxlength="700" required></textarea>
+            </label>
+            <button class="reviews-add-btn" type="submit">Submit review</button>
+        </form>
+    </div>
+</div>
 
 <!-- #region Product Modal -->
 <div class="modal-overlay" id="product-modal" onclick="closeProductModal(event)">
@@ -153,7 +189,7 @@
 <!-- #endregion -->
 
 <!-- #region Scripts -->
-<script src="app.js?v=20260326-cashback-auto-use"></script>
+<script src="app.js?v=20260326-reviews-backend"></script>
 <!-- #endregion -->
 </body>
 </html>

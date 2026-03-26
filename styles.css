@@ -684,6 +684,10 @@ body {
     gap: 0.32rem;
 }
 
+.reviews-control-action {
+    align-content: end;
+}
+
 .reviews-control span {
     font-size: 0.8rem;
     color: var(--text-secondary);
@@ -815,6 +819,85 @@ body {
 
 .reviews-load-more:active {
     transform: scale(0.98);
+}
+
+.reviews-add-btn {
+    border: 1px solid rgba(212, 175, 85, 0.45);
+    background: linear-gradient(180deg, rgba(212, 175, 85, 0.2), rgba(212, 175, 85, 0.08));
+    color: #f7e7ba;
+    border-radius: 10px;
+    padding: 0.62rem 0.9rem;
+    font-size: 0.84rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 0.15s ease, filter 0.2s ease;
+}
+
+.reviews-add-btn:hover { filter: brightness(1.08); }
+.reviews-add-btn:active { transform: scale(0.98); }
+
+.review-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9200;
+    background: rgba(0, 0, 0, 0.72);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.review-modal-overlay.hidden { display: none !important; }
+
+.review-modal-card {
+    width: 100%;
+    max-width: 460px;
+    background: #141424;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 14px;
+    padding: 1rem;
+    position: relative;
+}
+
+.review-modal-card h3 {
+    font-size: 1rem;
+    margin-bottom: 0.8rem;
+}
+
+.review-modal-close {
+    position: absolute;
+    top: 0.55rem;
+    right: 0.55rem;
+    border: 0;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 1rem;
+}
+
+.review-form {
+    display: grid;
+    gap: 0.62rem;
+}
+
+.review-form label {
+    display: grid;
+    gap: 0.3rem;
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+}
+
+.review-form input,
+.review-form select,
+.review-form textarea {
+    width: 100%;
+    border-radius: 9px;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    background: #0f0f1d;
+    color: #fff;
+    padding: 0.6rem 0.65rem;
+    font-family: var(--font-body);
+    font-size: 0.88rem;
 }
 
 @media (min-width: 860px) {

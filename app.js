@@ -711,10 +711,32 @@ let cartSyncTimer = null;
 let catalogLoadInFlight = null;
 let contactUrlsLoadInFlight = null;
 let ageGateInFlight = null;
-const MOCK_REVIEWS = [];
+let organicReviews = [];
 let reviewFilter = 'all';
 let reviewSort = 'recent';
 let visibleReviewsCount = 6;
+let reviewsLoadInFlight = null;
+
+async function loadOrganicReviews() {
+    if (!POINTS_API_URL || !getInitData()) return [];
+    if (reviewsLoadInFlight) return reviewsLoadInFlight;
+    reviewsLoadInFlight = (async () => {
+        try {
+            const r = await fetch(`${POINTS_API_URL}/api/reviews`, {
+                headers: catalogApiHeaders(),
+                cache: 'no-store'
+            });
+            if (!r.ok) return [];
+            const d = await r.json();
+            return Array.isArray(d?.reviews) ? d.reviews : [];
+        } catch (e) {
+            return [];
+        } finally {
+            reviewsLoadInFlight = null;
+        }
+    })();
+    return reviewsLoadInFlight;
+}
 
 function formatReviewDate(value) {
     const d = new Date(value);
@@ -723,7 +745,7 @@ function formatReviewDate(value) {
 }
 
 function getReviewsByCurrentSettings() {
-    let list = MOCK_REVIEWS.slice();
+    let list = organicReviews.slice();
     if (reviewFilter !== 'all') {
         const expected = Number(reviewFilter);
         list = list.filter((r) => Number(r.rating) === expected);
@@ -751,10 +773,10 @@ function renderStarIcons(rating, labelPrefix) {
 function renderReviewsSummary() {
     const el = document.getElementById('reviews-summary');
     if (!el) return;
-    const total = MOCK_REVIEWS.length;
-    const avg = total ? (MOCK_REVIEWS.reduce((sum, r) => sum + Number(r.rating || 0), 0) / total) : 0;
+    const total = organicReviews.length;
+    const avg = total ? (organicReviews.reduce((sum, r) => sum + Number(r.rating || 0), 0) / total) : 0;
     const counts = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
-    MOCK_REVIEWS.forEach((r) => {
+    organicReviews.forEach((r) => {
         const key = Number(r.rating);
         if (counts[key] != null) counts[key] += 1;
     });
@@ -808,12 +830,17 @@ function renderReviewsList() {
     else loadMoreBtn.classList.add('hidden');
 }
 
-function initReviewsSection() {
+async function initReviewsSection() {
     const filterEl = document.getElementById('review-filter');
     const sortEl = document.getElementById('review-sort');
     const loadMoreBtn = document.getElementById('reviews-load-more');
-    if (!filterEl || !sortEl || !loadMoreBtn) return;
-    if (MOCK_REVIEWS.length === 0) {
+    const addBtn = document.getElementById('reviews-add-btn');
+    const modal = document.getElementById('review-modal');
+    const closeBtn = document.getElementById('review-modal-close');
+    const form = document.getElementById('review-form');
+    if (!filterEl || !sortEl || !loadMoreBtn || !addBtn || !modal || !closeBtn || !form) return;
+    organicReviews = await loadOrganicReviews();
+    if (organicReviews.length === 0) {
         filterEl.disabled = true;
         sortEl.disabled = true;
     }
@@ -830,6 +857,54 @@ function initReviewsSection() {
     loadMoreBtn.addEventListener('click', () => {
         visibleReviewsCount += 4;
         renderReviewsList();
+    });
+    const openModal = () => modal.classList.remove('hidden');
+    const closeModal = () => modal.classList.add('hidden');
+    addBtn.addEventListener('click', openModal);
+    closeBtn.addEventListener('click', closeModal);
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeModal();
+    });
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const name = document.getElementById('review-name')?.value?.trim();
+        const rating = Number(document.getElementById('review-rating')?.value || 5);
+        const title = document.getElementById('review-title-input')?.value?.trim();
+        const text = document.getElementById('review-text')?.value?.trim();
+        if (!name || !title || !text) return;
+        try {
+            const r = await fetch(`${POINTS_API_URL}/api/reviews`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', ...catalogApiHeaders() },
+                body: JSON.stringify({
+                    initData: getInitData(),
+                    name,
+                    rating: Math.max(1, Math.min(5, rating || 5)),
+                    title,
+                    text
+                })
+            });
+            const d = await r.json().catch(() => ({}));
+            if (!r.ok || !d?.ok) {
+                showToast('Review submit failed. Please retry.');
+                return;
+            }
+            organicReviews = await loadOrganicReviews();
+        } catch (err) {
+            showToast('Network error while sending review.');
+            return;
+        }
+        filterEl.disabled = false;
+        sortEl.disabled = false;
+        reviewFilter = 'all';
+        reviewSort = 'recent';
+        filterEl.value = 'all';
+        sortEl.value = 'recent';
+        visibleReviewsCount = 6;
+        renderReviewsSummary();
+        renderReviewsList();
+        form.reset();
+        closeModal();
     });
     renderReviewsSummary();
     renderReviewsList();

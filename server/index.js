@@ -87,6 +87,7 @@ const CART_ACTIVITY_FILE = path.join(__dirname, 'cart_activity.json');
 const BOT_CHAT_LANG_FILE = path.join(__dirname, 'bot_chat_lang.json');
 const CART_REMINDERS_FILE = path.join(__dirname, 'cart_reminders.json');
 const CASHBACK_WALLETS_FILE = path.join(__dirname, 'cashback_wallets.json');
+const REVIEWS_FILE = path.join(__dirname, 'reviews.json');
 const ORDER_QUEUE_FILE = path.join(__dirname, 'order_queue.jsonl');
 
 function loadBotUsers() {
@@ -275,6 +276,39 @@ function getCashbackBalance(chatId) {
   const wallet = data.users[String(chatId)];
   const bal = wallet && typeof wallet.balance_chf === 'number' ? wallet.balance_chf : 0;
   return roundMoneyChf(bal);
+}
+
+function loadReviews() {
+  try {
+    const raw = fs.readFileSync(REVIEWS_FILE, 'utf8');
+    const arr = JSON.parse(raw);
+    if (!Array.isArray(arr)) return [];
+    return arr
+      .filter((r) => r && typeof r === 'object')
+      .map((r) => ({
+        id: Number(r.id) || Date.now(),
+        name: String(r.name || '').slice(0, 80),
+        rating: Math.max(1, Math.min(5, Number(r.rating) || 5)),
+        title: String(r.title || '').slice(0, 120),
+        text: String(r.text || '').slice(0, 1200),
+        date: String(r.date || new Date().toISOString().slice(0, 10)),
+        verified: !!r.verified,
+        created_at: r.created_at || null
+      }))
+      .filter((r) => r.name && r.title && r.text);
+  } catch {
+    return [];
+  }
+}
+
+function saveReviews(rows) {
+  const list = Array.isArray(rows) ? rows : [];
+  try {
+    fs.writeFileSync(REVIEWS_FILE, JSON.stringify(list, null, 2), 'utf8');
+  } catch (e) {
+    console.error('❌ Could not save reviews.json:', e.message);
+  }
+  return list;
 }
 
 function upsertCartActivity(user, payload) {
@@ -1236,6 +1270,46 @@ app.get('/api/my-cashback', requireTelegramInitForPublicApi, (req, res) => {
   const w = data.users[id];
   const balance_chf = w && typeof w.balance_chf === 'number' ? roundMoneyChf(w.balance_chf) : 0;
   res.json({ ok: true, balance_chf, currency: 'CHF' });
+});
+
+app.get('/api/reviews', requireTelegramInitForPublicApi, (_req, res) => {
+  const rows = loadReviews().sort((a, b) => {
+    const ta = a.created_at ? new Date(a.created_at).getTime() : new Date(a.date).getTime();
+    const tb = b.created_at ? new Date(b.created_at).getTime() : new Date(b.date).getTime();
+    return tb - ta;
+  });
+  res.json({ ok: true, reviews: rows });
+});
+
+app.post('/api/reviews', requireTelegramInitForPublicApi, (req, res) => {
+  const initData = req.get('X-Telegram-Init-Data') || req.body?.initData;
+  const user = getInitDataUser(initData);
+  if (!user || !user.id) {
+    return res.status(401).json({ error: 'Invalid initData' });
+  }
+  addOrUpdateBotUserFromWebAppUser(user);
+  const rating = Math.max(1, Math.min(5, Number(req.body?.rating) || 5));
+  const title = String(req.body?.title || '').trim().slice(0, 120);
+  const text = String(req.body?.text || '').trim().slice(0, 1200);
+  const preferredName = String(req.body?.name || '').trim().slice(0, 80);
+  const fallbackName = user.username ? `@${user.username}` : [user.first_name, user.last_name].filter(Boolean).join(' ') || `User ${user.id}`;
+  const name = preferredName || fallbackName;
+  if (!title || !text) return res.status(400).json({ error: 'title_text_required' });
+  const rows = loadReviews();
+  const row = {
+    id: Date.now(),
+    name,
+    rating,
+    title,
+    text,
+    date: new Date().toISOString().slice(0, 10),
+    created_at: new Date().toISOString(),
+    verified: false,
+    user_id: String(user.id)
+  };
+  rows.unshift(row);
+  saveReviews(rows);
+  res.json({ ok: true, review: row });
 });
 
 // Public media proxy: browser only sees your domain (blocks SSRF via host allowlist)
