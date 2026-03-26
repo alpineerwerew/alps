@@ -109,7 +109,21 @@ pm2 logs alps-bot
 curl -k -sS https://127.0.0.1/healthz   # doit renvoyer {"ok":true,...}
 ```
 
-**Optionnel (watchdog)** : si tu veux redémarrer automatiquement quand `/healthz` ne répond plus, ajoute une tâche cron (root) qui appelle `curl` puis `pm2 restart alps-web`.
+**Watchdog (optionnel mais utile)** : la séparation `alps-web` / `alps-bot` enlève le gros risque « Telegram bloque tout ». Un cron sur `/healthz` reste une **sécurité de secours** si le processus web seul plante (TLS, mémoire, bug rare). Script fourni : `server/health-watch.sh`.
+
+```bash
+chmod +x /opt/alps/server/health-watch.sh
+# test manuel
+/opt/alps/server/health-watch.sh
+```
+
+Crontab root (ex. toutes les **5** minutes — 2 min est plus agressif si tu veux réagir plus vite) :
+
+```cron
+*/5 * * * * /opt/alps/server/health-watch.sh >>/var/log/alps-health.log 2>&1
+```
+
+Variables optionnelles : `HEALTH_URL`, `MAX_TIME`, `PM2_APP` (défaut `alps-web`).
 
 ### Ancien mode : un seul processus
 
