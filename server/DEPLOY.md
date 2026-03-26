@@ -224,6 +224,47 @@ apt install -y certbot python3-certbot-nginx
 certbot --nginx -d alpine710.art -d www.alpine710.art
 ```
 
+---
+
+## 9. Migration Supabase (Postgres) + backups SQL
+
+Si tu veux remplacer les JSON locaux par une base SQL managée:
+
+1) Dans Supabase, ouvre **SQL Editor** et exécute:
+
+```sql
+-- copier/coller le contenu de server/sql/supabase_schema.sql
+```
+
+2) Dans `server/.env`, ajoute:
+
+```bash
+SUPABASE_DB_URL=postgres://postgres:...@db.xxx.supabase.co:5432/postgres
+```
+
+3) Depuis le VPS:
+
+```bash
+cd /opt/alps/server
+npm install --production
+npm run db:bootstrap
+npm run db:import:json
+```
+
+4) Backup SQL (manuel):
+
+```bash
+cd /opt/alps/server
+chmod +x scripts/backup-supabase.sh
+SUPABASE_DB_URL="$SUPABASE_DB_URL" ./scripts/backup-supabase.sh
+```
+
+5) Backup SQL (cron quotidien, exemple 03:15):
+
+```cron
+15 3 * * * cd /opt/alps/server && SUPABASE_DB_URL='postgres://...' ./scripts/backup-supabase.sh >>/var/log/alps-supabase-backup.log 2>&1
+```
+
 Résultat : **https://alpine710.art** sert le catalogue et les routes **`/api/*`** (produits, commande, etc.) via le proxy. Dans `app.js`, `POINTS_API_URL` pointe en pratique sur la même origine (`window.location.origin` en prod) — ce n’est pas un système de « points » séparé dans le code actuel.
 
 ---
