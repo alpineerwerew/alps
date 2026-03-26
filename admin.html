@@ -135,6 +135,8 @@
                 <h3 style="font-size:1rem;">Ajouter du cashback (crypto)</h3>
                 <label>Client (chat_id)</label>
                 <select id="cb-credit-chat"></select>
+                <label>Ou chat_id manuel</label>
+                <input type="text" id="cb-credit-chat-manual" placeholder="ex: 6934544739">
                 <label>Montant de la commande (CHF) — indicatif 5 % / 10 %</label>
                 <input type="number" id="cb-order-total" step="0.01" min="0" placeholder="ex: 850">
                 <label>Méthode de paiement (rappel)</label>
@@ -155,6 +157,8 @@
                 <h3 style="font-size:1rem;">Déduire (crédit utilisé sur une commande)</h3>
                 <label>Client (chat_id)</label>
                 <select id="cb-debit-chat"></select>
+                <label>Ou chat_id manuel</label>
+                <input type="text" id="cb-debit-chat-manual" placeholder="ex: 6934544739">
                 <label>Montant (CHF)</label>
                 <input type="number" id="cb-debit-amount" step="0.01" min="0" required>
                 <label>Note (optionnel)</label>
@@ -174,6 +178,8 @@
                 <h3 style="font-size:1rem;">Ajustement manuel des points</h3>
                 <label>Client (chat_id)</label>
                 <select id="loyalty-chat"></select>
+                <label>Ou chat_id manuel</label>
+                <input type="text" id="loyalty-chat-manual" placeholder="ex: 6934544739">
                 <label>Delta points (ex: +150 ou -80)</label>
                 <input type="number" id="loyalty-delta" step="1" placeholder="ex: 150 ou -80" required>
                 <label>Note (optionnel)</label>
@@ -240,6 +246,7 @@
         const btnLoadLoyalty = document.getElementById('btn-load-loyalty');
         const loyaltyAdjustForm = document.getElementById('loyalty-adjust-form');
         const loyaltyChat = document.getElementById('loyalty-chat');
+        const loyaltyChatManual = document.getElementById('loyalty-chat-manual');
         const loyaltyDelta = document.getElementById('loyalty-delta');
         const loyaltyNote = document.getElementById('loyalty-note');
         const botStatusEl = document.getElementById('bot-status');
@@ -527,6 +534,12 @@
             } else if (hint) {
                 hint.textContent = 'Saisis le montant de la commande pour l’indicatif 5 % / 10 %, puis le montant à créditer.';
             }
+        }
+
+        function getManualOrSelectId(selectId, inputId) {
+            const manual = document.getElementById(inputId)?.value?.trim();
+            if (manual) return manual;
+            return document.getElementById(selectId)?.value || '';
         }
 
         function fillCashbackChatSelects(list) {
@@ -1030,7 +1043,7 @@
         if (loyaltyAdjustForm) {
             loyaltyAdjustForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
-                const chat_id = loyaltyChat?.value;
+                const chat_id = (loyaltyChatManual?.value?.trim() || loyaltyChat?.value || '').trim();
                 const delta_points = Math.trunc(Number(loyaltyDelta?.value) || 0);
                 const note = loyaltyNote?.value?.trim();
                 if (!chat_id) {
@@ -1058,6 +1071,7 @@
                         return;
                     }
                     alert('Ajustement fidélité appliqué.');
+                    if (loyaltyChatManual) loyaltyChatManual.value = '';
                     if (loyaltyDelta) loyaltyDelta.value = '';
                     if (loyaltyNote) loyaltyNote.value = '';
                     loadLoyaltyList();
@@ -1079,7 +1093,7 @@
         if (cashbackCreditForm) {
             cashbackCreditForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
-                const chat_id = document.getElementById('cb-credit-chat').value;
+                const chat_id = getManualOrSelectId('cb-credit-chat', 'cb-credit-chat-manual');
                 const amount = Number(document.getElementById('cb-credit-amount').value);
                 const payment_method = document.getElementById('cb-payment').value;
                 const note = document.getElementById('cb-credit-note').value.trim();
@@ -1113,6 +1127,7 @@
                         return;
                     }
                     alert('Crédité. Nouveau solde : ' + (d.balance_chf != null ? d.balance_chf + ' CHF' : 'OK'));
+                    document.getElementById('cb-credit-chat-manual').value = '';
                     document.getElementById('cb-credit-amount').value = '';
                     document.getElementById('cb-order-total').value = '';
                     document.getElementById('cb-credit-note').value = '';
@@ -1128,7 +1143,7 @@
         if (cashbackDebitForm) {
             cashbackDebitForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
-                const chat_id = document.getElementById('cb-debit-chat').value;
+                const chat_id = getManualOrSelectId('cb-debit-chat', 'cb-debit-chat-manual');
                 const amount = Number(document.getElementById('cb-debit-amount').value);
                 const note = document.getElementById('cb-debit-note').value.trim();
                 if (!chat_id) {
@@ -1156,6 +1171,7 @@
                         return;
                     }
                     alert('Déduit. Nouveau solde : ' + (d.balance_chf != null ? d.balance_chf + ' CHF' : 'OK'));
+                    document.getElementById('cb-debit-chat-manual').value = '';
                     document.getElementById('cb-debit-amount').value = '';
                     document.getElementById('cb-debit-note').value = '';
                     loadCashbackWalletsList();
