@@ -88,6 +88,7 @@ const BOT_CHAT_LANG_FILE = path.join(__dirname, 'bot_chat_lang.json');
 const CART_REMINDERS_FILE = path.join(__dirname, 'cart_reminders.json');
 const CASHBACK_WALLETS_FILE = path.join(__dirname, 'cashback_wallets.json');
 const REVIEWS_FILE = path.join(__dirname, 'reviews.json');
+const ORDERS_HISTORY_FILE = path.join(__dirname, 'orders_history.json');
 const ORDER_QUEUE_FILE = path.join(__dirname, 'order_queue.jsonl');
 
 function loadBotUsers() {
@@ -293,6 +294,7 @@ function loadReviews() {
         text: String(r.text || '').slice(0, 1200),
         date: String(r.date || new Date().toISOString().slice(0, 10)),
         verified: !!r.verified,
+        approved: !!r.approved,
         created_at: r.created_at || null
       }))
       .filter((r) => r.name && r.title && r.text);
@@ -309,6 +311,76 @@ function saveReviews(rows) {
     console.error('❌ Could not save reviews.json:', e.message);
   }
   return list;
+}
+
+function loadOrdersHistory() {
+  try {
+    const raw = fs.readFileSync(ORDERS_HISTORY_FILE, 'utf8');
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveOrdersHistory(rows) {
+  const list = Array.isArray(rows) ? rows : [];
+  try {
+    fs.writeFileSync(ORDERS_HISTORY_FILE, JSON.stringify(list, null, 2), 'utf8');
+  } catch (e) {
+    console.error('❌ Could not save orders_history.json:', e.message);
+  }
+  return list;
+}
+
+function parseOrderForReference(orderText) {
+  const txt = String(orderText || '');
+  const lines = txt.split('\n').map((l) => String(l || '').trim()).filter(Boolean);
+  const itemNames = [];
+  for (const l of lines) {
+    const m = l.match(/^\d+\.\s+(.+)$/);
+    if (m && m[1]) {
+      const core = m[1].replace(/\s*\(.+\)\s*$/, '').trim();
+      if (core) itemNames.push(core);
+    }
+  }
+  const totalLine = lines.find((l) => /(?:total|gesamt)\s*:/i.test(l)) || '';
+  const totalMatch = totalLine.match(/([\d.,]+)\s*CHF/i);
+  const totalChf = totalMatch ? Number(String(totalMatch[1]).replace(',', '.')) : null;
+  return {
+    items: itemNames.slice(0, 8),
+    items_label: itemNames.slice(0, 3).join(', '),
+    total_chf: Number.isFinite(totalChf) ? totalChf : null
+  };
+}
+
+function appendOrderHistory(user, orderText) {
+  if (!user || !user.id) return null;
+  const summary = parseOrderForReference(orderText);
+  const rows = loadOrdersHistory();
+  const row = {
+    id: Date.now(),
+    ref: `AC-${Date.now().toString(36).toUpperCase()}`,
+    user_id: String(user.id),
+    username: user.username ? `@${user.username}` : null,
+    first_name: user.first_name || null,
+    last_name: user.last_name || null,
+    order_text: String(orderText || ''),
+    items: summary.items,
+    total_chf: summary.total_chf,
+    created_at: new Date().toISOString(),
+    status: 'confirmed'
+  };
+  rows.unshift(row);
+  if (rows.length > 5000) rows.length = 5000;
+  saveOrdersHistory(rows);
+  return row;
+}
+
+function getLatestConfirmedOrderForUser(userId) {
+  if (!userId) return null;
+  const rows = loadOrdersHistory();
+  return rows.find((r) => String(r.user_id) === String(userId) && (r.status || 'confirmed') === 'confirmed') || null;
 }
 
 function upsertCartActivity(user, payload) {
@@ -1273,7 +1345,9 @@ app.get('/api/my-cashback', requireTelegramInitForPublicApi, (req, res) => {
 });
 
 app.get('/api/reviews', requireTelegramInitForPublicApi, (_req, res) => {
-  const rows = loadReviews().sort((a, b) => {
+  const rows = loadReviews()
+    .filter((r) => !!r.approved)
+    .sort((a, b) => {
     const ta = a.created_at ? new Date(a.created_at).getTime() : new Date(a.date).getTime();
     const tb = b.created_at ? new Date(b.created_at).getTime() : new Date(b.date).getTime();
     return tb - ta;
@@ -1295,7 +1369,18 @@ app.post('/api/reviews', requireTelegramInitForPublicApi, (req, res) => {
   const fallbackName = user.username ? `@${user.username}` : [user.first_name, user.last_name].filter(Boolean).join(' ') || `User ${user.id}`;
   const name = preferredName || fallbackName;
   if (!title || !text) return res.status(400).json({ error: 'title_text_required' });
+  const latestOrder = getLatestConfirmedOrderForUser(user.id);
+  if (!latestOrder) {
+    return res.status(403).json({ error: 'review_requires_confirmed_order' });
+  }
   const rows = loadReviews();
+  const alreadyReviewed = rows.some((r) =>
+    String(r.user_id || '') === String(user.id) &&
+    String(r.order_ref || '') === String(latestOrder.ref || '')
+  );
+  if (alreadyReviewed) {
+    return res.status(409).json({ error: 'review_already_exists_for_order' });
+  }
   const row = {
     id: Date.now(),
     name,
@@ -1305,11 +1390,45 @@ app.post('/api/reviews', requireTelegramInitForPublicApi, (req, res) => {
     date: new Date().toISOString().slice(0, 10),
     created_at: new Date().toISOString(),
     verified: false,
-    user_id: String(user.id)
+    approved: false,
+    user_id: String(user.id),
+    order_ref: latestOrder.ref || null,
+    ordered_items: Array.isArray(latestOrder.items) ? latestOrder.items.slice(0, 5) : []
   };
   rows.unshift(row);
   saveReviews(rows);
   res.json({ ok: true, review: row });
+});
+
+app.get('/api/admin/reviews', (req, res) => {
+  if (!ensureOwner(req, res)) return;
+  const rows = loadReviews().sort((a, b) => {
+    const ta = a.created_at ? new Date(a.created_at).getTime() : new Date(a.date).getTime();
+    const tb = b.created_at ? new Date(b.created_at).getTime() : new Date(b.date).getTime();
+    return tb - ta;
+  });
+  res.json({ ok: true, reviews: rows });
+});
+
+app.post('/api/admin/reviews/:id/approve', (req, res) => {
+  if (!ensureOwner(req, res)) return;
+  const id = Number(req.params.id);
+  const rows = loadReviews();
+  const idx = rows.findIndex((r) => Number(r.id) === id);
+  if (idx === -1) return res.status(404).json({ error: 'review_not_found' });
+  rows[idx] = { ...rows[idx], approved: true };
+  saveReviews(rows);
+  res.json({ ok: true, review: rows[idx] });
+});
+
+app.delete('/api/admin/reviews/:id', (req, res) => {
+  if (!ensureOwner(req, res)) return;
+  const id = Number(req.params.id);
+  const rows = loadReviews();
+  const next = rows.filter((r) => Number(r.id) !== id);
+  if (next.length === rows.length) return res.status(404).json({ error: 'review_not_found' });
+  saveReviews(next);
+  res.json({ ok: true });
 });
 
 // Public media proxy: browser only sees your domain (blocks SSRF via host allowlist)
@@ -1694,6 +1813,7 @@ app.post('/api/order', (req, res) => {
   }
   const userId = user.id;
   addOrUpdateBotUserFromWebAppUser(user);
+  const orderHist = appendOrderHistory(user, orderText);
   const cashbackUseChf = roundMoneyChf(Number(cashbackUseRaw) || 0);
   let cashbackDebited = false;
   if (cashbackUseChf < 0) {
@@ -1732,7 +1852,7 @@ app.post('/api/order', (req, res) => {
       console.error('❌ order_queue:', e.message);
       return res.status(500).json({ error: 'queue_failed' });
     }
-    return res.json({ ok: true, queued: true, cashback_balance_chf: getCashbackBalance(userId) });
+    return res.json({ ok: true, queued: true, cashback_balance_chf: getCashbackBalance(userId), order_ref: orderHist?.ref || null });
   }
 
   const fromLabel = user.username ? `@${user.username}` : [user.first_name, user.last_name].filter(Boolean).join(' ') || `ID ${userId}`;
@@ -1752,7 +1872,7 @@ app.post('/api/order', (req, res) => {
     console.error('❌ Error sending confirmation to user:', err.message);
   });
 
-  res.json({ ok: true, cashback_balance_chf: getCashbackBalance(userId) });
+  res.json({ ok: true, cashback_balance_chf: getCashbackBalance(userId), order_ref: orderHist?.ref || null });
 });
 
 app.post('/api/cart-activity', (req, res) => {

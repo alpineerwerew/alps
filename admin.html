@@ -164,6 +164,13 @@
                 </div>
             </form>
         </div>
+
+        <div class="import-wrap">
+            <h2>Avis clients (modération)</h2>
+            <p>Chaque avis doit être validé avant publication sur le catalogue.</p>
+            <button type="button" class="btn primary" id="btn-load-reviews">Charger les avis</button>
+            <div id="reviews-admin-list" style="margin-top:0.75rem;font-size:0.85rem;"></div>
+        </div>
     </div>
 
     <script>
@@ -208,6 +215,8 @@
         const btnLoadUsers = document.getElementById('btn-load-users');
         const cartActivityList = document.getElementById('cart-activity-list');
         const btnLoadCartActivity = document.getElementById('btn-load-cart-activity');
+        const reviewsAdminList = document.getElementById('reviews-admin-list');
+        const btnLoadReviews = document.getElementById('btn-load-reviews');
         const botStatusEl = document.getElementById('bot-status');
         const btnBotToggle = document.getElementById('btn-bot-toggle');
         const categoryForm = document.getElementById('category-form');
@@ -544,6 +553,98 @@
             }
         }
 
+        async function loadReviewsAdminList() {
+            if (!reviewsAdminList) return;
+            reviewsAdminList.innerHTML = '<p>Chargement...</p>';
+            try {
+                const r = await fetch(API_URL + '/api/admin/reviews?initData=' + encodeURIComponent(getInitData()));
+                const d = await r.json();
+                if (!r.ok || !d.ok) {
+                    reviewsAdminList.innerHTML = '<p class="msg err">Erreur lors du chargement des avis.</p>';
+                    return;
+                }
+                const list = Array.isArray(d.reviews) ? d.reviews : [];
+                if (!list.length) {
+                    reviewsAdminList.innerHTML = '<p>Aucun avis pour le moment.</p>';
+                    return;
+                }
+                const rows = list.map((rv, i) => {
+                    const status = rv.approved ? 'Publié' : 'En attente';
+                    const date = rv.date ? new Date(rv.date).toLocaleDateString() : '—';
+                    const rating = Number(rv.rating) || 0;
+                    const stars = '★'.repeat(Math.max(0, Math.min(5, rating))) + '☆'.repeat(5 - Math.max(0, Math.min(5, rating)));
+                    const orderRef = rv.order_ref ? escapeHtml(String(rv.order_ref)) : '—';
+                    const ordered = Array.isArray(rv.ordered_items) && rv.ordered_items.length
+                        ? escapeHtml(rv.ordered_items.join(', '))
+                        : '—';
+                    const approveBtn = rv.approved
+                        ? ''
+                        : `<button type="button" class="btn" data-review-approve="${rv.id}">Approuver</button>`;
+                    return `<tr>
+                        <td>${i + 1}</td>
+                        <td>${escapeHtml(rv.name || '—')}</td>
+                        <td>${escapeHtml(stars)}</td>
+                        <td>${escapeHtml(rv.title || '')}</td>
+                        <td>${escapeHtml((rv.text || '').slice(0, 140))}${(rv.text || '').length > 140 ? '…' : ''}</td>
+                        <td>${orderRef}</td>
+                        <td>${ordered}</td>
+                        <td>${date}</td>
+                        <td>${status}</td>
+                        <td>${approveBtn}<button type="button" class="btn danger" data-review-delete="${rv.id}">Supprimer</button></td>
+                    </tr>`;
+                });
+                reviewsAdminList.innerHTML = `
+                    <table>
+                        <thead><tr><th>#</th><th>Auteur</th><th>Note</th><th>Titre</th><th>Texte</th><th>Réf commande</th><th>Articles</th><th>Date</th><th>Statut</th><th></th></tr></thead>
+                        <tbody>${rows.join('')}</tbody>
+                    </table>
+                `;
+                reviewsAdminList.querySelectorAll('[data-review-approve]').forEach((btn) => {
+                    btn.addEventListener('click', async () => {
+                        const id = Number(btn.getAttribute('data-review-approve'));
+                        try {
+                            const rr = await fetch(API_URL + '/api/admin/reviews/' + id + '/approve', {
+                                method: 'POST',
+                                headers: getAuthHeadersJson(),
+                                body: JSON.stringify(getAuthBody())
+                            });
+                            const dd = await rr.json().catch(() => ({}));
+                            if (!rr.ok || !dd.ok) {
+                                alert(dd.error || 'Erreur');
+                                return;
+                            }
+                            loadReviewsAdminList();
+                        } catch (e) {
+                            alert('Erreur réseau');
+                        }
+                    });
+                });
+                reviewsAdminList.querySelectorAll('[data-review-delete]').forEach((btn) => {
+                    btn.addEventListener('click', async () => {
+                        const id = Number(btn.getAttribute('data-review-delete'));
+                        if (!confirm('Supprimer cet avis ?')) return;
+                        try {
+                            const rr = await fetch(API_URL + '/api/admin/reviews/' + id, {
+                                method: 'DELETE',
+                                headers: getAuthHeadersJson(),
+                                body: JSON.stringify(getAuthBody())
+                            });
+                            const dd = await rr.json().catch(() => ({}));
+                            if (!rr.ok || !dd.ok) {
+                                alert(dd.error || 'Erreur');
+                                return;
+                            }
+                            loadReviewsAdminList();
+                        } catch (e) {
+                            alert('Erreur réseau');
+                        }
+                    });
+                });
+            } catch (e) {
+                reviewsAdminList.innerHTML = '<p class="msg err">Erreur réseau lors du chargement des avis.</p>';
+            }
+        }
+
         function escapeHtml(s) {
             const div = document.createElement('div');
             div.textContent = s;
@@ -850,6 +951,9 @@
         if (btnLoadCashback) {
             btnLoadCashback.addEventListener('click', () => loadCashbackWalletsList());
         }
+        if (btnLoadReviews) {
+            btnLoadReviews.addEventListener('click', () => loadReviewsAdminList());
+        }
         const cbOrderTotal = document.getElementById('cb-order-total');
         const cbPayment = document.getElementById('cb-payment');
         if (cbOrderTotal) cbOrderTotal.addEventListener('input', updateCashbackCreditHint);
@@ -957,6 +1061,7 @@
             if (await checkAdmin()) {
                 load();
                 loadBotEnabled();
+                loadReviewsAdminList();
             }
         })();
     </script>

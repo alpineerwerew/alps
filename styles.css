@@ -787,6 +787,12 @@ body {
     color: #d5d8df;
 }
 
+.review-order-ref {
+    margin-top: 0.45rem;
+    font-size: 0.74rem;
+    color: var(--text-muted);
+}
+
 .review-empty {
     border-radius: 12px;
     padding: 1rem;

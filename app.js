@@ -824,6 +824,7 @@ function renderReviewsList() {
             </div>
             <div class="review-rating-wrap">${renderStarIcons(r.rating, `${r.name} rating`)}</div>
             <p class="review-body">${escapeHtml(r.text)}</p>
+            ${r.order_ref ? `<p class="review-order-ref">Order reference: ${escapeHtml(r.order_ref)}${Array.isArray(r.ordered_items) && r.ordered_items.length ? ` · ${escapeHtml(r.ordered_items.join(', '))}` : ''}</p>` : ''}
         </article>
     `).join('');
     if (visibleReviewsCount < source.length) loadMoreBtn.classList.remove('hidden');
@@ -886,6 +887,14 @@ async function initReviewsSection() {
             });
             const d = await r.json().catch(() => ({}));
             if (!r.ok || !d?.ok) {
+                if (d?.error === 'review_requires_confirmed_order') {
+                    showToast('Only customers with a confirmed order can post a review.');
+                    return;
+                }
+                if (d?.error === 'review_already_exists_for_order') {
+                    showToast('You already reviewed this order reference.');
+                    return;
+                }
                 showToast('Review submit failed. Please retry.');
                 return;
             }
