@@ -1767,12 +1767,12 @@ function renderProducts() {
         if (primary) {
             if (primary.type === 'video') {
                 const thumb = primary.thumbnail ? ` poster="${escapeHtml(primary.thumbnail)}"` : '';
-                media = `<video src="${escapeHtml(primary.url)}#t=0.1"${thumb} playsinline muted preload="metadata"></video>`;
+                media = `<video src="${escapeHtml(primary.url)}"${thumb} playsinline muted preload="none"></video>`;
             } else {
                 media = `<img src="${escapeHtml(primary.url)}" alt="${escapeHtml(primary.alt || p.name)}" loading="lazy">`;
             }
         } else if (p.media_type === 'video' && p.video_url) {
-            media = `<video src="${escapeHtml(p.video_url)}#t=0.1" playsinline muted preload="metadata"></video>`;
+            media = `<video src="${escapeHtml(p.video_url)}" playsinline muted preload="none"></video>`;
         } else if (p.image_url) {
             media = `<img src="${escapeHtml(p.image_url)}" alt="${escapeHtml(p.name)}" loading="lazy">`;
         } else {
@@ -1816,7 +1816,7 @@ function openProduct(id) {
     if (Array.isArray(p.media) && p.media.length > 0) {
         media = buildModalCarouselHtml(p);
     } else if (p.media_type === 'video' && p.video_url) {
-        media = `<video src="${escapeHtml(p.video_url)}" class="modal-media" controls playsinline preload="metadata"></video>`;
+        media = `<video src="${escapeHtml(p.video_url)}" class="modal-media" controls playsinline preload="none"></video>`;
     } else if (p.image_url) {
         media = `<img src="${escapeHtml(p.image_url)}" class="modal-media" alt="${escapeHtml(p.name)}">`;
     } else {
@@ -1884,7 +1884,7 @@ function buildModalCarouselHtml(product) {
             const thumb = m.thumbnail ? ` poster="${escapeHtml(m.thumbnail)}"` : '';
             return `
                 <div class="carousel-slide${isActive}" data-index="${index}">
-                    <video src="${escapeHtml(m.url)}"${thumb} controls playsinline preload="metadata" class="carousel-video"></video>
+                    <video src="${escapeHtml(m.url)}"${thumb} controls playsinline preload="none" class="carousel-video"></video>
                 </div>`;
         }
         return `
@@ -1906,7 +1906,7 @@ function buildModalCarouselHtml(product) {
             return `
                 <div class="thumbnail${isActive}" data-target-index="${index}">
                     <div class="video-thumbnail">
-                        <video src="${escapeHtml(m.url)}"${poster} muted playsinline preload="metadata" aria-label="${escapeHtml(m.alt || product.name)}"></video>
+                        <video src="${escapeHtml(m.url)}"${poster} muted playsinline preload="none" aria-label="${escapeHtml(m.alt || product.name)}"></video>
                         <div class="play-icon">▶</div>
                     </div>
                 </div>`;
@@ -1963,11 +1963,11 @@ function initModalCarousel() {
         indicators.forEach((ind, i) => ind.classList.toggle('active', i === currentIndex));
         thumbnails.forEach((thumb, i) => thumb.classList.toggle('active', i === currentIndex));
 
-        // Quand on affiche la slide vidéo, forcer le chargement pour qu'elle s'affiche (sinon reste noir)
         const activeSlide = slides[currentIndex];
         const video = activeSlide ? activeSlide.querySelector('video') : null;
         if (video) {
-            video.load();
+            video.autoplay = false;
+            video.pause();
         }
     }
 
