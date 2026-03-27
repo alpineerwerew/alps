@@ -1560,6 +1560,30 @@ const storage = multer.diskStorage({
 });
 const uploadMw = multer({ storage, limits: { fileSize: 50 * 1024 * 1024 } }); // 50 MB
 
+function createVideoImagePreview(inputPath) {
+  return new Promise((resolve, reject) => {
+    const parsed = path.parse(inputPath);
+    const outPath = path.join(parsed.dir, `${parsed.name}.jpg`);
+    const maxWidth = Math.max(240, Math.min(1280, Number(process.env.VIDEO_PREVIEW_MAX_WIDTH) || 720));
+    const args = [
+      '-y',
+      '-ss', '0.8',
+      '-i', inputPath,
+      '-frames:v', '1',
+      '-vf', `scale=${maxWidth}:-1:flags=lanczos`,
+      outPath
+    ];
+    const ff = spawn('ffmpeg', args, { stdio: ['ignore', 'ignore', 'pipe'] });
+    let errBuf = '';
+    ff.stderr.on('data', (d) => { errBuf += String(d || ''); });
+    ff.on('error', (err) => reject(err));
+    ff.on('close', (code) => {
+      if (code === 0) return resolve(outPath);
+      reject(new Error(errBuf || `ffmpeg_exit_${code}`));
+    });
+  });
+}
+
 // ---- Express API ----
 const app = express();
 app.set('trust proxy', 1);
@@ -1593,10 +1617,22 @@ app.post('/api/upload', uploadMw.single('file'), async (req, res) => {
     return res.status(400).json({ error: 'No file uploaded' });
   }
   let finalFilename = req.file.filename;
+  let previewImageFilename = null;
+  const uploadedPath = req.file.path;
+  const isVideo = String(req.file.mimetype || '').startsWith('video/');
+  if (isVideo) {
+    try {
+      const jpgPath = await createVideoImagePreview(uploadedPath);
+      previewImageFilename = path.basename(jpgPath);
+    } catch (e) {
+      console.warn('⚠️ Video preview image generation failed:', e?.message || e);
+    }
+  }
   // Always use CATALOG_URL (https) to avoid mixed-content issues in Telegram WebApp
   const baseUrl = (CATALOG_URL || '').replace(/\/+$/, '');
   const url = `${baseUrl}/uploads/${finalFilename}`;
-  res.json({ ok: true, url });
+  const preview_image_url = previewImageFilename ? `${baseUrl}/uploads/${previewImageFilename}` : null;
+  res.json({ ok: true, url, preview_image_url, has_preview_image: !!preview_image_url });
 });
 
 // ---- Public config (Signal / Threema links for catalog) ----
