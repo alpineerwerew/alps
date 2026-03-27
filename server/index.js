@@ -6,6 +6,7 @@ const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 const crypto = require('crypto');
 const fs = require('fs');
+const { spawn } = require('child_process');
 const http = require('http');
 const https = require('https');
 const { Readable } = require('stream');
