@@ -1561,30 +1561,34 @@ const storage = multer.diskStorage({
 });
 const uploadMw = multer({ storage, limits: { fileSize: 50 * 1024 * 1024 } }); // 50 MB
 
-function createVideoGifPreview(inputPath) {
-  return new Promise((resolve, reject) => {
-    const parsed = path.parse(inputPath);
-    const outPath = path.join(parsed.dir, `${parsed.name}.gif`);
-    const maxSeconds = Math.max(2, Math.min(20, Number(process.env.GIF_MAX_SECONDS) || 8));
-    const maxWidth = Math.max(240, Math.min(1080, Number(process.env.GIF_MAX_WIDTH) || 540));
-    const fps = Math.max(6, Math.min(20, Number(process.env.GIF_FPS) || 10));
-    const args = [
-      '-y',
-      '-i', inputPath,
-      '-vf', `fps=${fps},scale=${maxWidth}:-1:flags=lanczos`,
-      '-t', String(maxSeconds),
-      '-loop', '0',
-      '-an',
-      outPath
-    ];
-    const ff = spawn('ffmpeg', args, { stdio: ['ignore', 'ignore', 'pipe'] });
-    let errBuf = '';
-    ff.stderr.on('data', (d) => { errBuf += String(d || ''); });
-    ff.on('error', (err) => reject(err));
-    ff.on('close', (code) => {
-      if (code === 0) return resolve(outPath);
-      reject(new Error(errBuf || `ffmpeg_exit_${code}`));
-    });
+function getGifPreviewOutputPath(inputPath) {
+  const parsed = path.parse(inputPath);
+  return path.join(parsed.dir, `${parsed.name}.gif`);
+}
+
+function startVideoGifPreviewJob(inputPath, outPath) {
+  const maxSeconds = Math.max(2, Math.min(20, Number(process.env.GIF_MAX_SECONDS) || 8));
+  const maxWidth = Math.max(240, Math.min(1080, Number(process.env.GIF_MAX_WIDTH) || 540));
+  const fps = Math.max(6, Math.min(20, Number(process.env.GIF_FPS) || 10));
+  const args = [
+    '-y',
+    '-i', inputPath,
+    '-vf', `fps=${fps},scale=${maxWidth}:-1:flags=lanczos`,
+    '-t', String(maxSeconds),
+    '-loop', '0',
+    '-an',
+    outPath
+  ];
+  const ff = spawn('ffmpeg', args, { stdio: ['ignore', 'ignore', 'pipe'] });
+  let errBuf = '';
+  ff.stderr.on('data', (d) => { errBuf += String(d || ''); });
+  ff.on('error', (err) => {
+    console.warn('⚠️ GIF preview start failed:', err?.message || err);
+  });
+  ff.on('close', (code) => {
+    if (code !== 0) {
+      console.warn('⚠️ GIF preview generation failed:', errBuf || `ffmpeg_exit_${code}`);
+    }
   });
 }
 
@@ -1625,12 +1629,9 @@ app.post('/api/upload', uploadMw.single('file'), async (req, res) => {
   const uploadedPath = req.file.path;
   const isVideo = String(req.file.mimetype || '').startsWith('video/');
   if (isVideo) {
-    try {
-      const gifPath = await createVideoGifPreview(uploadedPath);
-      previewGifFilename = path.basename(gifPath);
-    } catch (e) {
-      console.warn('⚠️ GIF preview generation failed:', e?.message || e);
-    }
+    const gifPath = getGifPreviewOutputPath(uploadedPath);
+    previewGifFilename = path.basename(gifPath);
+    startVideoGifPreviewJob(uploadedPath, gifPath); // async: do not block upload response
   }
   // Always use CATALOG_URL (https) to avoid mixed-content issues in Telegram WebApp
   const baseUrl = (CATALOG_URL || '').replace(/\/+$/, '');
