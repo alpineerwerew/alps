@@ -6,6 +6,7 @@ const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 const crypto = require('crypto');
 const fs = require('fs');
+const { spawn } = require('child_process');
 const http = require('http');
 const https = require('https');
 const { Readable } = require('stream');
@@ -1560,6 +1561,33 @@ const storage = multer.diskStorage({
 });
 const uploadMw = multer({ storage, limits: { fileSize: 50 * 1024 * 1024 } }); // 50 MB
 
+function createVideoGifPreview(inputPath) {
+  return new Promise((resolve, reject) => {
+    const parsed = path.parse(inputPath);
+    const outPath = path.join(parsed.dir, `${parsed.name}.gif`);
+    const maxSeconds = Math.max(2, Math.min(20, Number(process.env.GIF_MAX_SECONDS) || 8));
+    const maxWidth = Math.max(240, Math.min(1080, Number(process.env.GIF_MAX_WIDTH) || 540));
+    const fps = Math.max(6, Math.min(20, Number(process.env.GIF_FPS) || 10));
+    const args = [
+      '-y',
+      '-i', inputPath,
+      '-vf', `fps=${fps},scale=${maxWidth}:-1:flags=lanczos`,
+      '-t', String(maxSeconds),
+      '-loop', '0',
+      '-an',
+      outPath
+    ];
+    const ff = spawn('ffmpeg', args, { stdio: ['ignore', 'ignore', 'pipe'] });
+    let errBuf = '';
+    ff.stderr.on('data', (d) => { errBuf += String(d || ''); });
+    ff.on('error', (err) => reject(err));
+    ff.on('close', (code) => {
+      if (code === 0) return resolve(outPath);
+      reject(new Error(errBuf || `ffmpeg_exit_${code}`));
+    });
+  });
+}
+
 // ---- Express API ----
 const app = express();
 app.set('trust proxy', 1);
@@ -1579,18 +1607,36 @@ app.get('/healthz', (_req, res) => {
 });
 
 // Fichiers uploadés accessibles en /uploads/...
-app.use('/uploads', express.static(UPLOAD_DIR));
+app.use('/uploads', express.static(UPLOAD_DIR, {
+  maxAge: '30d',
+  immutable: true,
+  etag: true,
+  lastModified: true
+}));
 
 // ---- Upload API (owner only) ----
-app.post('/api/upload', uploadMw.single('file'), (req, res) => {
+app.post('/api/upload', uploadMw.single('file'), async (req, res) => {
   if (!ensureOwner(req, res)) return;
   if (!req.file || !req.file.filename) {
     return res.status(400).json({ error: 'No file uploaded' });
   }
+  let finalFilename = req.file.filename;
+  let previewGifFilename = null;
+  const uploadedPath = req.file.path;
+  const isVideo = String(req.file.mimetype || '').startsWith('video/');
+  if (isVideo) {
+    try {
+      const gifPath = await createVideoGifPreview(uploadedPath);
+      previewGifFilename = path.basename(gifPath);
+    } catch (e) {
+      console.warn('⚠️ GIF preview generation failed:', e?.message || e);
+    }
+  }
   // Always use CATALOG_URL (https) to avoid mixed-content issues in Telegram WebApp
   const baseUrl = (CATALOG_URL || '').replace(/\/+$/, '');
-  const url = `${baseUrl}/uploads/${req.file.filename}`;
-  res.json({ ok: true, url });
+  const url = `${baseUrl}/uploads/${finalFilename}`;
+  const preview_gif_url = previewGifFilename ? `${baseUrl}/uploads/${previewGifFilename}` : null;
+  res.json({ ok: true, url, preview_gif_url, has_preview_gif: !!preview_gif_url });
 });
 
 // ---- Public config (Signal / Threema links for catalog) ----
