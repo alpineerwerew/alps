@@ -1735,6 +1735,10 @@ function enforceManualPlayOnly(scope) {
     });
 }
 
+function isGifMediaUrl(url) {
+    return /\.gif(?:\?|#|$)/i.test(String(url || '').trim());
+}
+
 function normalizeBadgeKey(key) {
     const k = String(key || '').toLowerCase().trim();
     if (k === 'promo') return 'promotion';
@@ -1924,11 +1928,12 @@ function buildModalCarouselHtml(product) {
         const isActive = index === 0 ? ' active' : '';
         if (m.type === 'video') {
             const thumbSrc = m.thumbnail ? String(m.thumbnail) : '';
+            const safeThumbSrc = thumbSrc && !isGifMediaUrl(thumbSrc) ? thumbSrc : '';
             return `
                 <div class="thumbnail${isActive}" data-target-index="${index}">
                     <div class="video-thumbnail">
-                        ${thumbSrc
-                            ? `<img src="${escapeHtml(thumbSrc)}" alt="${escapeHtml(m.alt || product.name)}" loading="lazy">`
+                        ${safeThumbSrc
+                            ? `<img src="${escapeHtml(safeThumbSrc)}" alt="${escapeHtml(m.alt || product.name)}" loading="lazy">`
                             : `<div class="video-thumb-fallback" aria-label="${escapeHtml(m.alt || product.name)}"></div>`
                         }
                         <div class="play-icon">▶</div>
