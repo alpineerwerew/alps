@@ -1716,6 +1716,25 @@ function getPrimaryMedia(product) {
     return null;
 }
 
+function enforceManualPlayOnly(scope) {
+    const root = scope || document;
+    const videos = Array.from(root.querySelectorAll('video'));
+    videos.forEach((v) => {
+        if (!v || v.dataset.manualPlayBound === '1') return;
+        v.dataset.manualPlayBound = '1';
+        v.dataset.userInteracted = '0';
+        const markInteracted = () => { v.dataset.userInteracted = '1'; };
+        v.addEventListener('pointerdown', markInteracted, { passive: true });
+        v.addEventListener('touchstart', markInteracted, { passive: true });
+        v.addEventListener('click', markInteracted);
+        v.addEventListener('keydown', markInteracted);
+        v.addEventListener('play', () => {
+            if (v.dataset.userInteracted === '1') return;
+            try { v.pause(); } catch (e) {}
+        });
+    });
+}
+
 function normalizeBadgeKey(key) {
     const k = String(key || '').toLowerCase().trim();
     if (k === 'promo') return 'promotion';
@@ -1797,6 +1816,7 @@ function renderProducts() {
                 </div>
             </div>`;
     }).join('');
+    enforceManualPlayOnly(grid);
 }
 
 function openProduct(id) {
@@ -1869,6 +1889,8 @@ function openProduct(id) {
     if (Array.isArray(p.media) && p.media.length > 0) {
         initModalCarousel();
     }
+    const modalContent = document.getElementById('modal-content');
+    enforceManualPlayOnly(modalContent || undefined);
 
     document.getElementById('product-modal').classList.add('active');
 }
@@ -1969,6 +1991,7 @@ function initModalCarousel() {
             video.autoplay = false;
             video.pause();
         }
+        enforceManualPlayOnly(container);
     }
 
     container.addEventListener('click', (e) => {
