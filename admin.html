@@ -303,7 +303,6 @@
         let currentBotEnabled = null;
         let allOrdersHistory = [];
         let allContacts = [];
-        let videoPreviewByUrl = {};
 
         async function checkAdmin() {
             const init = getInitData();
@@ -433,7 +432,7 @@
                 const d = await r.json();
                 if (!r.ok) { statusEl.textContent = d.error || 'Erreur'; statusEl.className = 'upload-status err'; return; }
                 if (typeof setUploadResult === 'function') setUploadResult(d);
-                statusEl.textContent = d.has_preview_gif ? '✓ Vidéo + aperçu GIF' : '✓ Envoyé';
+                statusEl.textContent = '✓ Envoyé';
                 statusEl.className = 'upload-status done';
             } catch (e) {
                 statusEl.textContent = 'Erreur réseau';
@@ -1302,10 +1301,6 @@
             pImageUrl.value = p.image_url || '';
             const allMedia = Array.isArray(p.media) ? p.media.filter(m => m && m.url) : [];
             const videoMedia = allMedia.filter((m) => String(m.type || '').toLowerCase() === 'video');
-            videoPreviewByUrl = {};
-            videoMedia.forEach((m) => {
-                if (m.url && m.thumbnail) videoPreviewByUrl[String(m.url)] = String(m.thumbnail);
-            });
             const videoUrls = videoMedia.length
                 ? videoMedia.map((m) => String(m.url))
                 : (p.video_url ? [String(p.video_url)] : []);
@@ -1380,7 +1375,6 @@
                 for (const file of files) {
                     await uploadFile(file, uploadVideoStatus, (d) => {
                         appendUrlLine(pVideoUrl, d.url);
-                        if (d.url && d.preview_gif_url) videoPreviewByUrl[d.url] = d.preview_gif_url;
                     });
                 }
             })();
@@ -1390,7 +1384,6 @@
         document.getElementById('btn-add').addEventListener('click', () => {
             editId.value = '';
             productForm.reset();
-            videoPreviewByUrl = {};
             productForm.classList.remove('hidden');
             fillCategoriesSelect();
             pVariants.value = '';
@@ -1418,8 +1411,7 @@
                     media.push({ type: 'image', url: vu, alt: '' });
                     return;
                 }
-                const thumb = videoPreviewByUrl[vu] || null;
-                media.push({ type: 'video', url: vu, alt: '', thumbnail: thumb || undefined });
+                media.push({ type: 'video', url: vu, alt: '' });
             });
             const extra = parseMediaExtra(pMediaExtra?.value || '');
             if (extra.length) {
