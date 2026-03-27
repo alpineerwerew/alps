@@ -1923,12 +1923,14 @@ function buildModalCarouselHtml(product) {
     const thumbs = mediaItems.map((m, index) => {
         const isActive = index === 0 ? ' active' : '';
         if (m.type === 'video') {
-            // <img> ne peut pas afficher un .mp4 → on utilise <video> pour afficher la 1ère frame
-            const poster = m.thumbnail ? ` poster="${escapeHtml(m.thumbnail)}"` : '';
+            const thumbSrc = m.thumbnail ? String(m.thumbnail) : '';
             return `
                 <div class="thumbnail${isActive}" data-target-index="${index}">
                     <div class="video-thumbnail">
-                        <video src="${escapeHtml(m.url)}"${poster} muted playsinline preload="none" aria-label="${escapeHtml(m.alt || product.name)}"></video>
+                        ${thumbSrc
+                            ? `<img src="${escapeHtml(thumbSrc)}" alt="${escapeHtml(m.alt || product.name)}" loading="lazy">`
+                            : `<div class="video-thumb-fallback" aria-label="${escapeHtml(m.alt || product.name)}"></div>`
+                        }
                         <div class="play-icon">▶</div>
                     </div>
                 </div>`;
