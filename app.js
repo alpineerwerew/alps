@@ -415,15 +415,6 @@ function applyTranslations() {
     const navCatalogLabel = document.getElementById('nav-catalog-label');
     if (navCatalogLabel) navCatalogLabel.textContent = t('nav_catalog');
 
-    const chip = document.getElementById('cashback-chip-label');
-    if (chip) chip.textContent = t('cashback_chip_short');
-    const cmt = document.getElementById('cashback-modal-title');
-    const cmb = document.getElementById('cashback-modal-body');
-    const cmok = document.getElementById('cashback-modal-ok');
-    if (cmt) cmt.textContent = t('cashback_modal_title');
-    if (cmb) cmb.textContent = t('cashback_modal_body');
-    if (cmok) cmok.textContent = t('cashback_modal_ok');
-
     const editContactBtn = document.getElementById('btn-edit-contact');
     if (editContactBtn) editContactBtn.textContent = t('contact_edit_btn');
 
@@ -788,8 +779,6 @@ const PRODUCTS = [
 // 🔒 CODE APP — NE PAS MODIFIER
 // =============================================
 let cart = [];
-let myCashbackBalanceChf = 0;
-let autoUseCashback = true;
 let selectedPricingIdx = null;
 let selectedVariantIdxs = [];
 let currentProduct = null;
@@ -800,306 +789,7 @@ let catalogLoadInFlight = null;
 let contactUrlsLoadInFlight = null;
 let ageGateInFlight = null;
 const ONBOARDING_STORAGE_KEY = 'ac_onboarding_v1';
-let organicReviews = [];
-let reviewFilter = 'all';
-let reviewSort = 'recent';
-let visibleReviewsCount = 6;
-let reviewEligibility = null;
-let productRatingMap = new Map();
-let reviewsLoadInFlight = null;
 let currentOnboardingStep = 1;
-
-async function loadOrganicReviews() {
-    if (!POINTS_API_URL || !getInitData()) return [];
-    if (reviewsLoadInFlight) return reviewsLoadInFlight;
-    reviewsLoadInFlight = (async () => {
-        try {
-            const r = await fetch(`${POINTS_API_URL}/api/reviews`, {
-                headers: catalogApiHeaders(),
-                cache: 'no-store'
-            });
-            if (!r.ok) return [];
-            const d = await r.json();
-            return Array.isArray(d?.reviews) ? d.reviews : [];
-        } catch (e) {
-            return [];
-        } finally {
-            reviewsLoadInFlight = null;
-        }
-    })();
-    return reviewsLoadInFlight;
-}
-
-async function loadReviewEligibility() {
-    if (!POINTS_API_URL || !getInitData()) return null;
-    try {
-        const r = await fetch(`${POINTS_API_URL}/api/reviews/eligibility`, {
-            headers: catalogApiHeaders(),
-            cache: 'no-store'
-        });
-        if (!r.ok) return null;
-        const d = await r.json();
-        return d && d.ok ? d : null;
-    } catch (e) {
-        return null;
-    }
-}
-
-function formatReviewDate(value) {
-    const d = new Date(value);
-    if (Number.isNaN(d.getTime())) return value;
-    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
-}
-
-function getReviewsByCurrentSettings() {
-    let list = organicReviews.slice();
-    if (reviewFilter !== 'all') {
-        const expected = Number(reviewFilter);
-        list = list.filter((r) => Number(r.rating) === expected);
-    }
-    if (reviewSort === 'high') {
-        list.sort((a, b) => b.rating - a.rating || new Date(b.date) - new Date(a.date));
-    } else if (reviewSort === 'low') {
-        list.sort((a, b) => a.rating - b.rating || new Date(b.date) - new Date(a.date));
-    } else {
-        list.sort((a, b) => new Date(b.date) - new Date(a.date));
-    }
-    return list;
-}
-
-function rebuildProductRatingMap() {
-    const m = new Map();
-    organicReviews.forEach((r) => {
-        const pid = Number(r?.product_id);
-        if (!Number.isFinite(pid) || pid <= 0) return;
-        const prev = m.get(pid) || { count: 0, sum: 0 };
-        prev.count += 1;
-        prev.sum += Math.max(1, Math.min(5, Number(r.rating) || 0));
-        m.set(pid, prev);
-    });
-    productRatingMap = m;
-}
-
-function getProductRatingMeta(productId) {
-    const pid = Number(productId);
-    const v = productRatingMap.get(pid);
-    if (!v || !v.count) return null;
-    return { avg: v.sum / v.count, count: v.count };
-}
-
-function renderStarIcons(rating, labelPrefix) {
-    const safe = Math.max(0, Math.min(5, Number(rating) || 0));
-    let stars = '';
-    for (let i = 1; i <= 5; i++) {
-        const filled = i <= safe ? 'is-filled' : '';
-        stars += `<span class="review-star ${filled}" aria-hidden="true">★</span>`;
-    }
-    return `<span class="review-stars" aria-label="${escapeHtml(labelPrefix)} ${safe} out of 5">${stars}</span>`;
-}
-
-function renderReviewsSummary() {
-    const el = document.getElementById('reviews-summary');
-    if (!el) return;
-    const total = organicReviews.length;
-    const avg = total ? (organicReviews.reduce((sum, r) => sum + Number(r.rating || 0), 0) / total) : 0;
-    const counts = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
-    organicReviews.forEach((r) => {
-        const key = Number(r.rating);
-        if (counts[key] != null) counts[key] += 1;
-    });
-    const bars = [5, 4, 3, 2, 1].map((n) => {
-        const count = counts[n] || 0;
-        const pct = total ? Math.round((count / total) * 100) : 0;
-        return `<div class="rating-row">
-            <div class="rating-row-label">${n}★</div>
-            <div class="rating-bar-track"><div class="rating-bar-fill" style="width:${pct}%;"></div></div>
-            <div class="rating-row-count">${count}</div>
-        </div>`;
-    }).join('');
-    el.innerHTML = `
-        <div class="summary-score">
-            <div class="summary-score-value">${avg.toFixed(1)}</div>
-            <div class="summary-score-stars">${renderStarIcons(Math.round(avg), 'Average rating')}</div>
-            <div class="summary-score-meta">${total} reviews</div>
-        </div>
-        <div class="summary-breakdown">${bars}</div>
-    `;
-}
-
-function renderReviewsList() {
-    const listEl = document.getElementById('reviews-list');
-    const loadMoreBtn = document.getElementById('reviews-load-more');
-    if (!listEl || !loadMoreBtn) return;
-    const source = getReviewsByCurrentSettings();
-    const visible = source.slice(0, visibleReviewsCount);
-    if (!visible.length) {
-        listEl.innerHTML = `<div class="review-empty">No reviews yet. Be the first verified customer to leave feedback.</div>`;
-        loadMoreBtn.classList.add('hidden');
-        return;
-    }
-    listEl.innerHTML = visible.map((r) => `
-        <article class="review-card">
-            <div class="review-card-top">
-                <div>
-                    <h3 class="review-title">${escapeHtml(r.title)}</h3>
-                    ${r.product_name ? `<div class="review-product-name">${escapeHtml(r.product_name)}</div>` : ''}
-                    <div class="review-author-row">
-                        <span class="review-author">${escapeHtml(r.name)}</span>
-                        ${r.verified ? '<span class="review-verified">Verified</span>' : ''}
-                    </div>
-                </div>
-                <div class="review-card-aside">
-                    ${r.product_image ? `<img class="review-product-thumb" src="${escapeHtml(r.product_image)}" alt="Product from reviewed order" loading="lazy">` : ''}
-                    <time class="review-date" datetime="${escapeHtml(r.date)}">${escapeHtml(formatReviewDate(r.date))}</time>
-                </div>
-            </div>
-            <div class="review-rating-wrap">${renderStarIcons(r.rating, `${r.name} rating`)}</div>
-            <p class="review-body">${escapeHtml(r.text)}</p>
-            ${r.order_ref ? `<p class="review-order-ref">Order reference: ${escapeHtml(r.order_ref)}${Array.isArray(r.ordered_items) && r.ordered_items.length ? ` · ${escapeHtml(r.ordered_items.join(', '))}` : ''}</p>` : ''}
-        </article>
-    `).join('');
-    if (visibleReviewsCount < source.length) loadMoreBtn.classList.remove('hidden');
-    else loadMoreBtn.classList.add('hidden');
-}
-
-async function initReviewsSection() {
-    const filterEl = document.getElementById('review-filter');
-    const sortEl = document.getElementById('review-sort');
-    const loadMoreBtn = document.getElementById('reviews-load-more');
-    const addBtn = document.getElementById('reviews-add-btn');
-    const modal = document.getElementById('review-modal');
-    const closeBtn = document.getElementById('review-modal-close');
-    const form = document.getElementById('review-form');
-    const refHint = document.getElementById('review-order-ref-hint');
-    const productSel = document.getElementById('review-product');
-    if (!filterEl || !sortEl || !loadMoreBtn || !addBtn || !modal || !closeBtn || !form || !productSel) return;
-    organicReviews = await loadOrganicReviews();
-    rebuildProductRatingMap();
-    if (organicReviews.length === 0) {
-        filterEl.disabled = true;
-        sortEl.disabled = true;
-    }
-    filterEl.addEventListener('change', (e) => {
-        reviewFilter = e.target.value || 'all';
-        visibleReviewsCount = 6;
-        renderReviewsList();
-    });
-    sortEl.addEventListener('change', (e) => {
-        reviewSort = e.target.value || 'recent';
-        visibleReviewsCount = 6;
-        renderReviewsList();
-    });
-    loadMoreBtn.addEventListener('click', () => {
-        visibleReviewsCount += 4;
-        renderReviewsList();
-    });
-    const openModal = async () => {
-        modal.classList.remove('hidden');
-        if (refHint) refHint.textContent = 'Checking order reference...';
-        reviewEligibility = await loadReviewEligibility();
-        productSel.innerHTML = '';
-        if (!reviewEligibility) {
-            if (refHint) refHint.textContent = 'Unable to check order reference right now.';
-            productSel.disabled = true;
-            return;
-        }
-        const items = Array.isArray(reviewEligibility.ordered_items) && reviewEligibility.ordered_items.length
-            ? ` (${reviewEligibility.ordered_items.join(', ')})`
-            : '';
-        if (reviewEligibility.order_ref) {
-            if (refHint) refHint.textContent = `Order reference: ${reviewEligibility.order_ref}${items}`;
-        } else if (reviewEligibility.reason === 'review_requires_confirmed_order') {
-            if (refHint) refHint.textContent = 'No confirmed order found yet for your account.';
-        } else if (reviewEligibility.reason === 'review_already_exists_for_order_products') {
-            if (refHint) refHint.textContent = `All products from order ${reviewEligibility.order_ref || ''} are already reviewed.`;
-        } else {
-            if (refHint) refHint.textContent = 'Order reference unavailable.';
-        }
-        const opts = Array.isArray(reviewEligibility.eligible_products) ? reviewEligibility.eligible_products : [];
-        if (!opts.length) {
-            productSel.innerHTML = '<option value="">No eligible product found</option>';
-            productSel.disabled = true;
-            return;
-        }
-        productSel.innerHTML = opts.map((p) => `<option value="${Number(p.id)}">${escapeHtml(p.name || `Product #${p.id}`)}</option>`).join('');
-        productSel.disabled = false;
-    };
-    const closeModal = () => modal.classList.add('hidden');
-    addBtn.addEventListener('click', openModal);
-    closeBtn.addEventListener('click', closeModal);
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) closeModal();
-    });
-    form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const name = document.getElementById('review-name')?.value?.trim();
-        const rating = Number(document.getElementById('review-rating')?.value || 5);
-        const productId = Number(document.getElementById('review-product')?.value);
-        const title = document.getElementById('review-title-input')?.value?.trim();
-        const text = document.getElementById('review-text')?.value?.trim();
-        if (!name || !title || !text || !Number.isFinite(productId) || productId <= 0) return;
-        if (reviewEligibility && reviewEligibility.can_review === false) {
-            if (reviewEligibility.reason === 'review_already_exists_for_order' || reviewEligibility.reason === 'review_already_exists_for_order_products') {
-                showToast('You already reviewed this order reference.');
-            } else {
-                showToast('Only customers with a confirmed order can post a review.');
-            }
-            return;
-        }
-        try {
-            const r = await fetch(`${POINTS_API_URL}/api/reviews`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', ...catalogApiHeaders() },
-                body: JSON.stringify({
-                    initData: getInitData(),
-                    name,
-                    product_id: productId,
-                    rating: Math.max(1, Math.min(5, rating || 5)),
-                    title,
-                    text
-                })
-            });
-            const d = await r.json().catch(() => ({}));
-            if (!r.ok || !d?.ok) {
-                if (d?.error === 'review_requires_confirmed_order') {
-                    showToast('Only customers with a confirmed order can post a review.');
-                    return;
-                }
-                if (d?.error === 'review_already_exists_for_order' || d?.error === 'review_already_exists_for_order_product') {
-                    showToast('You already reviewed this order reference.');
-                    return;
-                }
-                if (d?.error === 'review_product_not_in_order') {
-                    showToast('Select a product from your confirmed order.');
-                    return;
-                }
-                showToast('Review submit failed. Please retry.');
-                return;
-            }
-            organicReviews = await loadOrganicReviews();
-            rebuildProductRatingMap();
-        } catch (err) {
-            showToast('Network error while sending review.');
-            return;
-        }
-        filterEl.disabled = false;
-        sortEl.disabled = false;
-        reviewFilter = 'all';
-        reviewSort = 'recent';
-        filterEl.value = 'all';
-        sortEl.value = 'recent';
-        visibleReviewsCount = 6;
-        renderReviewsSummary();
-        renderReviewsList();
-        renderProducts();
-        form.reset();
-        showToast('Thanks! Your review will be published after admin verification.');
-        closeModal();
-    });
-    renderReviewsSummary();
-    renderReviewsList();
-    renderProducts();
-}
 
 function closeAgeGate() {
     const gate = document.getElementById('age-gate');
@@ -1488,153 +1178,19 @@ function formatChfAmount(n) {
     return `${x.toFixed(2)} ${CURRENCY}`;
 }
 
-function getAutoUseCashbackPref() {
-    try {
-        const v = localStorage.getItem('ac_auto_cashback');
-        if (v === '0') return false;
-        if (v === '1') return true;
-    } catch (e) {}
-    return true;
-}
-
-function setAutoUseCashbackPref(v) {
-    autoUseCashback = !!v;
-    try {
-        localStorage.setItem('ac_auto_cashback', autoUseCashback ? '1' : '0');
-    } catch (e) {}
-}
-
 function computeCartTotals() {
     const subtotal = cart.reduce((sum, item) => sum + (Number(item?.price) || 0), 0);
-    const loyaltyPct = Math.max(0, Number(loyaltySnapshot?.discount_percent) || 0);
-    const loyaltyDiscount = Math.max(0, subtotal * (loyaltyPct / 100));
-    const afterLoyalty = Math.max(0, subtotal - loyaltyDiscount);
-    const cashbackDiscount = autoUseCashback ? Math.min(afterLoyalty, Math.max(0, Number(myCashbackBalanceChf) || 0)) : 0;
-    const rawPayable = Math.max(0, afterLoyalty - cashbackDiscount);
-    const payableRounded = Math.max(0, Math.round(rawPayable));
-    return { subtotal, loyaltyPct, loyaltyDiscount, cashbackDiscount, rawPayable, payableRounded };
-}
-
-let cashbackLoadInFlight = null;
-let loyaltyLoadInFlight = null;
-let loyaltySnapshot = null;
-let loyaltyExpanded = false;
-async function loadMyCashback() {
-    if (!POINTS_API_URL || !getInitData()) return;
-    if (cashbackLoadInFlight) return cashbackLoadInFlight;
-    cashbackLoadInFlight = (async () => {
-        try {
-            const r = await fetch(`${POINTS_API_URL}/api/my-cashback`, {
-                headers: catalogApiHeaders(),
-                cache: 'no-store'
-            });
-            if (r.status === 401) return;
-            const d = await r.json();
-            if (d.ok && typeof d.balance_chf === 'number') {
-                myCashbackBalanceChf = Number(d.balance_chf) || 0;
-                const balEl = document.getElementById('cashback-chip-balance');
-                if (balEl) balEl.textContent = formatChfAmount(myCashbackBalanceChf);
-                if (document.getElementById('cart-overlay')?.classList.contains('active')) renderCart();
-            }
-        } catch (e) {}
-    })().finally(() => {
-        cashbackLoadInFlight = null;
-    });
-    return cashbackLoadInFlight;
-}
-
-function renderLoyalty(snapshot) {
-    const levelBadge = document.getElementById('loyalty-level-badge');
-    const pointsEl = document.getElementById('loyalty-points');
-    const fillEl = document.getElementById('loyalty-progress-fill');
-    const progressLabel = document.getElementById('loyalty-progress-label');
-    const nextLabel = document.getElementById('loyalty-next-label');
-    const rewardsEl = document.getElementById('loyalty-rewards');
-    const details = document.getElementById('loyalty-details');
-    const toggle = document.getElementById('loyalty-toggle');
-    if (!levelBadge || !pointsEl || !fillEl || !progressLabel || !nextLabel || !rewardsEl || !details || !toggle) return;
-    const snap = snapshot || {
-        points: 0,
-        tier_label: 'Bronze',
-        progress: 0,
-        points_to_next: 0,
-        next_tier_label: 'Silver',
-        rewards: []
-    };
-    loyaltySnapshot = snap;
-    levelBadge.textContent = snap.tier_label || 'Bronze';
-    levelBadge.className = `loyalty-level-badge tier-${String(snap.tier_key || 'bronze').toLowerCase()}`;
-    pointsEl.textContent = String(Number(snap.points) || 0);
-    const pct = Math.round(Math.max(0, Math.min(1, Number(snap.progress) || 0)) * 100);
-    fillEl.style.width = `${pct}%`;
-    progressLabel.textContent = snap.next_tier_label ? `${pct}% to ${snap.next_tier_label}` : 'Max level reached';
-    nextLabel.textContent = snap.next_tier_label
-        ? `${Number(snap.points_to_next) || 0} points to ${snap.next_tier_label}`
-        : 'You are at the highest tier';
-    const rewards = Array.isArray(snap.rewards) ? snap.rewards : [];
-    rewardsEl.innerHTML = rewards.map((r) => `
-        <div class="loyalty-reward ${r.unlocked ? 'unlocked' : 'locked'}">
-            <div class="loyalty-reward-tier">${escapeHtml(r.label || '')}</div>
-            <div class="loyalty-reward-items">${escapeHtml((Array.isArray(r.items) ? r.items.join(' • ') : ''))}</div>
-        </div>
-    `).join('');
-    details.classList.toggle('hidden', !loyaltyExpanded);
-    toggle.setAttribute('aria-expanded', loyaltyExpanded ? 'true' : 'false');
-    toggle.textContent = loyaltyExpanded ? 'Hide' : 'Details';
-}
-
-async function loadLoyaltyStatus() {
-    if (!POINTS_API_URL || !getInitData()) return;
-    if (loyaltyLoadInFlight) return loyaltyLoadInFlight;
-    loyaltyLoadInFlight = (async () => {
-        try {
-            const r = await fetch(`${POINTS_API_URL}/api/loyalty/me`, {
-                headers: catalogApiHeaders(),
-                cache: 'no-store'
-            });
-            if (r.status === 401) return;
-            const d = await r.json();
-            if (d?.ok) renderLoyalty(d);
-        } catch (e) {}
-    })().finally(() => {
-        loyaltyLoadInFlight = null;
-    });
-    return loyaltyLoadInFlight;
-}
-
-function wireCashbackUi() {
-    const overlay = document.getElementById('cashback-info-modal');
-    const btn = document.getElementById('btn-cashback-info');
-    const closeBtn = document.getElementById('cashback-modal-close');
-    const okBtn = document.getElementById('cashback-modal-ok');
-    const close = () => overlay?.classList.add('hidden');
-    btn?.addEventListener('click', () => overlay?.classList.remove('hidden'));
-    closeBtn?.addEventListener('click', close);
-    okBtn?.addEventListener('click', close);
-    overlay?.addEventListener('click', (e) => {
-        if (e.target === overlay) close();
-    });
+    const payableRounded = Math.max(0, Math.round(subtotal));
+    return { subtotal, payableRounded };
 }
 
 function init() {
     document.title = "Alpine Connexion";
-    autoUseCashback = getAutoUseCashbackPref();
-    renderLoyalty(null);
-    const loyaltyToggle = document.getElementById('loyalty-toggle');
-    const loyaltyDetails = document.getElementById('loyalty-details');
-    if (loyaltyToggle && loyaltyDetails) {
-        loyaltyToggle.addEventListener('click', () => {
-            loyaltyExpanded = !loyaltyExpanded;
-            renderLoyalty(loyaltySnapshot);
-        });
-    }
-    wireCashbackUi();
     const editContactBtn = document.getElementById('btn-edit-contact');
     editContactBtn?.addEventListener('click', async () => {
         await showAgeGate(true);
         applyTranslations();
     });
-    initReviewsSection();
     const tg = window.Telegram?.WebApp;
     if (tg) {
         try {
@@ -1657,8 +1213,6 @@ function init() {
         buildFilters();
         applyTranslations();
         renderProducts();
-        loadMyCashback();
-        loadLoyaltyStatus();
     })();
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') refreshCatalog();
@@ -1705,8 +1259,6 @@ async function refreshCatalog() {
     await loadCatalog();
     refreshCategoryFilter();
     renderProducts();
-    loadMyCashback();
-    loadLoyaltyStatus();
 }
 
 function getPrimaryMedia(product) {
@@ -1804,18 +1356,12 @@ function renderProducts() {
 
         const fp = p.pricing?.[0];
         const price = fp ? `<span class="price-from">${t('price_from_prefix')}</span>${fp.price} ${CURRENCY}` : '';
-        const rm = getProductRatingMeta(p.id);
-        const ratingHtml = rm
-            ? `<div class="product-rating-line" aria-label="Rated ${rm.avg.toFixed(1)} out of 5 from ${rm.count} reviews">★ ${rm.avg.toFixed(1)} <span>(${rm.count})</span></div>`
-            : '';
-
         return `
             <div class="product-card" onclick="openProduct(${p.id})">
                 <div class="product-media-wrap">${badgeHtml}${media}</div>
                 <div class="product-card-body">
                     <div class="product-card-name">${escapeHtml(p.name)}</div>
                     <div class="product-card-desc">${escapeHtml((p.description||'').split('\n')[0])}</div>
-                    ${ratingHtml}
                     <div class="product-card-price">${price}</div>
                 </div>
             </div>`;
@@ -1874,17 +1420,11 @@ function openProduct(id) {
 
     let gallery = p.gallery_link
         ? `<a href="${escapeHtml(p.gallery_link)}" target="_blank" class="gallery-link">📸 Voir les photos</a>` : '';
-    const rm = getProductRatingMeta(p.id);
-    const modalRatingHtml = rm
-        ? `<div class="product-modal-rating">★ ${rm.avg.toFixed(1)} · ${rm.count} review${rm.count > 1 ? 's' : ''}</div>`
-        : '';
-
     document.getElementById('modal-content').innerHTML = `
         ${media}
         <div class="modal-body">
             <div class="modal-title">${escapeHtml(p.name)}</div>
             <div class="modal-category-badge">${escapeHtml(cat?.name || '')}</div>
-            ${modalRatingHtml}
             <div class="modal-description">${escapeHtml(p.description || '')}</div>
             ${gallery}${variants}${pricing}
             <button class="btn-add-cart" id="btn-add" onclick="addToCart()" disabled>${t('btn_add_cart')}</button>
@@ -2141,23 +1681,11 @@ function renderCart() {
 
     h += `<div class="cart-footer">
         <div class="cart-total-row">
-            <span class="cart-total-label">${t('cashback_subtotal_label')}</span>
+            <span class="cart-total-label">${t('total_label')}</span>
             <span class="cart-total-amount cart-total-amount-small">${totals.subtotal.toFixed(2)} ${CURRENCY}</span>
         </div>
-        <div class="cart-total-row cart-total-discount-row">
-            <span class="cart-total-label">${t('loyalty_discount_label')} (${totals.loyaltyPct}%)</span>
-            <span class="cart-total-discount">- ${totals.loyaltyDiscount.toFixed(2)} ${CURRENCY}</span>
-        </div>
-        <label class="cart-cashback-toggle">
-            <input type="checkbox" id="cart-auto-cashback" ${autoUseCashback ? 'checked' : ''}>
-            <span>${t('cashback_auto_apply')} (${formatChfAmount(myCashbackBalanceChf)})</span>
-        </label>
-        <div class="cart-total-row cart-total-discount-row">
-            <span class="cart-total-label">${t('cashback_discount_label')}</span>
-            <span class="cart-total-discount">- ${totals.cashbackDiscount.toFixed(2)} ${CURRENCY}</span>
-        </div>
         <div class="cart-total-row">
-            <span class="cart-total-label">${t('cashback_payable_label')}</span>
+            <span class="cart-total-label">${t('total_label')}</span>
             <span class="cart-total-amount">${totals.payableRounded.toFixed(0)} ${CURRENCY}</span>
         </div>
         <div class="checkout-hint">${t('rounded_total_note')}</div>
@@ -2166,13 +1694,6 @@ function renderCart() {
     `;
     h += `</div>`;
     c.innerHTML = h;
-    const autoCb = document.getElementById('cart-auto-cashback');
-    if (autoCb) {
-        autoCb.addEventListener('change', (e) => {
-            setAutoUseCashbackPref(!!e.target.checked);
-            renderCart();
-        });
-    }
 }
 
 function clearSavedCart() {
@@ -2212,12 +1733,6 @@ function buildOrderText(totals, orderId) {
         if (item.variant) msg += ` (${item.variant})`;
         msg += `\n   📦 ${item.qty} ${u} — ${item.price} ${CURRENCY}\n\n`;
     });
-    if (tvals.loyaltyDiscount > 0) {
-        msg += `${t('loyalty_discount_label')} (${tvals.loyaltyPct}%) : -${tvals.loyaltyDiscount.toFixed(2)} ${CURRENCY}\n`;
-    }
-    if (tvals.cashbackDiscount > 0) {
-        msg += `${t('cashback_applied_to_order')} : -${tvals.cashbackDiscount.toFixed(2)} ${CURRENCY}\n`;
-    }
     msg += `${t('order_total')} : ${tvals.payableRounded.toFixed(0)} ${CURRENCY}`;
     return msg;
 }
@@ -2242,22 +1757,11 @@ async function checkout() {
                     initData: getInitData(),
                     orderText,
                     order_id: orderId,
-                    customer_contact: getCustomerContactSummary(),
-                    cashback_use_chf: totals.cashbackDiscount
+                    customer_contact: getCustomerContactSummary()
                 })
             });
             const data = await res.json().catch(() => ({}));
             if (res.ok && data.ok) {
-                if (typeof data.cashback_balance_chf === 'number') {
-                    myCashbackBalanceChf = Number(data.cashback_balance_chf) || 0;
-                    const balEl = document.getElementById('cashback-chip-balance');
-                    if (balEl) balEl.textContent = formatChfAmount(myCashbackBalanceChf);
-                }
-                if (data.loyalty && data.loyalty.points != null) {
-                    renderLoyalty(data.loyalty);
-                } else {
-                    loadLoyaltyStatus();
-                }
                 cart = [];
                 saveCartToStorage();
                 updateCartBadge();
@@ -2265,11 +1769,6 @@ async function checkout() {
                 closeCart();
                 showToast(t('order_sent'));
                 if (window.Telegram?.WebApp) window.Telegram.WebApp.close();
-                return;
-            } else if (data.error === 'insufficient_cashback') {
-                showToast(t('cashback_insufficient'));
-                await loadMyCashback();
-                renderCart();
                 return;
             }
         } catch (e) {}

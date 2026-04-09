@@ -12,15 +12,6 @@
 </head>
 <body>
 
-<div id="cashback-info-modal" class="cashback-info-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="cashback-modal-title">
-    <div class="cashback-info-card" onclick="event.stopPropagation()">
-        <button type="button" class="cashback-info-close" id="cashback-modal-close" aria-label="Close">✕</button>
-        <h2 id="cashback-modal-title"></h2>
-        <p id="cashback-modal-body" class="cashback-modal-body"></p>
-        <button type="button" class="age-gate-btn age-gate-btn-primary cashback-info-ok" id="cashback-modal-ok"></button>
-    </div>
-</div>
-
 <div id="age-gate" class="age-gate hidden" role="dialog" aria-modal="true" aria-labelledby="age-gate-title">
     <div class="age-gate-card">
         <div class="age-gate-progress">
@@ -102,81 +93,14 @@
                     <option value="de">DE</option>
                 </select>
                 <button type="button" class="contact-edit-btn" id="btn-edit-contact"></button>
-                <button type="button" class="points-badge" id="btn-cashback-info" aria-haspopup="dialog">
-                    <span id="cashback-chip-label">Cashback</span>
-                    <span id="cashback-chip-balance">—</span>
-                </button>
             </div>
             <select class="filter-select" id="filter-category">
                 <option value="" id="filter-all-option">📂 Toutes les catégories</option>
             </select>
         </nav>
-        <section class="loyalty-section" aria-labelledby="loyalty-title">
-            <div class="loyalty-card">
-                <div class="loyalty-head">
-                    <h3 id="loyalty-title">Loyalty Program</h3>
-                    <span id="loyalty-level-badge" class="loyalty-level-badge">Bronze</span>
-                </div>
-                <div class="loyalty-summary-row">
-                    <div class="loyalty-points-row">
-                        <span>Points</span>
-                        <strong id="loyalty-points">0</strong>
-                    </div>
-                    <button type="button" id="loyalty-toggle" class="loyalty-toggle" aria-expanded="false">Details</button>
-                </div>
-                <div class="loyalty-progress-track" aria-label="Loyalty progress">
-                    <div id="loyalty-progress-fill" class="loyalty-progress-fill" style="width:0%"></div>
-                </div>
-                <div class="loyalty-meta">
-                    <span id="loyalty-progress-label">0% to next level</span>
-                    <span id="loyalty-next-label">0 points to Silver</span>
-                </div>
-                <div id="loyalty-details" class="loyalty-details hidden">
-                    <div id="loyalty-rewards" class="loyalty-rewards"></div>
-                </div>
-            </div>
-        </section>
         <main class="products-wrap">
             <div class="products-grid" id="products-grid"></div>
         </main>
-        <section class="reviews-section" aria-labelledby="reviews-title">
-            <div class="reviews-shell">
-                <div class="reviews-header">
-                    <h2 id="reviews-title">Customer Reviews</h2>
-                    <p class="reviews-subtitle">Trusted feedback from verified buyers</p>
-                </div>
-                <div class="reviews-summary" id="reviews-summary"></div>
-                <div class="reviews-toolbar">
-                    <label class="reviews-control">
-                        <span>Filter</span>
-                        <select id="review-filter" aria-label="Filter reviews by rating">
-                            <option value="all">All ratings</option>
-                            <option value="5">5★ only</option>
-                            <option value="4">4★ only</option>
-                            <option value="3">3★ only</option>
-                            <option value="2">2★ only</option>
-                            <option value="1">1★ only</option>
-                        </select>
-                    </label>
-                    <label class="reviews-control">
-                        <span>Sort</span>
-                        <select id="review-sort" aria-label="Sort reviews">
-                            <option value="recent">Most recent</option>
-                            <option value="high">Highest rating</option>
-                            <option value="low">Lowest rating</option>
-                        </select>
-                    </label>
-                    <div class="reviews-control reviews-control-action">
-                        <span>Share</span>
-                        <button id="reviews-add-btn" class="reviews-add-btn" type="button">Write a review</button>
-                    </div>
-                </div>
-                <div id="reviews-list" class="reviews-list"></div>
-                <div class="reviews-footer">
-                    <button id="reviews-load-more" class="reviews-load-more" type="button">Load more reviews</button>
-                </div>
-            </div>
-        </section>
     </div>
     <!-- #endregion -->
 
@@ -190,43 +114,6 @@
     <!-- #endregion -->
 </div>
 <!-- #endregion -->
-
-<div id="review-modal" class="review-modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="review-modal-title">
-    <div class="review-modal-card" onclick="event.stopPropagation()">
-        <button id="review-modal-close" class="review-modal-close" type="button" aria-label="Close">✕</button>
-        <h3 id="review-modal-title">Write a review</h3>
-        <form id="review-form" class="review-form">
-            <div id="review-order-ref-hint" class="review-order-ref-hint">Checking order reference...</div>
-            <label>
-                Product from this order
-                <select id="review-product" required></select>
-            </label>
-            <label>
-                Name
-                <input id="review-name" type="text" maxlength="60" required>
-            </label>
-            <label>
-                Rating
-                <select id="review-rating" required>
-                    <option value="5">5★</option>
-                    <option value="4">4★</option>
-                    <option value="3">3★</option>
-                    <option value="2">2★</option>
-                    <option value="1">1★</option>
-                </select>
-            </label>
-            <label>
-                Title
-                <input id="review-title-input" type="text" maxlength="90" required>
-            </label>
-            <label>
-                Review
-                <textarea id="review-text" rows="4" maxlength="700" required></textarea>
-            </label>
-            <button class="reviews-add-btn" type="submit">Submit review</button>
-        </form>
-    </div>
-</div>
 
 <!-- #region Product Modal -->
 <div class="modal-overlay" id="product-modal" onclick="closeProductModal(event)">
@@ -258,7 +145,7 @@
 <!-- #endregion -->
 
 <!-- #region Scripts -->
-<script src="app.js?v=20260326-onboarding-contact-gate"></script>
+<script src="app.js?v=20260326-disable-reviews-cashback-loyalty"></script>
 <!-- #endregion -->
 </body>
 </html>
