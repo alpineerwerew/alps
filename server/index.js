@@ -19,6 +19,7 @@ const BOT_TOKEN = process.env.BOT_TOKEN;
 const OWNER_CHAT_ID = process.env.OWNER_CHAT_ID;
 const CATALOG_URL = (process.env.CATALOG_URL || 'https://alpine710.art').replace(/^http:\/\//i, 'https://');
 const PORT = process.env.PORT || 3000;
+const INITDATA_MAX_AGE_SECONDS = Math.max(60, Math.min(24 * 60 * 60, Number(process.env.INITDATA_MAX_AGE_SECONDS) || 1800));
 // `all` (défaut) = bot + web dans le même processus. `web` = catalogue/API seuls. `bot` = Telegram seul (recommandé avec `web` pour uptime).
 const PROCESS_ROLE_RAW = String(process.env.PROCESS_ROLE || 'all').toLowerCase().trim();
 const PROCESS_ROLE = PROCESS_ROLE_RAW === 'web' || PROCESS_ROLE_RAW === 'bot' ? PROCESS_ROLE_RAW : 'all';
@@ -52,6 +53,10 @@ function validateInitData(initData) {
   const secretKey = crypto.createHmac('sha256', 'WebAppData').update(BOT_TOKEN).digest();
   const computedHash = crypto.createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
   if (computedHash !== hash) return null;
+  const authDate = Number(params.get('auth_date'));
+  if (!Number.isFinite(authDate) || authDate <= 0) return null;
+  const nowSec = Math.floor(Date.now() / 1000);
+  if (Math.abs(nowSec - authDate) > INITDATA_MAX_AGE_SECONDS) return null;
   const userStr = params.get('user');
   if (!userStr) return null;
   try {
@@ -73,6 +78,10 @@ function getInitDataUser(initData) {
   const secretKey = crypto.createHmac('sha256', 'WebAppData').update(BOT_TOKEN).digest();
   const computedHash = crypto.createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
   if (computedHash !== hash) return null;
+  const authDate = Number(params.get('auth_date'));
+  if (!Number.isFinite(authDate) || authDate <= 0) return null;
+  const nowSec = Math.floor(Date.now() / 1000);
+  if (Math.abs(nowSec - authDate) > INITDATA_MAX_AGE_SECONDS) return null;
   const userStr = params.get('user');
   if (!userStr) return null;
   try {
@@ -1316,11 +1325,37 @@ try {
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, UPLOAD_DIR),
   filename: (_req, file, cb) => {
-    const ext = (file.originalname && path.extname(file.originalname)) || (file.mimetype && file.mimetype.startsWith('video/') ? '.mp4' : '.jpg');
+    const mime = String(file.mimetype || '').toLowerCase();
+    let ext = '.bin';
+    if (mime === 'image/jpeg' || mime === 'image/jpg') ext = '.jpg';
+    else if (mime === 'image/png') ext = '.png';
+    else if (mime === 'image/webp') ext = '.webp';
+    else if (mime === 'image/gif') ext = '.gif';
+    else if (mime === 'video/mp4') ext = '.mp4';
+    else if (mime === 'video/webm') ext = '.webm';
+    else if (mime === 'video/quicktime') ext = '.mov';
     cb(null, `upload_${Date.now()}_${Math.random().toString(36).slice(2)}${ext}`);
   }
 });
-const uploadMw = multer({ storage, limits: { fileSize: 50 * 1024 * 1024 } }); // 50 MB
+const uploadMw = multer({
+  storage,
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50 MB
+  fileFilter: (_req, file, cb) => {
+    const mime = String(file.mimetype || '').toLowerCase();
+    const allowed = new Set([
+      'image/jpeg',
+      'image/jpg',
+      'image/png',
+      'image/webp',
+      'image/gif',
+      'video/mp4',
+      'video/webm',
+      'video/quicktime'
+    ]);
+    if (!allowed.has(mime)) return cb(new Error('unsupported_file_type'));
+    cb(null, true);
+  }
+});
 
 function createVideoImagePreview(inputPath) {
   return new Promise((resolve, reject) => {
@@ -1358,6 +1393,12 @@ app.use(
   })
 );
 app.use(express.json());
+app.use((err, _req, res, next) => {
+  if (err && err.type === 'entity.parse.failed') {
+    return res.status(400).json({ error: 'invalid_json' });
+  }
+  return next(err);
+});
 
 app.get('/healthz', (_req, res) => {
   res.setHeader('Cache-Control', 'no-store');
@@ -1369,7 +1410,10 @@ app.use('/uploads', express.static(UPLOAD_DIR, {
   maxAge: '30d',
   immutable: true,
   etag: true,
-  lastModified: true
+  lastModified: true,
+  setHeaders: (res) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+  }
 }));
 
 // ---- Upload API (owner only) ----
@@ -1962,6 +2006,15 @@ app.use(catalogHtmlSecurityGate);
 });
 
 app.use(express.static(staticRoot, { index: false }));
+
+// Keep error responses explicit and avoid noisy stack traces for common client errors.
+app.use((err, _req, res, next) => {
+  if (!err) return next();
+  if (err.type === 'entity.parse.failed') return res.status(400).json({ error: 'invalid_json' });
+  if (err.message === 'unsupported_file_type') return res.status(400).json({ error: 'unsupported_file_type' });
+  if (err.code === 'LIMIT_FILE_SIZE') return res.status(413).json({ error: 'file_too_large' });
+  return res.status(500).json({ error: 'internal_error' });
+});
 
 if (TELEGRAM_WEBAPP_ONLY) {
   console.log('🔐 TELEGRAM_WEBAPP_ONLY : catalogue réservé au bot (API signée + filtre HTML). Local sans Telegram : TELEGRAM_WEBAPP_ONLY=0 dans server/.env');
