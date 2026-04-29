@@ -416,6 +416,27 @@ function setChatLang(chatId, lang) {
 }
 
 let broadcastPending = false;
+let broadcastAwaitingHours = false;
+let broadcastDraft = null;
+
+function normalizeAutoDeleteDelayMsFromHours(rawHours) {
+  const hours = Number(rawHours);
+  if (!Number.isFinite(hours) || hours <= 0) return 0;
+  const ms = Math.floor(hours * 60 * 60 * 1000);
+  // Node timers max around 24.8 days
+  return Math.min(ms, 2147483647);
+}
+
+function scheduleDeleteMessage(chatId, messageId, delayMs) {
+  if (!delayMs || delayMs <= 0) return;
+  setTimeout(async () => {
+    try {
+      await bot.deleteMessage(chatId, messageId);
+    } catch (_e) {
+      // Ignore deletion failures (rights/time window/message already gone)
+    }
+  }, delayMs);
+}
 
 // ---- Bot enable/disable (admin control) ----
 const BOT_ENABLED_FILE = path.join(__dirname, 'bot_enabled.json');
@@ -796,9 +817,9 @@ function buildHelpMessage(isOwner, lang) {
   let s = `${L.help_how_to}\n\n${L.help_detail}`;
   if (isOwner) {
     const adminLines = {
-      fr: '/admin — Admin produits\n/broadcast — Message à tous les utilisateurs',
-      en: '/admin — Product admin\n/broadcast — Message all users',
-      de: '/admin — Produkt-Admin\n/broadcast — Nachricht an alle'
+      fr: '/admin — Admin produits\n/broadcast — Message à tous (2 étapes, auto-suppression 0-72h)',
+      en: '/admin — Product admin\n/broadcast — Message all users (2 steps, auto-delete 0-72h)',
+      de: '/admin — Produkt-Admin\n/broadcast — Nachricht an alle (2 Schritte, Auto-Loeschen 0-72h)'
     };
     s += '\n\n——— Admin ———\n';
     s += adminLines[lang] || adminLines.fr;
@@ -929,20 +950,67 @@ bot.on('message', async (msg) => {
     return;
   }
 
-  // Owner: /broadcast — demande le message à diffuser
+  // Owner: /broadcast — étape 1, demander le message à diffuser
   if (isOwner && /^\/broadcast\s*$/i.test(text)) {
     broadcastPending = true;
-    await bot.sendMessage(chatId, '📢 Envoie le message à diffuser à tous les utilisateurs (texte ou photo avec légende).\nAnnule avec /cancel.');
+    broadcastAwaitingHours = false;
+    broadcastDraft = null;
+    await bot.sendMessage(
+      chatId,
+      '📢 Étape 1/2: envoie le message à diffuser à tous les utilisateurs (texte ou photo avec légende).\nAnnule avec /cancel.'
+    );
     return;
   }
   if (isOwner && /^\/cancel\s*$/i.test(text)) {
     broadcastPending = false;
+    broadcastAwaitingHours = false;
+    broadcastDraft = null;
     await bot.sendMessage(chatId, 'Annulé.');
     return;
   }
-  // Owner en mode broadcast : le message (texte ou photo) est envoyé à tous
+  // Owner en mode broadcast : capture le message à diffuser (étape 1/2)
   if (isOwner && broadcastPending) {
     broadcastPending = false;
+    if (msg.photo && msg.photo.length) {
+      broadcastDraft = {
+        type: 'photo',
+        file_id: msg.photo[msg.photo.length - 1].file_id,
+        caption: msg.caption || ''
+      };
+    } else if (msg.text) {
+      broadcastDraft = {
+        type: 'text',
+        text: msg.text
+      };
+    } else {
+      broadcastPending = true;
+      await bot.sendMessage(chatId, 'Format non pris en charge. Envoie du texte ou une photo avec légende.');
+      return;
+    }
+    broadcastAwaitingHours = true;
+    await bot.sendMessage(
+      chatId,
+      '⏱️ Étape 2/2: indique le délai d’auto-suppression en heures (nombre entier de 0 à 72).\nExemples: 0 (pas de suppression), 1, 24, 72.'
+    );
+    return;
+  }
+
+  // Owner en mode broadcast : reçoit les heures puis diffuse
+  if (isOwner && broadcastAwaitingHours) {
+    const hours = Number((text || '').replace(',', '.'));
+    const validInteger = Number.isInteger(hours);
+    if (!validInteger || hours < 0 || hours > 72) {
+      await bot.sendMessage(chatId, 'Valeur invalide. Envoie un nombre entier entre 0 et 72.');
+      return;
+    }
+    const autoDeleteDelayMs = normalizeAutoDeleteDelayMsFromHours(hours);
+    broadcastAwaitingHours = false;
+    const draft = broadcastDraft;
+    broadcastDraft = null;
+    if (!draft) {
+      await bot.sendMessage(chatId, 'Aucun message en attente. Recommence avec /broadcast.');
+      return;
+    }
     const users = loadBotUsers();
     if (!users.length) {
       await bot.sendMessage(chatId, 'Aucun utilisateur enregistré (personne n’a encore fait /start ou commandé).');
@@ -953,19 +1021,26 @@ bot.on('message', async (msg) => {
     for (const u of users) {
       const id = u && typeof u === 'object' ? u.chat_id : u;
       try {
-        if (msg.photo && msg.photo.length) {
-          await bot.sendPhoto(id, msg.photo[msg.photo.length - 1].file_id, { caption: msg.caption || '' });
-        } else if (msg.text) {
-          await bot.sendMessage(id, msg.text);
+        let sentMsg = null;
+        if (draft.type === 'photo' && draft.file_id) {
+          sentMsg = await bot.sendPhoto(id, draft.file_id, { caption: draft.caption || '' });
+        } else if (draft.type === 'text' && draft.text) {
+          sentMsg = await bot.sendMessage(id, draft.text);
         } else {
           continue;
+        }
+        if (autoDeleteDelayMs > 0 && sentMsg?.message_id) {
+          scheduleDeleteMessage(id, sentMsg.message_id, autoDeleteDelayMs);
         }
         sent++;
       } catch (e) {
         failed++;
       }
     }
-    await bot.sendMessage(chatId, `✅ Diffusion terminée : ${sent} envoyé(s), ${failed} échec(s) (${users.length} destinataires).`);
+    const autoDeleteInfo = autoDeleteDelayMs > 0
+      ? ` Auto-suppression prévue dans ${hours}h.`
+      : '';
+    await bot.sendMessage(chatId, `✅ Diffusion terminée : ${sent} envoyé(s), ${failed} échec(s) (${users.length} destinataires).${autoDeleteInfo}`);
     return;
   }
 
