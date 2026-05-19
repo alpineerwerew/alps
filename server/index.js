@@ -1240,6 +1240,25 @@ function sanitizeBadges(input) {
   return out.map((k) => (k === 'promo' ? 'promotion' : k));
 }
 
+function productHasNewBadge(product) {
+  return sanitizeBadges(product?.badges).includes('new');
+}
+
+function compareProductsForCatalog(a, b) {
+  const aNew = productHasNewBadge(a) ? 0 : 1;
+  const bNew = productHasNewBadge(b) ? 0 : 1;
+  if (aNew !== bNew) return aNew - bNew;
+  const sa = Number(a?.sort ?? a?.id ?? 0);
+  const sb = Number(b?.sort ?? b?.id ?? 0);
+  return sa - sb;
+}
+
+function nextSortForNewProduct(products) {
+  if (!products.length) return 0;
+  const sorts = products.map((p) => Number(p.sort ?? p.id ?? 0));
+  return Math.min(...sorts) - 10;
+}
+
 function saveProductsData(data) {
   try {
     fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(data, null, 2), 'utf8');
@@ -1719,11 +1738,7 @@ app.post('/api/admin/bot-toggle', (req, res) => {
 // ---- Products API (public read) ----
 app.get('/api/products', requireTelegramInitForPublicApi, (req, res) => {
   const data = loadProductsData();
-  let products = (data.products || []).slice().sort((a, b) => {
-    const sa = Number(a.sort ?? a.id ?? 0);
-    const sb = Number(b.sort ?? b.id ?? 0);
-    return sa - sb;
-  });
+  let products = (data.products || []).slice().sort(compareProductsForCatalog);
   const base = getPublicCatalogBase(req);
   if (PROXY_MEDIA_URLS && base) {
     products = products.map((p) => rewriteProductMediaForCatalog(p, base));
@@ -1741,7 +1756,9 @@ app.post('/api/products', (req, res) => {
   const data = loadProductsData();
   const products = data.products || [];
   const maxId = products.length ? Math.max(...products.map((p) => Number(p.id) || 0)) : 0;
-  const maxSort = products.length ? Math.max(...products.map((p) => Number(p.sort) || 0)) : 0;
+  const sortValue = product.sort !== undefined && product.sort !== null && !Number.isNaN(Number(product.sort))
+    ? Number(product.sort)
+    : nextSortForNewProduct(products);
   const newProduct = {
     id: maxId + 1,
     name: String(product.name).trim(),
@@ -1751,7 +1768,7 @@ app.post('/api/products', (req, res) => {
     media_type: product.media_type || 'image',
     media: Array.isArray(product.media) ? product.media : [],
     gallery_link: product.gallery_link || null,
-    sort: Number(product.sort) || (maxSort || maxId * 10 || 10),
+    sort: sortValue,
     category_id: Number(product.category_id) || 1,
     unit_type: product.unit_type || 'gram',
     unit_label: product.unit_label ? String(product.unit_label).trim().slice(0, 20) : null,

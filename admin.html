@@ -865,6 +865,15 @@
             return div.innerHTML;
         }
 
+        function compareProductsForAdmin(a, b) {
+            const aBadges = Array.isArray(a.badges) ? a.badges.map((x) => String(x).toLowerCase()) : [];
+            const bBadges = Array.isArray(b.badges) ? b.badges.map((x) => String(x).toLowerCase()) : [];
+            const aNew = aBadges.includes('new') ? 0 : 1;
+            const bNew = bBadges.includes('new') ? 0 : 1;
+            if (aNew !== bNew) return aNew - bNew;
+            return (Number(a.sort ?? a.id ?? 0)) - (Number(b.sort ?? b.id ?? 0));
+        }
+
         function ensureProductSorts() {
             if (!Array.isArray(products)) return;
             let changed = false;
@@ -920,6 +929,7 @@
                 return;
             }
             ensureProductSorts();
+            products.sort(compareProductsForAdmin);
             productsList.innerHTML = `
                 <table>
                     <thead><tr><th>Nom</th><th>Prix</th><th>Ordre</th><th></th></tr></thead>

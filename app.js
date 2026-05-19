@@ -1331,12 +1331,22 @@ function badgeLabel(key) {
     return String(key || '');
 }
 
+function compareProductsForCatalog(a, b) {
+    const aNew = getProductBadges(a).includes('new') ? 0 : 1;
+    const bNew = getProductBadges(b).includes('new') ? 0 : 1;
+    if (aNew !== bNew) return aNew - bNew;
+    const sa = Number(a.sort ?? a.id ?? 0);
+    const sb = Number(b.sort ?? b.id ?? 0);
+    return sa - sb;
+}
+
 function renderProducts() {
     const grid = document.getElementById('products-grid');
     const list = catalogProducts.length ? catalogProducts : PRODUCTS;
     let filtered = selectedCategory !== null
         ? list.filter(p => p.category_id === selectedCategory)
         : [...list];
+    filtered = filtered.slice().sort(compareProductsForCatalog);
 
     if (!filtered.length) {
         grid.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📦</div><p>${t('no_products')}</p></div>`;
