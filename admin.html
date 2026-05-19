@@ -70,6 +70,16 @@
             <select id="p-category"></select>
             <label>Prix (ex: 7:160, 28:600 ou un seul 15)</label>
             <input type="text" id="p-pricing" placeholder="7:160, 28:600">
+            <label>Unité affichée (quantité)</label>
+            <select id="p-unit-type">
+                <option value="gram">Grammes (g)</option>
+                <option value="unit">Unité(s)</option>
+                <option value="custom">Personnalisée…</option>
+            </select>
+            <div id="p-unit-label-wrap" class="hidden" style="margin-top:0.5rem;">
+                <label for="p-unit-label">Libellé personnalisé (ex: ml, pcs, jar)</label>
+                <input type="text" id="p-unit-label" placeholder="ml" maxlength="20">
+            </div>
             <label>Variants (une par ligne ou séparés par des virgules)</label>
             <textarea id="p-variants" placeholder="Lemon up, Untruly OG"></textarea>
             <label>Badges (mise en avant)</label>
@@ -186,6 +196,9 @@
         const pDescription = document.getElementById('p-description');
         const pCategory = document.getElementById('p-category');
         const pPricing = document.getElementById('p-pricing');
+        const pUnitType = document.getElementById('p-unit-type');
+        const pUnitLabel = document.getElementById('p-unit-label');
+        const pUnitLabelWrap = document.getElementById('p-unit-label-wrap');
         const pVariants = document.getElementById('p-variants');
         const pBadgeNew = document.getElementById('p-badge-new');
         const pBadgePromo = document.getElementById('p-badge-promo');
@@ -292,6 +305,41 @@
             } finally {
                 btnBotToggle.disabled = false;
             }
+        }
+
+        function toggleUnitLabelField() {
+            if (!pUnitLabelWrap) return;
+            const show = pUnitType && pUnitType.value === 'custom';
+            pUnitLabelWrap.classList.toggle('hidden', !show);
+        }
+
+        function readUnitFromForm() {
+            const type = pUnitType ? pUnitType.value : 'gram';
+            if (type === 'custom') {
+                const label = (pUnitLabel?.value || '').trim();
+                return { unit_type: 'custom', unit_label: label || 'pc' };
+            }
+            return { unit_type: type, unit_label: null };
+        }
+
+        function fillUnitOnForm(p) {
+            if (!pUnitType) return;
+            const label = p?.unit_label && String(p.unit_label).trim();
+            if (label) {
+                pUnitType.value = 'custom';
+                if (pUnitLabel) pUnitLabel.value = label;
+            } else if (p?.unit_type === 'unit') {
+                pUnitType.value = 'unit';
+                if (pUnitLabel) pUnitLabel.value = '';
+            } else {
+                pUnitType.value = 'gram';
+                if (pUnitLabel) pUnitLabel.value = '';
+            }
+            toggleUnitLabelField();
+        }
+
+        if (pUnitType) {
+            pUnitType.addEventListener('change', toggleUnitLabelField);
         }
 
         function parsePricing(str) {
@@ -916,6 +964,7 @@
             pDescription.value = p.description || '';
             pCategory.value = p.category_id || 1;
             pPricing.value = (p.pricing && p.pricing.length) ? p.pricing.map(x => x.qty + ':' + x.price).join(', ') : '';
+            fillUnitOnForm(p);
             pVariants.value = (p.variants && p.variants.length) ? p.variants.join(', ') : '';
             const badges = Array.isArray(p.badges) ? p.badges.map((b) => String(b).toLowerCase()) : [];
             pBadgeNew.checked = badges.includes('new');
@@ -1015,6 +1064,7 @@
             productForm.classList.remove('hidden');
             fillCategoriesSelect();
             pVariants.value = '';
+            fillUnitOnForm({ unit_type: 'gram' });
             if (pBadgeNew) pBadgeNew.checked = false;
             if (pBadgePromo) pBadgePromo.checked = false;
             pVideoUrl.value = '';
@@ -1066,7 +1116,7 @@
                 media_type: videoUrl ? 'video' : 'image',
                 media: media.length ? media : (imageUrl ? [{ type: 'image', url: imageUrl, alt: productName }] : []),
                 gallery_link: null,
-                unit_type: 'gram',
+                ...readUnitFromForm(),
                 badges
             };
             try {

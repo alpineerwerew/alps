@@ -331,6 +331,16 @@ function saveCartToStorage() {
     } catch (e) {}
 }
 
+function formatUnitDisplay(item) {
+    const label = item?.unit_label && String(item.unit_label).trim();
+    if (label) return label;
+    if (item?.unit_type === 'gram') return 'g';
+    if (item?.unit_type === 'unit') {
+        return currentLang === 'en' ? 'unit(s)' : currentLang === 'de' ? 'Einheit(en)' : 'unité(s)';
+    }
+    return 'g';
+}
+
 function loadCartFromStorage() {
     try {
         const raw = localStorage.getItem(getCartStorageKey());
@@ -339,13 +349,19 @@ function loadCartFromStorage() {
         if (!Array.isArray(parsed)) return;
         cart = parsed
             .filter((item) => item && typeof item === 'object')
-            .map((item) => ({
-                name: String(item.name || ''),
-                unit_type: item.unit_type === 'gram' ? 'gram' : 'unit',
-                qty: Number(item.qty) || 0,
-                price: Number(item.price) || 0,
-                variant: item.variant ? String(item.variant) : null
-            }))
+            .map((item) => {
+                const unitLabel = item.unit_label ? String(item.unit_label).trim().slice(0, 20) : null;
+                let unitType = item.unit_type === 'unit' ? 'unit' : (item.unit_type === 'custom' ? 'custom' : 'gram');
+                if (unitLabel) unitType = 'custom';
+                return {
+                    name: String(item.name || ''),
+                    unit_type: unitType,
+                    unit_label: unitLabel || null,
+                    qty: Number(item.qty) || 0,
+                    price: Number(item.price) || 0,
+                    variant: item.variant ? String(item.variant) : null
+                };
+            })
             .filter((item) => item.name && item.qty > 0 && item.price >= 0);
     } catch (e) {}
 }
@@ -1403,9 +1419,7 @@ function openProduct(id) {
             ).join('')}</div></div>`;
     }
 
-    const unit = p.unit_type === 'gram'
-        ? 'g'
-        : (currentLang === 'en' ? 'unit(s)' : currentLang === 'de' ? 'Einheit(en)' : 'unité(s)');
+    const unit = formatUnitDisplay(p);
     let pricing = '';
     if (p.pricing?.length) {
         pricing = `<div class="selector-section">
@@ -1622,6 +1636,7 @@ function addToCart() {
     cart.push({
         name: currentProduct.name,
         unit_type: currentProduct.unit_type,
+        unit_label: currentProduct.unit_label || null,
         qty: tier.qty,
         price: tier.price,
         variant: v
@@ -1667,7 +1682,7 @@ function renderCart() {
     const totals = computeCartTotals();
     let h = '';
     cart.forEach((item, i) => {
-        const u = item.unit_type === 'gram' ? 'g' : 'unité(s)';
+        const u = formatUnitDisplay(item);
         h += `<div class="cart-item">
             <div class="cart-item-top">
                 <div class="cart-item-name">${escapeHtml(item.name)}</div>
@@ -1726,9 +1741,7 @@ function buildOrderText(totals, orderId) {
     if (orderId) msg += `${t('order_id_label')} : ${orderId}\n`;
     msg += `${t('order_customer_contact')} : ${contactSummary}\n\n`;
     cart.forEach((item, i) => {
-        const u = item.unit_type === 'gram'
-            ? 'g'
-            : (currentLang === 'en' ? 'unit(s)' : currentLang === 'de' ? 'Einheit(en)' : 'unité(s)');
+        const u = formatUnitDisplay(item);
         msg += `${i+1}. ${item.name}`;
         if (item.variant) msg += ` (${item.variant})`;
         msg += `\n   📦 ${item.qty} ${u} — ${item.price} ${CURRENCY}\n\n`;

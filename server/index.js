@@ -1754,6 +1754,7 @@ app.post('/api/products', (req, res) => {
     sort: Number(product.sort) || (maxSort || maxId * 10 || 10),
     category_id: Number(product.category_id) || 1,
     unit_type: product.unit_type || 'gram',
+    unit_label: product.unit_label ? String(product.unit_label).trim().slice(0, 20) : null,
     pricing: Array.isArray(product.pricing) && product.pricing.length
       ? product.pricing.map((x) => ({ qty: Number(x.qty) || 0, price: Number(x.price) || 0 }))
       : [{ qty: 1, price: 0 }],
@@ -1787,6 +1788,9 @@ app.put('/api/products/:id', (req, res) => {
     sort: product.sort !== undefined ? Number(product.sort) || 0 : (products[idx].sort || 0),
     category_id: Number(product.category_id ?? products[idx].category_id) || 1,
     unit_type: (product.unit_type ?? products[idx].unit_type) || 'gram',
+    unit_label: product.unit_label !== undefined
+      ? (product.unit_label ? String(product.unit_label).trim().slice(0, 20) : null)
+      : (products[idx].unit_label || null),
     pricing: Array.isArray(product.pricing) && product.pricing.length
       ? product.pricing.map((x) => ({ qty: Number(x.qty) || 0, price: Number(x.price) || 0 }))
       : (products[idx].pricing || [{ qty: 1, price: 0 }]),
