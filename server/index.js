@@ -1297,10 +1297,47 @@ function getPublicCatalogBase(req) {
   return `${p}://${host}`;
 }
 
+function unwrapProxiedMediaUrl(urlString) {
+  let s = String(urlString || '').trim();
+  if (!s) return s;
+  for (let i = 0; i < 3; i++) {
+    try {
+      const u = new URL(s);
+      const path = u.pathname.replace(/\/+$/, '');
+      if (path !== '/api/media') break;
+      const inner = u.searchParams.get('u');
+      if (!inner) break;
+      const next = decodeURIComponent(inner);
+      if (next === s) break;
+      s = next;
+    } catch {
+      break;
+    }
+  }
+  return s;
+}
+
+function normalizeProductMediaUrlsForClient(product) {
+  const p = { ...product };
+  if (p.image_url) p.image_url = unwrapProxiedMediaUrl(p.image_url);
+  if (p.video_url) p.video_url = unwrapProxiedMediaUrl(p.video_url);
+  if (Array.isArray(p.media)) {
+    p.media = p.media.map((m) => {
+      if (!m || typeof m !== 'object') return m;
+      const out = { ...m };
+      if (out.url) out.url = unwrapProxiedMediaUrl(out.url);
+      if (out.thumbnail) out.thumbnail = unwrapProxiedMediaUrl(out.thumbnail);
+      return out;
+    });
+  }
+  return p;
+}
+
 function rewriteMediaUrlForCatalog(u, basePublic) {
-  if (!u || !canProxyMediaUrl(u)) return u;
+  const direct = unwrapProxiedMediaUrl(u);
+  if (!direct || !canProxyMediaUrl(direct)) return direct || u;
   const b = basePublic.replace(/\/+$/, '');
-  return `${b}/api/media?u=${encodeURIComponent(u)}`;
+  return `${b}/api/media?u=${encodeURIComponent(direct)}`;
 }
 
 function rewriteProductMediaForCatalog(product, basePublic) {
@@ -1739,6 +1776,7 @@ app.post('/api/admin/bot-toggle', (req, res) => {
 app.get('/api/products', requireTelegramInitForPublicApi, (req, res) => {
   const data = loadProductsData();
   let products = (data.products || []).slice().sort(compareProductsForCatalog);
+  products = products.map((p) => normalizeProductMediaUrlsForClient(p));
   const base = getPublicCatalogBase(req);
   if (PROXY_MEDIA_URLS && base) {
     products = products.map((p) => rewriteProductMediaForCatalog(p, base));

@@ -40,9 +40,13 @@ const I18N = {
         btn_checkout: '📩 Commander via Telegram',
         order_header: '🛒 Nouvelle Commande',
         order_total: '💰 Total',
-        choose_variant: '🎨 Choisissez votre variante',
-        choose_qty: '📦 Choisissez votre quantité',
+        choose_variant: 'Choisis ta variante',
+        choose_qty: 'Choisis ta quantité',
         price_from_prefix: 'dès ',
+        filter_all_short: 'Tout',
+        hint_choose_qty: 'Sélectionne une quantité pour continuer',
+        hint_choose_variant: 'Sélectionne au moins une variante',
+        empty_show_all: 'Voir tout le catalogue',
         no_products: 'Aucun produit trouvé',
         open_in_telegram: 'Ouvre depuis Telegram',
         error_catalog_access: 'Impossible d’accéder au catalogue. Ouvre l’application depuis le bot Telegram.',
@@ -120,9 +124,13 @@ Important :
         btn_checkout: '📩 Order via Telegram',
         order_header: '🛒 New Order',
         order_total: '💰 Total',
-        choose_variant: '🎨 Choose your variant',
-        choose_qty: '📦 Choose your quantity',
+        choose_variant: 'Choose your variant',
+        choose_qty: 'Choose your quantity',
         price_from_prefix: 'from ',
+        filter_all_short: 'All',
+        hint_choose_qty: 'Select a quantity to continue',
+        hint_choose_variant: 'Select at least one variant',
+        empty_show_all: 'Show full catalog',
         no_products: 'No products found',
         open_in_telegram: 'Open from Telegram',
         error_catalog_access: 'Cannot load the catalog. Open the app from the Telegram bot.',
@@ -200,9 +208,13 @@ Important:
         btn_checkout: '📩 Über Telegram bestellen',
         order_header: '🛒 Neue Bestellung',
         order_total: '💰 Gesamt',
-        choose_variant: '🎨 Variante wählen',
-        choose_qty: '📦 Menge wählen',
+        choose_variant: 'Variante wählen',
+        choose_qty: 'Menge wählen',
         price_from_prefix: 'ab ',
+        filter_all_short: 'Alle',
+        hint_choose_qty: 'Wähle eine Menge, um fortzufahren',
+        hint_choose_variant: 'Wähle mindestens eine Variante',
+        empty_show_all: 'Gesamten Katalog anzeigen',
         no_products: 'Keine Produkte gefunden',
         open_in_telegram: 'Öffne über Telegram',
         error_catalog_access: 'Katalog nicht erreichbar. Öffne die App über den Telegram-Bot.',
@@ -299,11 +311,24 @@ function setLang(lang) {
         localStorage.setItem('ac_lang', lang);
     } catch (e) {}
     applyTranslations();
+    renderProducts();
 }
 
 function getInitData() {
     const tg = window.Telegram?.WebApp;
     return (tg && tg.initData) ? tg.initData : '';
+}
+
+function hapticLight() {
+    try {
+        window.Telegram?.WebApp?.HapticFeedback?.impactOccurred('light');
+    } catch (e) {}
+}
+
+function hapticSuccess() {
+    try {
+        window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('success');
+    } catch (e) {}
 }
 
 function getTelegramUserIdFromInitData() {
@@ -405,11 +430,7 @@ function applyTranslations() {
         document.documentElement.lang = currentLang;
     }
 
-    // Texte "Toutes les catégories"
-    const filterAll = document.getElementById('filter-all-option');
-    if (filterAll) {
-        filterAll.textContent = t('filter_all');
-    }
+    refreshCategoryChips();
 
     // Titre du panier
     const cartTitle = document.getElementById('cart-title');
@@ -461,6 +482,7 @@ const CATEGORIES = [
 // =============================================
 let catalogProducts = [];
 let catalogCategories = [];
+let catalogLoading = false;
 
 const PRODUCTS = [
     
@@ -1222,11 +1244,14 @@ function init() {
         scheduleCartActivitySync();
         const ageOk = await ensureAgeConfirmed();
         if (!ageOk) return;
+        catalogLoading = true;
+        renderProducts();
         await loadCatalog();
         const appEl = document.getElementById('app');
         if (appEl && appEl.classList.contains('hidden')) return;
         await loadContactUrls();
-        buildFilters();
+        buildCategoryChips();
+        catalogLoading = false;
         applyTranslations();
         renderProducts();
     })();
@@ -1243,38 +1268,124 @@ function showView(viewName) {
     navCatalog?.setAttribute('aria-current', 'page');
 }
 
-function buildFilters() {
-    const sel = document.getElementById('filter-category');
+function buildCategoryChips() {
+    const chipsEl = document.getElementById('category-chips');
+    if (!chipsEl) return;
     const list = catalogCategories.length ? catalogCategories : CATEGORIES;
-    list.forEach(c => {
-        const opt = document.createElement('option');
-        opt.value = c.id;
-        opt.textContent = c.name;
-        sel.appendChild(opt);
-    });
-    sel.addEventListener('change', e => {
-        selectedCategory = e.target.value ? parseInt(e.target.value) : null;
+    chipsEl.innerHTML = [
+        `<button type="button" class="category-chip${selectedCategory === null ? ' active' : ''}" data-cat="" role="tab" aria-selected="${selectedCategory === null}">${escapeHtml(t('filter_all_short'))}</button>`,
+        ...list.map((c) => {
+            const active = selectedCategory === c.id;
+            return `<button type="button" class="category-chip${active ? ' active' : ''}" data-cat="${c.id}" role="tab" aria-selected="${active}">${escapeHtml(c.name)}</button>`;
+        })
+    ].join('');
+    if (chipsEl.dataset.bound === '1') return;
+    chipsEl.dataset.bound = '1';
+    chipsEl.addEventListener('click', (e) => {
+        const chip = e.target.closest('.category-chip');
+        if (!chip) return;
+        hapticLight();
+        selectedCategory = chip.dataset.cat ? parseInt(chip.dataset.cat, 10) : null;
+        chipsEl.querySelectorAll('.category-chip').forEach((el) => {
+            const on = el === chip;
+            el.classList.toggle('active', on);
+            el.setAttribute('aria-selected', on ? 'true' : 'false');
+        });
         renderProducts();
     });
 }
 
-function refreshCategoryFilter() {
-    const sel = document.getElementById('filter-category');
-    if (!sel) return;
-    while (sel.options.length > 1) sel.remove(1);
-    const list = catalogCategories.length ? catalogCategories : CATEGORIES;
-    list.forEach(c => {
-        const opt = document.createElement('option');
-        opt.value = c.id;
-        opt.textContent = c.name;
-        sel.appendChild(opt);
-    });
+function refreshCategoryChips() {
+    const chipsEl = document.getElementById('category-chips');
+    if (!chipsEl || !chipsEl.dataset.bound) return;
+    buildCategoryChips();
+}
+
+function clearCategoryFilter() {
+    selectedCategory = null;
+    refreshCategoryChips();
+    renderProducts();
 }
 
 async function refreshCatalog() {
-    await loadCatalog();
-    refreshCategoryFilter();
+    catalogLoading = true;
     renderProducts();
+    await loadCatalog();
+    refreshCategoryChips();
+    catalogLoading = false;
+    renderProducts();
+}
+
+function renderProductSkeletons() {
+    return Array.from({ length: 6 }, () => `
+        <div class="product-card product-card-skeleton" aria-hidden="true">
+            <div class="skeleton-block skeleton-media"></div>
+            <div class="product-card-body">
+                <div class="skeleton-block skeleton-line mid"></div>
+                <div class="skeleton-block skeleton-line short"></div>
+            </div>
+        </div>`).join('');
+}
+
+function unwrapProxiedMediaUrl(url) {
+    let s = String(url || '').trim();
+    if (!s) return s;
+    for (let i = 0; i < 3; i++) {
+        try {
+            const u = new URL(s);
+            const path = u.pathname.replace(/\/+$/, '');
+            if (path !== '/api/media') break;
+            const inner = u.searchParams.get('u');
+            if (!inner) break;
+            const next = decodeURIComponent(inner);
+            if (next === s) break;
+            s = next;
+        } catch (e) {
+            break;
+        }
+    }
+    return s;
+}
+
+function optimizeCloudinaryImageUrl(url, width = 520) {
+    const raw = unwrapProxiedMediaUrl(url);
+    if (!raw || !/res\.cloudinary\.com/i.test(raw) || !raw.includes('/image/upload/')) return raw;
+    if (/\/upload\/[^/]*(f_auto|q_auto|w_\d)/.test(raw)) return raw;
+    return raw.replace('/image/upload/', `/image/upload/f_auto,q_auto,w_${width}/`);
+}
+
+function catalogImageSrc(url) {
+    return optimizeCloudinaryImageUrl(unwrapProxiedMediaUrl(url));
+}
+
+function catalogVideoSrc(url) {
+    return unwrapProxiedMediaUrl(url);
+}
+
+function handleCatalogMediaError(el) {
+    if (!el) return;
+    const wrap = el.closest('.product-media-wrap');
+    const direct = el.dataset.directUrl || '';
+    const retries = Number(el.dataset.mediaRetries || 0);
+    if (retries === 0 && direct && el.src !== direct) {
+        el.dataset.mediaRetries = '1';
+        el.src = direct;
+        return;
+    }
+    if (wrap && !wrap.querySelector('.product-media-placeholder')) {
+        el.remove();
+        const ph = document.createElement('div');
+        ph.className = 'product-media-placeholder';
+        ph.textContent = '🌿';
+        wrap.appendChild(ph);
+    }
+}
+
+function catalogImgTag(url, alt, extraClass) {
+    const src = catalogImageSrc(url);
+    const direct = escapeHtml(unwrapProxiedMediaUrl(url));
+    const cls = extraClass ? ` class="${extraClass}"` : '';
+    return `<img src="${escapeHtml(src)}" data-direct-url="${direct}"${cls} alt="${escapeHtml(alt || '')}" loading="lazy" decoding="async" onerror="handleCatalogMediaError(this)">`;
 }
 
 function getPrimaryMedia(product) {
@@ -1342,6 +1453,13 @@ function compareProductsForCatalog(a, b) {
 
 function renderProducts() {
     const grid = document.getElementById('products-grid');
+    if (!grid) return;
+
+    if (catalogLoading) {
+        grid.innerHTML = renderProductSkeletons();
+        return;
+    }
+
     const list = catalogProducts.length ? catalogProducts : PRODUCTS;
     let filtered = selectedCategory !== null
         ? list.filter(p => p.category_id === selectedCategory)
@@ -1349,13 +1467,17 @@ function renderProducts() {
     filtered = filtered.slice().sort(compareProductsForCatalog);
 
     if (!filtered.length) {
-        grid.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📦</div><p>${t('no_products')}</p></div>`;
+        const showAllBtn = selectedCategory !== null
+            ? `<button type="button" class="empty-state-btn" onclick="clearCategoryFilter()">${escapeHtml(t('empty_show_all'))}</button>`
+            : '';
+        grid.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📦</div><p>${t('no_products')}</p>${showAllBtn}</div>`;
         return;
     }
 
     grid.innerHTML = filtered.map(p => {
         let media = '';
         const badges = getProductBadges(p).slice(0, 2);
+        const isNew = badges.includes('new');
         const badgeHtml = badges.length
             ? `<div class="product-badge-wrap">${badges.map((b) => {
                 const cls = b === 'new' ? 'product-badge-new' : 'product-badge-promotion';
@@ -1367,15 +1489,15 @@ function renderProducts() {
         const primary = getPrimaryMedia(p);
         if (primary) {
             if (primary.type === 'video') {
-                const thumb = primary.thumbnail ? ` poster="${escapeHtml(primary.thumbnail)}"` : '';
-                media = `<video src="${escapeHtml(primary.url)}"${thumb} playsinline muted preload="none"></video>`;
+                const thumb = primary.thumbnail ? ` poster="${escapeHtml(catalogImageSrc(primary.thumbnail))}"` : '';
+                media = `<video src="${escapeHtml(catalogVideoSrc(primary.url))}"${thumb} playsinline muted preload="none"></video>`;
             } else {
-                media = `<img src="${escapeHtml(primary.url)}" alt="${escapeHtml(primary.alt || p.name)}" loading="lazy">`;
+                media = catalogImgTag(primary.url, primary.alt || p.name);
             }
         } else if (p.media_type === 'video' && p.video_url) {
-            media = `<video src="${escapeHtml(p.video_url)}" playsinline muted preload="none"></video>`;
+            media = `<video src="${escapeHtml(catalogVideoSrc(p.video_url))}" playsinline muted preload="none"></video>`;
         } else if (p.image_url) {
-            media = `<img src="${escapeHtml(p.image_url)}" alt="${escapeHtml(p.name)}" loading="lazy">`;
+            media = catalogImgTag(p.image_url, p.name);
         } else {
             media = '<div class="product-media-placeholder">🌿</div>';
         }
@@ -1383,7 +1505,7 @@ function renderProducts() {
         const fp = p.pricing?.[0];
         const price = fp ? `<span class="price-from">${t('price_from_prefix')}</span>${fp.price} ${CURRENCY}` : '';
         return `
-            <div class="product-card" onclick="openProduct(${p.id})">
+            <div class="product-card${isNew ? ' is-new' : ''}" onclick="openProduct(${p.id})">
                 <div class="product-media-wrap">${badgeHtml}${media}</div>
                 <div class="product-card-body">
                     <div class="product-card-name">${escapeHtml(p.name)}</div>
@@ -1412,9 +1534,9 @@ function openProduct(id) {
     if (Array.isArray(p.media) && p.media.length > 0) {
         media = buildModalCarouselHtml(p);
     } else if (p.media_type === 'video' && p.video_url) {
-        media = `<video src="${escapeHtml(p.video_url)}" class="modal-media" controls playsinline preload="none"></video>`;
+        media = `<video src="${escapeHtml(catalogVideoSrc(p.video_url))}" class="modal-media" controls playsinline preload="none"></video>`;
     } else if (p.image_url) {
-        media = `<img src="${escapeHtml(p.image_url)}" class="modal-media" alt="${escapeHtml(p.name)}">`;
+        media = catalogImgTag(p.image_url, p.name, 'modal-media');
     } else {
         media = '<div class="modal-media-placeholder">🌿</div>';
     }
@@ -1451,8 +1573,10 @@ function openProduct(id) {
             <div class="modal-category-badge">${escapeHtml(cat?.name || '')}</div>
             <div class="modal-description">${escapeHtml(p.description || '')}</div>
             ${gallery}${variants}${pricing}
-            <button class="btn-add-cart" id="btn-add" onclick="addToCart()" disabled>${t('btn_add_cart')}</button>
         </div>`;
+
+    const addBtn = document.getElementById('btn-add');
+    if (addBtn) addBtn.textContent = t('btn_add_cart');
 
     if (Array.isArray(p.media) && p.media.length > 0) {
         initModalCarousel();
@@ -1460,7 +1584,12 @@ function openProduct(id) {
     const modalContent = document.getElementById('modal-content');
     enforceManualPlayOnly(modalContent || undefined);
 
+    const modalScroll = document.getElementById('modal-scroll');
+    if (modalScroll) modalScroll.scrollTop = 0;
+
     document.getElementById('product-modal').classList.add('active');
+    hapticLight();
+    updateBtn();
 }
 
 // =========================
@@ -1471,15 +1600,15 @@ function buildModalCarouselHtml(product) {
     const slides = mediaItems.map((m, index) => {
         const isActive = index === 0 ? ' active' : '';
         if (m.type === 'video') {
-            const thumb = m.thumbnail ? ` poster="${escapeHtml(m.thumbnail)}"` : '';
+            const thumb = m.thumbnail ? ` poster="${escapeHtml(catalogImageSrc(m.thumbnail))}"` : '';
             return `
                 <div class="carousel-slide${isActive}" data-index="${index}">
-                    <video src="${escapeHtml(m.url)}"${thumb} controls playsinline preload="none" class="carousel-video"></video>
+                    <video src="${escapeHtml(catalogVideoSrc(m.url))}"${thumb} controls playsinline preload="none" class="carousel-video"></video>
                 </div>`;
         }
         return `
             <div class="carousel-slide${isActive}" data-index="${index}">
-                <img src="${escapeHtml(m.url)}" alt="${escapeHtml(m.alt || product.name)}" class="carousel-image">
+                ${catalogImgTag(m.url, m.alt || product.name, 'carousel-image')}
             </div>`;
     }).join('');
 
@@ -1491,13 +1620,13 @@ function buildModalCarouselHtml(product) {
     const thumbs = mediaItems.map((m, index) => {
         const isActive = index === 0 ? ' active' : '';
         if (m.type === 'video') {
-            const thumbSrc = m.thumbnail ? String(m.thumbnail) : '';
+            const thumbSrc = m.thumbnail ? catalogImageSrc(m.thumbnail) : '';
             const safeThumbSrc = thumbSrc && !isGifMediaUrl(thumbSrc) ? thumbSrc : '';
             return `
                 <div class="thumbnail${isActive}" data-target-index="${index}">
                     <div class="video-thumbnail">
                         ${safeThumbSrc
-                            ? `<img src="${escapeHtml(safeThumbSrc)}" alt="${escapeHtml(m.alt || product.name)}" loading="lazy">`
+                            ? catalogImgTag(m.thumbnail, m.alt || product.name)
                             : `<div class="video-thumb-fallback" aria-label="${escapeHtml(m.alt || product.name)}"></div>`
                         }
                         <div class="play-icon">▶</div>
@@ -1506,7 +1635,7 @@ function buildModalCarouselHtml(product) {
         }
         return `
             <div class="thumbnail${isActive}" data-target-index="${index}">
-                <img src="${escapeHtml(m.url)}" alt="${escapeHtml(m.alt || product.name)}">
+                ${catalogImgTag(m.url, m.alt || product.name)}
             </div>`;
     }).join('');
 
@@ -1600,7 +1729,19 @@ function closeProductModal(e) {
         document.getElementById('product-modal').classList.remove('active');
 }
 
+function getAddToCartState() {
+    if (!currentProduct) return { ready: false, reason: '' };
+    if (selectedPricingIdx === null) {
+        return { ready: false, reason: t('hint_choose_qty') };
+    }
+    if (currentProduct.variants?.length && (!Array.isArray(selectedVariantIdxs) || !selectedVariantIdxs.length)) {
+        return { ready: false, reason: t('hint_choose_variant') };
+    }
+    return { ready: true, reason: '' };
+}
+
 function pickVariant(i) {
+    hapticLight();
     if (!Array.isArray(selectedVariantIdxs)) selectedVariantIdxs = [];
     const idxPos = selectedVariantIdxs.indexOf(i);
     if (idxPos >= 0) {
@@ -1620,6 +1761,7 @@ function pickVariant(i) {
 }
 
 function pickPricing(i) {
+    hapticLight();
     selectedPricingIdx = i;
     document.querySelectorAll('.pricing-row').forEach((el,j) => el.classList.toggle('selected', j===i));
     updateBtn();
@@ -1627,9 +1769,24 @@ function pickPricing(i) {
 
 function updateBtn() {
     const btn = document.getElementById('btn-add');
-    if (!btn) return;
-    const hv = currentProduct?.variants?.length > 0;
-    btn.disabled = !(selectedPricingIdx !== null && (!hv || (Array.isArray(selectedVariantIdxs) && selectedVariantIdxs.length > 0)));
+    const hint = document.getElementById('modal-sticky-hint');
+    const priceEl = document.getElementById('modal-sticky-price');
+    const state = getAddToCartState();
+    if (btn) btn.disabled = !state.ready;
+    if (hint) {
+        hint.textContent = state.reason;
+        hint.classList.toggle('hidden', state.ready || !state.reason);
+    }
+    if (priceEl) {
+        if (state.ready && selectedPricingIdx !== null && currentProduct?.pricing?.[selectedPricingIdx]) {
+            const tier = currentProduct.pricing[selectedPricingIdx];
+            priceEl.textContent = `${tier.price} ${CURRENCY}`;
+            priceEl.classList.remove('hidden');
+        } else {
+            priceEl.textContent = '';
+            priceEl.classList.add('hidden');
+        }
+    }
 }
 
 function addToCart() {
@@ -1655,6 +1812,7 @@ function addToCart() {
     saveCartToStorage();
     updateCartBadge();
     scheduleCartActivitySync();
+    hapticSuccess();
     closeProductModal();
     showToast(t('toast_added'));
     const fab = document.getElementById('cart-fab');

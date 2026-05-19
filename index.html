@@ -2,7 +2,8 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#050510">
     <title>Alpine Connexion</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -86,17 +87,15 @@
     <!-- #region Vue Catalogue -->
     <div class="view-panel" id="view-catalog">
         <nav class="filter-bar" aria-label="Filtres">
-            <div class="filter-bar-left">
-                <select class="lang-select" id="lang-switch" onchange="setLang(this.value)">
+            <div class="filter-bar-top">
+                <select class="lang-select" id="lang-switch" onchange="setLang(this.value)" aria-label="Langue">
                     <option value="fr">FR</option>
                     <option value="en">EN</option>
                     <option value="de">DE</option>
                 </select>
                 <button type="button" class="contact-edit-btn" id="btn-edit-contact"></button>
             </div>
-            <select class="filter-select" id="filter-category">
-                <option value="" id="filter-all-option">📂 Toutes les catégories</option>
-            </select>
+            <div class="category-chips-scroll" id="category-chips" role="tablist" aria-label="Catégories"></div>
         </nav>
         <main class="products-wrap">
             <div class="products-grid" id="products-grid"></div>
@@ -120,7 +119,16 @@
     <div class="modal-sheet" onclick="event.stopPropagation()">
         <div class="modal-handle"></div>
         <button class="modal-close" onclick="closeProductModal()">✕</button>
-        <div id="modal-content"></div>
+        <div class="modal-scroll" id="modal-scroll">
+            <div id="modal-content"></div>
+        </div>
+        <div class="modal-sticky-bar" id="modal-sticky-bar">
+            <p class="modal-sticky-hint hidden" id="modal-sticky-hint" role="status"></p>
+            <div class="modal-sticky-row">
+                <div class="modal-sticky-price hidden" id="modal-sticky-price" aria-live="polite"></div>
+                <button type="button" class="btn-add-cart btn-add-cart-sticky" id="btn-add" onclick="addToCart()" disabled></button>
+            </div>
+        </div>
     </div>
 </div>
 <!-- #endregion -->
@@ -145,7 +153,7 @@
 <!-- #endregion -->
 
 <!-- #region Scripts -->
-<script src="app.js?v=20260326-disable-reviews-cashback-loyalty"></script>
+<script src="app.js?v=20260519-media-new-badge"></script>
 <!-- #endregion -->
 </body>
 </html>
