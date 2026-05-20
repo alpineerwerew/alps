@@ -90,6 +90,53 @@ Avant un `git pull` sur le VPS, sauvegarde `server/products.json` si tu as modif
 
 ---
 
+## 4 bis — Nginx + Node sur `127.0.0.1:3000` (recommandé, évite le conflit port 80 / certbot)
+
+Si **Node** écoute sur le **port 80** en même temps que **nginx**, `certbot renew` échoue (`bind() to 0.0.0.0:80 failed`). La config saine :
+
+| Service | Rôle |
+|--------|------|
+| **nginx** | Ports **80** et **443**, certificats Let’s Encrypt, `proxy_pass` vers Node |
+| **Node (`alps-web`)** | **HTTP** uniquement sur **`127.0.0.1:3000`** (pas de `NODE_SSL_*`, pas d’écoute sur 80) |
+
+### Étape A — `.env` dans `server/`
+
+```bash
+PORT=3000
+LISTEN_HOST=127.0.0.1
+HTTP_REDIRECT_PORT=0
+CATALOG_URL=https://alpine710.art
+# Ne pas définir NODE_SSL_CERT ni NODE_SSL_KEY
+```
+
+Redémarre ensuite : `pm2 restart alps-web alps-bot`.
+
+### Étape B — Nginx
+
+Modèle prêt à copier : **`server/nginx-alpine710.conf.example`** (HTTP **80** → Node ; **certbot --nginx** ajoute ensuite le **443** / TLS sans que Node occupe le port 80).
+
+```bash
+sudo apt install -y nginx
+sudo cp /opt/alps/server/nginx-alpine710.conf.example /etc/nginx/sites-available/alpine710.art
+sudo ln -sf /etc/nginx/sites-available/alpine710.art /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+Certificat Let’s Encrypt (première fois ou renouvellement géré par nginx) :
+
+```bash
+sudo apt install -y certbot python3-certbot-nginx
+sudo certbot --nginx -d alpine710.art -d www.alpine710.art
+```
+
+Les renouvellements (`certbot renew`) ne nécessitent plus d’arrêter PM2 si Node n’écoute **pas** sur le **80**.
+
+### Étape C — Pare-feu
+
+Tu n’as **pas** besoin d’ouvrir le **3000** vers Internet si Node n’écoute que sur `127.0.0.1`. Garde **22**, **80**, **443**.
+
+---
+
 ## 5. Lancer le bot en continu (pm2)
 
 ### Recommandé : **deux processus** (catalogue toujours joignable)
@@ -111,7 +158,8 @@ Vérifier :
 pm2 status
 pm2 logs alps-web
 pm2 logs alps-bot
-curl -k -sS https://127.0.0.1/healthz   # doit renvoyer {"ok":true,...}
+curl -fsS --max-time 8 http://127.0.0.1:3000/healthz   # Node derrière Nginx (défaut .env.example)
+# Si Node termine le TLS lui-même sur 443 : curl -k -fsS https://127.0.0.1/healthz
 ```
 
 **Watchdog (optionnel mais utile)** : la séparation `alps-web` / `alps-bot` enlève le gros risque « Telegram bloque tout ». Un cron sur `/healthz` reste une **sécurité de secours** si le processus web seul plante (TLS, mémoire, bug rare). Script fourni : `server/health-watch.sh`.
@@ -154,13 +202,13 @@ pm2 logs alps-bot
 ```bash
 ufw allow 22
 ufw allow 80
-ufw allow 3000
+ufw allow 443
 ufw enable
 ```
 
 - **22** : SSH  
-- **3000** : utile seulement si tu proxies l’API derrière Nginx (sinon Node écoute souvent **80/443** directement)  
-- **80** / **443** : HTTP / HTTPS du catalogue + `/api`
+- **80** / **443** : HTTP / HTTPS (en prod avec Nginx devant Node, c’est nginx qui écoute ici ; Node reste sur **127.0.0.1:3000** sans ouvrir le 3000 au firewall)  
+- **3000** : à n’ouvrir **que** si tu n’as pas de reverse-proxy et que le catalogue appelle directement `http://IP:3000` (déconseillé une fois Nginx en place) : `ufw allow 3000`
 
 ---
 
@@ -176,6 +224,9 @@ Dans ton projet (fichier `app.js` à la racine), mets l’URL de ton serveur :
 ---
 
 ## 8. Option simple : site + API sur le même VPS (alpine710.art)
+
+> **Recommandé** : suis d’abord la section **« 4 bis — Nginx + Node sur 127.0.0.1:3000 »** et le fichier **`server/nginx-alpine710.conf.example`** (TLS nginx + tout le trafic proxy vers Node).  
+> L’ancienne variante ci‑dessous (nginx sert les fichiers statiques avec `try_files` et ne proxy que `/api`) fonctionne encore, mais **ne couvre pas** `/uploads` ni toutes les routes Express — le modèle **proxy intégral** dans `nginx-alpine710.conf.example` est préférable.
 
 Tout (catalogue + bot + API) sur un seul serveur, un seul domaine. Pas besoin de Netlify.
 

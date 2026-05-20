@@ -532,16 +532,9 @@ if (IS_BOT) {
 // Image de bienvenue (/start) — URL HTTPS vers ton serveur (ex: https://alpine710.art/uploads/logo.jpg)
 const WELCOME_IMAGE_URL = (process.env.WELCOME_IMAGE_URL || '').trim();
 
-function isCloudinaryMediaUrl(urlString) {
-  const s = String(urlString || '').trim();
-  if (!s) return false;
-  return /res\.cloudinary\.com/i.test(s);
-}
-
 function getWelcomeImageUrl() {
   const url = WELCOME_IMAGE_URL;
-  if (!url || isCloudinaryMediaUrl(url)) return null;
-  return url;
+  return url || null;
 }
 
 const BOT_STRINGS = {
@@ -1258,8 +1251,8 @@ function unwrapProxiedMediaUrl(urlString) {
 function sanitizeCatalogMediaUrl(urlString, basePublic) {
   if (!urlString) return null;
   const unwrapped = unwrapProxiedMediaUrl(urlString);
-  if (!unwrapped || isCloudinaryMediaUrl(unwrapped)) return null;
-  if (unwrapped.startsWith('/uploads/')) {
+  if (!unwrapped) return null;
+  if (unwrapped.startsWith('/') && !unwrapped.startsWith('//')) {
     const base = String(basePublic || CATALOG_URL || '').replace(/\/+$/, '');
     return base ? `${base}${unwrapped}` : unwrapped;
   }
@@ -1354,7 +1347,7 @@ function saveProductsData(data) {
   }
 }
 
-// ---- Media proxy (optional external hosts) — Cloudinary not supported ----
+// ---- Media proxy (optionnel : hôtes listés dans MEDIA_ALLOWED_HOSTS) ----
 const PROXY_MEDIA_URLS = process.env.PROXY_MEDIA_URLS === '1' || process.env.PROXY_MEDIA_URLS === 'true';
 const MEDIA_PROXY_MAX_BYTES = 55 * 1024 * 1024;
 
@@ -1365,7 +1358,6 @@ function getMediaAllowedHosts() {
 
 function canProxyMediaUrl(urlString) {
   if (!urlString || typeof urlString !== 'string') return false;
-  if (isCloudinaryMediaUrl(urlString)) return false;
   try {
     const u = new URL(urlString);
     if (u.protocol !== 'https:') return false;
@@ -1602,7 +1594,7 @@ app.get('/api/media', async (req, res) => {
   } catch {
     return res.status(400).send('Bad request');
   }
-  if (isCloudinaryMediaUrl(target) || !canProxyMediaUrl(target)) {
+  if (!canProxyMediaUrl(target)) {
     return res.status(403).send('Forbidden');
   }
   try {

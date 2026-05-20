@@ -10,7 +10,8 @@
 
 set -euo pipefail
 
-HEALTH_URL="${HEALTH_URL:-https://127.0.0.1/healthz}"
+# Par défaut : Node derrière Nginx sur 127.0.0.1:3000 (HTTP). Si Node termine le TLS lui-même, exporte HEALTH_URL=https://127.0.0.1/healthz
+HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:3000/healthz}"
 MAX_TIME="${MAX_TIME:-8}"
 PM2_APP="${PM2_APP:-alps-web}"
 

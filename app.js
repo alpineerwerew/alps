@@ -1000,15 +1000,11 @@ function renderProductSkeletons() {
         </div>`).join('');
 }
 
-function isCloudinaryMediaUrl(url) {
-    const s = String(url || '').trim();
-    return !!s && /res\.cloudinary\.com/i.test(s);
-}
-
+/** Médias catalogue : chemins relatifs du site → URL absolue (uploads, images statiques, etc.). */
 function resolveMediaUrl(url) {
     const s = String(url || '').trim();
-    if (!s || isCloudinaryMediaUrl(s)) return null;
-    if (s.startsWith('/uploads/')) {
+    if (!s) return null;
+    if (s.startsWith('/') && !s.startsWith('//')) {
         const base = String(POINTS_API_URL || window.location.origin || '').replace(/\/+$/, '');
         return base ? `${base}${s}` : s;
     }
@@ -1032,14 +1028,6 @@ function catalogImgTag(url, alt, extraClass) {
     if (!src) return '<div class="product-media-placeholder">🌿</div>';
     const cls = extraClass ? ` class="${extraClass}"` : '';
     return `<img src="${escapeHtml(src)}"${cls} alt="${escapeHtml(alt || '')}" loading="lazy" decoding="async" onerror="handleCatalogMediaError(this)">`;
-}
-
-function catalogVideoSrc(url) {
-    return resolveMediaUrl(url) || '';
-}
-
-function catalogImageSrc(url) {
-    return resolveMediaUrl(url) || '';
 }
 
 function getPrimaryMedia(product) {
@@ -1143,13 +1131,13 @@ function renderProducts() {
         const primary = getPrimaryMedia(p);
         if (primary) {
             if (primary.type === 'video') {
-                const thumb = primary.thumbnail ? ` poster="${escapeHtml(catalogImageSrc(primary.thumbnail))}"` : '';
-                media = `<video src="${escapeHtml(catalogVideoSrc(primary.url))}"${thumb} playsinline muted preload="none"></video>`;
+                const thumb = primary.thumbnail ? ` poster="${escapeHtml(resolveMediaUrl(primary.thumbnail))}"` : '';
+                media = `<video src="${escapeHtml(resolveMediaUrl(primary.url) || '')}"${thumb} playsinline muted preload="none"></video>`;
             } else {
                 media = catalogImgTag(primary.url, primary.alt || p.name);
             }
         } else if (p.media_type === 'video' && p.video_url) {
-            media = `<video src="${escapeHtml(catalogVideoSrc(p.video_url))}" playsinline muted preload="none"></video>`;
+            media = `<video src="${escapeHtml(resolveMediaUrl(p.video_url) || '')}" playsinline muted preload="none"></video>`;
         } else if (p.image_url) {
             media = catalogImgTag(p.image_url, p.name);
         } else {
@@ -1188,7 +1176,7 @@ function openProduct(id) {
     if (Array.isArray(p.media) && p.media.length > 0) {
         media = buildModalCarouselHtml(p);
     } else if (p.media_type === 'video' && p.video_url) {
-        media = `<video src="${escapeHtml(catalogVideoSrc(p.video_url))}" class="modal-media" controls playsinline preload="none"></video>`;
+        media = `<video src="${escapeHtml(resolveMediaUrl(p.video_url) || '')}" class="modal-media" controls playsinline preload="none"></video>`;
     } else if (p.image_url) {
         media = catalogImgTag(p.image_url, p.name, 'modal-media');
     } else {
@@ -1254,10 +1242,10 @@ function buildModalCarouselHtml(product) {
     const slides = mediaItems.map((m, index) => {
         const isActive = index === 0 ? ' active' : '';
         if (m.type === 'video') {
-            const thumb = m.thumbnail ? ` poster="${escapeHtml(catalogImageSrc(m.thumbnail))}"` : '';
+            const thumb = m.thumbnail ? ` poster="${escapeHtml(resolveMediaUrl(m.thumbnail))}"` : '';
             return `
                 <div class="carousel-slide${isActive}" data-index="${index}">
-                    <video src="${escapeHtml(catalogVideoSrc(m.url))}"${thumb} controls playsinline preload="none" class="carousel-video"></video>
+                    <video src="${escapeHtml(resolveMediaUrl(m.url) || '')}"${thumb} controls playsinline preload="none" class="carousel-video"></video>
                 </div>`;
         }
         return `
@@ -1274,7 +1262,7 @@ function buildModalCarouselHtml(product) {
     const thumbs = mediaItems.map((m, index) => {
         const isActive = index === 0 ? ' active' : '';
         if (m.type === 'video') {
-            const thumbSrc = m.thumbnail ? catalogImageSrc(m.thumbnail) : '';
+            const thumbSrc = m.thumbnail ? resolveMediaUrl(m.thumbnail) : '';
             const safeThumbSrc = thumbSrc && !isGifMediaUrl(thumbSrc) ? thumbSrc : '';
             return `
                 <div class="thumbnail${isActive}" data-target-index="${index}">
