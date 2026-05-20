@@ -529,8 +529,20 @@ if (IS_BOT) {
   console.log('ℹ️ PROCESS_ROLE=web : pas de Telegram sur ce processus — lance aussi `alps-bot` (PROCESS_ROLE=bot).');
 }
 
-// Image de bienvenue (logo Alpine Connexion — tu peux remplacer par ton image dans .env WELCOME_IMAGE_URL)
-const WELCOME_IMAGE_URL = process.env.WELCOME_IMAGE_URL || 'https://res.cloudinary.com/divcybeds/image/upload/v1771239856/Alpine_Connection_Wonka_LETTERING-V01_Logo_2022_o7rhyc.png';
+// Image de bienvenue (/start) — URL HTTPS vers ton serveur (ex: https://alpine710.art/uploads/logo.jpg)
+const WELCOME_IMAGE_URL = (process.env.WELCOME_IMAGE_URL || '').trim();
+
+function isCloudinaryMediaUrl(urlString) {
+  const s = String(urlString || '').trim();
+  if (!s) return false;
+  return /res\.cloudinary\.com/i.test(s);
+}
+
+function getWelcomeImageUrl() {
+  const url = WELCOME_IMAGE_URL;
+  if (!url || isCloudinaryMediaUrl(url)) return null;
+  return url;
+}
 
 const BOT_STRINGS = {
   fr: {
@@ -918,9 +930,14 @@ bot.onText(/\/start(?:\s+(.+))?/, async (msg) => {
   addBotUserFromMsg(msg);
   delete contactState[chatId];
   const caption = getWelcomeCaption();
-  try {
-    await bot.sendPhoto(chatId, WELCOME_IMAGE_URL, { caption, ...LANG_PICK_INLINE });
-  } catch (err) {
+  const welcomeImage = getWelcomeImageUrl();
+  if (welcomeImage) {
+    try {
+      await bot.sendPhoto(chatId, welcomeImage, { caption, ...LANG_PICK_INLINE });
+    } catch (err) {
+      await bot.sendMessage(chatId, caption, LANG_PICK_INLINE);
+    }
+  } else {
     await bot.sendMessage(chatId, caption, LANG_PICK_INLINE);
   }
 });
@@ -1218,10 +1235,80 @@ if (IS_BOT) setInterval(drainOrderQueueOnce, 1500);
 // ---- Products store (products.json) ----
 const PRODUCTS_FILE = path.join(__dirname, 'products.json');
 
+function unwrapProxiedMediaUrl(urlString) {
+  let s = String(urlString || '').trim();
+  if (!s) return s;
+  for (let i = 0; i < 3; i++) {
+    try {
+      const u = new URL(s);
+      const path = u.pathname.replace(/\/+$/, '');
+      if (path !== '/api/media') break;
+      const inner = u.searchParams.get('u');
+      if (!inner) break;
+      const next = decodeURIComponent(inner);
+      if (next === s) break;
+      s = next;
+    } catch {
+      break;
+    }
+  }
+  return s;
+}
+
+function sanitizeCatalogMediaUrl(urlString, basePublic) {
+  if (!urlString) return null;
+  const unwrapped = unwrapProxiedMediaUrl(urlString);
+  if (!unwrapped || isCloudinaryMediaUrl(unwrapped)) return null;
+  if (unwrapped.startsWith('/uploads/')) {
+    const base = String(basePublic || CATALOG_URL || '').replace(/\/+$/, '');
+    return base ? `${base}${unwrapped}` : unwrapped;
+  }
+  return unwrapped;
+}
+
+function normalizeProductMediaUrlsForClient(product, basePublic) {
+  const p = { ...product };
+  if (p.image_url !== undefined) p.image_url = sanitizeCatalogMediaUrl(p.image_url, basePublic);
+  if (p.video_url !== undefined) p.video_url = sanitizeCatalogMediaUrl(p.video_url, basePublic);
+  if (Array.isArray(p.media)) {
+    p.media = p.media
+      .map((m) => {
+        if (!m || typeof m !== 'object') return m;
+        const out = { ...m };
+        if (out.url) out.url = sanitizeCatalogMediaUrl(out.url, basePublic);
+        if (out.thumbnail) out.thumbnail = sanitizeCatalogMediaUrl(out.thumbnail, basePublic);
+        return out;
+      })
+      .filter((m) => m && m.url);
+  }
+  if (!p.image_url && Array.isArray(p.media)) {
+    const img = p.media.find((m) => String(m.type || '').toLowerCase() === 'image' && m.url);
+    if (img) p.image_url = img.url;
+  }
+  if (!p.video_url && Array.isArray(p.media)) {
+    const vid = p.media.find((m) => String(m.type || '').toLowerCase() === 'video' && m.url);
+    if (vid) p.video_url = vid.url;
+  }
+  if (Array.isArray(p.media) && p.media.length) {
+    const hasVideo = p.media.some((m) => String(m.type || '').toLowerCase() === 'video');
+    p.media_type = hasVideo ? 'video' : 'image';
+  }
+  return p;
+}
+
 function loadProductsData() {
   try {
-    const data = fs.readFileSync(PRODUCTS_FILE, 'utf8');
-    return JSON.parse(data);
+    const data = JSON.parse(fs.readFileSync(PRODUCTS_FILE, 'utf8'));
+    const base = String(CATALOG_URL || '').replace(/\/+$/, '');
+    if (!Array.isArray(data.products)) return data;
+    let changed = false;
+    data.products = data.products.map((p) => {
+      const cleaned = normalizeProductMediaUrlsForClient(p, base);
+      if (JSON.stringify(cleaned) !== JSON.stringify(p)) changed = true;
+      return cleaned;
+    });
+    if (changed) saveProductsData(data);
+    return data;
   } catch (e) {
     return { categories: [], products: [] };
   }
@@ -1267,21 +1354,24 @@ function saveProductsData(data) {
   }
 }
 
-// ---- Media proxy (hide CDN origin in catalog) — opt-in: PROXY_MEDIA_URLS=1 ----
+// ---- Media proxy (optional external hosts) — Cloudinary not supported ----
 const PROXY_MEDIA_URLS = process.env.PROXY_MEDIA_URLS === '1' || process.env.PROXY_MEDIA_URLS === 'true';
 const MEDIA_PROXY_MAX_BYTES = 55 * 1024 * 1024;
 
 function getMediaAllowedHosts() {
-  const raw = process.env.MEDIA_ALLOWED_HOSTS || 'res.cloudinary.com';
+  const raw = process.env.MEDIA_ALLOWED_HOSTS || '';
   return raw.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
 }
 
 function canProxyMediaUrl(urlString) {
   if (!urlString || typeof urlString !== 'string') return false;
+  if (isCloudinaryMediaUrl(urlString)) return false;
   try {
     const u = new URL(urlString);
     if (u.protocol !== 'https:') return false;
-    return getMediaAllowedHosts().includes(u.hostname.toLowerCase());
+    const hosts = getMediaAllowedHosts();
+    if (!hosts.length) return false;
+    return hosts.includes(u.hostname.toLowerCase());
   } catch {
     return false;
   }
@@ -1297,57 +1387,23 @@ function getPublicCatalogBase(req) {
   return `${p}://${host}`;
 }
 
-function unwrapProxiedMediaUrl(urlString) {
-  let s = String(urlString || '').trim();
-  if (!s) return s;
-  for (let i = 0; i < 3; i++) {
-    try {
-      const u = new URL(s);
-      const path = u.pathname.replace(/\/+$/, '');
-      if (path !== '/api/media') break;
-      const inner = u.searchParams.get('u');
-      if (!inner) break;
-      const next = decodeURIComponent(inner);
-      if (next === s) break;
-      s = next;
-    } catch {
-      break;
-    }
-  }
-  return s;
-}
-
-function normalizeProductMediaUrlsForClient(product) {
-  const p = { ...product };
-  if (p.image_url) p.image_url = unwrapProxiedMediaUrl(p.image_url);
-  if (p.video_url) p.video_url = unwrapProxiedMediaUrl(p.video_url);
-  if (Array.isArray(p.media)) {
-    p.media = p.media.map((m) => {
-      if (!m || typeof m !== 'object') return m;
-      const out = { ...m };
-      if (out.url) out.url = unwrapProxiedMediaUrl(out.url);
-      if (out.thumbnail) out.thumbnail = unwrapProxiedMediaUrl(out.thumbnail);
-      return out;
-    });
-  }
-  return p;
-}
-
 function rewriteMediaUrlForCatalog(u, basePublic) {
-  const direct = unwrapProxiedMediaUrl(u);
-  if (!direct || !canProxyMediaUrl(direct)) return direct || u;
+  const direct = sanitizeCatalogMediaUrl(u, basePublic);
+  if (!direct || !canProxyMediaUrl(direct)) return direct || null;
   const b = basePublic.replace(/\/+$/, '');
   return `${b}/api/media?u=${encodeURIComponent(direct)}`;
 }
 
 function rewriteProductMediaForCatalog(product, basePublic) {
-  const p = { ...product };
-  if (p.image_url) p.image_url = rewriteMediaUrlForCatalog(p.image_url, basePublic);
-  if (p.video_url) p.video_url = rewriteMediaUrlForCatalog(p.video_url, basePublic);
+  const p = normalizeProductMediaUrlsForClient(product, basePublic);
+  if (!PROXY_MEDIA_URLS) return p;
+  if (p.image_url) p.image_url = rewriteMediaUrlForCatalog(p.image_url, basePublic) || p.image_url;
+  if (p.video_url) p.video_url = rewriteMediaUrlForCatalog(p.video_url, basePublic) || p.video_url;
   if (Array.isArray(p.media)) {
     p.media = p.media.map((m) => {
       if (!m || typeof m !== 'object' || !m.url) return m;
-      return { ...m, url: rewriteMediaUrlForCatalog(m.url, basePublic) };
+      const url = rewriteMediaUrlForCatalog(m.url, basePublic) || m.url;
+      return { ...m, url };
     });
   }
   return p;
@@ -1546,7 +1602,7 @@ app.get('/api/media', async (req, res) => {
   } catch {
     return res.status(400).send('Bad request');
   }
-  if (!canProxyMediaUrl(target)) {
+  if (isCloudinaryMediaUrl(target) || !canProxyMediaUrl(target)) {
     return res.status(403).send('Forbidden');
   }
   try {
@@ -1775,12 +1831,9 @@ app.post('/api/admin/bot-toggle', (req, res) => {
 // ---- Products API (public read) ----
 app.get('/api/products', requireTelegramInitForPublicApi, (req, res) => {
   const data = loadProductsData();
-  let products = (data.products || []).slice().sort(compareProductsForCatalog);
-  products = products.map((p) => normalizeProductMediaUrlsForClient(p));
   const base = getPublicCatalogBase(req);
-  if (PROXY_MEDIA_URLS && base) {
-    products = products.map((p) => rewriteProductMediaForCatalog(p, base));
-  }
+  let products = (data.products || []).slice().sort(compareProductsForCatalog);
+  products = products.map((p) => rewriteProductMediaForCatalog(p, base));
   res.json({ categories: data.categories || [], products });
 });
 

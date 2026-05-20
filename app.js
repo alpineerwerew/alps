@@ -484,334 +484,7 @@ let catalogProducts = [];
 let catalogCategories = [];
 let catalogLoading = false;
 
-const PRODUCTS = [
-    
-    // ============ PRODUIT 1 - Exemple avec IMAGE ============
-        // ===== FLOWER – Strainz Worldwide Jars 7g =====
-    {
-        id: 1,
-        name: "Strainz Worldwide 7G jars ",
-        description: "Top Shelf Exotic Flower – Jars 7g",
-        // Image principale utilisée comme fallback si le carousel n'est pas défini
-        image_url: "/images/lemon-up-1.jpg",
-        video_url: null,
-        media_type: "image",
-        // Nouveau : tableau de médias pour le carousel (images + vidéos)
-        media: [
-            {
-                type: "image",
-                url: "https://res.cloudinary.com/divcybeds/image/upload/v1771229215/IMG_0542_q30mvc.jpg",
-                alt: "Lemon Up - Vue principale"
-            },
-       
-            {
-                type: "image",
-                url: "https://res.cloudinary.com/divcybeds/image/upload/v1771229216/IMG_0537_wd7aji.jpg",
-                alt: "Untruly OG - Vue principale"
-            },
-
-            {
-                type: "video",
-                url: "https://res.cloudinary.com/divcybeds/video/upload/v1771243903/IMG_6071_c6psmh.mp4",
-                alt: "Untruly OG - Combustion"
-            },
-           
-        ],
-        gallery_link: null,
-        category_id: 1,
-        unit_type: "gram",
-        pricing: [
-            { qty: 7, price: 160 },
-            { qty: 28, price: 600 },
-            { qty: 56, price: 1100 }
-        ],
-        variants: ["Lemon up","Untruly OG"]
-    },
-
-    // ===== Strainz Worldwide Bags 3.5g =====
-    {
-        id: 3,
-        name: "Strainz Worldwide 3.5G bags",
-        description: "Top Shelf Exotic Flower – Bags 3.5g",
-        image_url: null,
-        video_url: null,
-        media_type: "image",
-        media: [
-            {
-                type: "image",
-                url: "https://res.cloudinary.com/divcybeds/image/upload/v1771245550/photo_2026-02-16_19-39-00_em4zrk.jpg",
-                alt: "Strainz vu principal"
-            },
-            {
-                type: "video",
-                url: "https://res.cloudinary.com/divcybeds/video/upload/v1771244860/IMG_6537_1_xsoo91.mov",
-                alt: "Permanent Paradise - Vue principale"
-            },
-       
-            {
-                type: "video",
-                url: "https://res.cloudinary.com/divcybeds/video/upload/v1771244837/IMG_6536_1_mqv093.mov",
-                alt: "Crunch Berries - Vue principale"
-            },
-
-            {
-                type: "video",
-                url: "https://res.cloudinary.com/divcybeds/video/upload/v1771244837/IMG_6535_1_aniznq.mov",
-                alt: "PearlZ - Vue principale"
-            },
-
-            {
-                type: "video",
-                url: "https://res.cloudinary.com/divcybeds/video/upload/v1771244838/IMG_6534_1_oxm7j3.mov",
-                alt: "Glacier - Vue principale"
-            },
-        ],
-        gallery_link: null,
-        category_id: 1,
-        unit_type: "gram",
-        pricing: [
-            { qty: 3.5, price: 70 },
-            { qty: 14, price: 240 },
-            { qty: 28, price: 400 },
-            { qty: 56, price: 750 },
-            { qty: 112, price: 1400 }
-        ],
-        variants: [ "Glacier", "PearlZ", "Crunch Berries","Permanent Paradise"]
-    },
-
-    
-
-    // ===== GREENDawg =====
-    {
-        id: 7,
-        name: "RX (RS11 × Gelato X) – Greendawg",
-        description: "Top Shelf Exotic Flower – Bags 3.5g",
-        image_url: null,
-        video_url: null,
-        media_type: "image",
-        media: [
-            {
-                type: "image",
-                url: "https://res.cloudinary.com/divcybeds/image/upload/v1771245991/photo_2026-02-16_19-46-15_iukenz.jpg",
-                alt: "RX (RS11 × Gelato X) - Vue principale"
-            },
-            {
-                type: "video",
-                url: "https://res.cloudinary.com/divcybeds/video/upload/v1771246248/IMG_6645_ry1h5p.mov",
-                alt: "RX (RS11 × Gelato X) - Vue principale"
-            },
-        ],
-        gallery_link: null,
-        category_id: 1,
-        unit_type: "gram",
-        pricing: [
-            { qty: 3.5, price: 90 },
-            { qty: 14, price: 340 },
-            { qty: 28, price: 640 },
-        ],
-        variants: []
-    },
-
-    // ===== LIVE ROSIN =====
-    {
-        id: 8,
-        name: "Live Rosin – Bored Rosin",
-        description: "Live Hash Rosin USA 120-70u 1-3 washes",          
-        image_url: null,
-        video_url: null,
-        media_type: "image",
-        media: [
-            {
-                type: "image",
-                url: "https://res.cloudinary.com/divcybeds/image/upload/v1771231081/A459A9EA-82AB-4B06-98EF-3A0100DA673D_vhtlyk.jpg",
-                alt: "Bored Rosin - Vue principale"
-            },
-        ],
-        gallery_link: null,
-        category_id: 2,
-        unit_type: "gram",
-        pricing: [
-            { qty: 2, price: 180 },
-            { qty: 6, price: 450 },
-            { qty: 14, price: 900 },
-            { qty: 28, price: 1700 }
-        ],
-        variants: ["Candy Fumez", "Black Maple", "Moroccan Peaches", "Strawguava"]
-    },
-
-    // ===== WATER HASH PREMIUM =====
-    {
-        id: 9,
-        name: "Premium Grade WPFF ICE 707",
-        description: "Single Source Premium Water Hash WPFF USA ",
-        image_url: null,
-        video_url: null,
-        media_type: "image",
-        media: [
-            {
-                type: "image",
-                url: "https://res.cloudinary.com/divcybeds/image/upload/v1771246304/photo_2026-02-16_19-48-12_t2q48y.jpg",
-                alt: "Static Hash - Vue principale"
-            },
-        
-        {
-                type: "video",
-                url: "https://res.cloudinary.com/divcybeds/video/upload/v1771246032/IMG_6639_o2q1nb.mp4",
-                alt: "Static Hash - Combustion"
-            },
-        ],
-        gallery_link: null,
-        category_id: 4,
-        unit_type: "gram",
-        pricing: [
-            { qty: 5, price: 200 },
-            { qty: 10, price: 350 },
-            { qty: 20, price: 650 },
-            { qty: 50, price: 1200 },
-            { qty: 100, price: 2200 }
-        ],
-        variants: [
-            "Oreoz Blizzard",
-            "ZOAP",
-            "Moroccan Peaches",
-            "Grape Cream",
-            "Orange Cream",
-            "Ice Cream Cake",
-            "GMO",
-            "Garlic Nightmare"
-        ]
-    },
-
-    // ===== WATER HASH COMMERCIAL =====
-    {
-        id: 10,
-        name: "Water Hash – Commercial  WPFF ICE",
-        description: "Commercial Grade Water Hash",
-        image_url: null,
-        video_url: null,
-        media_type: "image",
-        media: [
-            {
-                type: "image",
-                url: "https://res.cloudinary.com/divcybeds/image/upload/v1771246304/photo_2026-02-16_19-48-12_t2q48y.jpg",
-                alt: "Static Hash - Vue principale"
-            },
-            {
-                type: "video",
-                url: "https://res.cloudinary.com/divcybeds/video/upload/v1771246032/IMG_6639_o2q1nb.mp4",
-                alt: "Static Hash - Combustion"
-            },
-        ],
-        gallery_link: null,
-        category_id: 4,
-        unit_type: "gram",
-        pricing: [
-            { qty: 5, price: 150 },
-            { qty: 10, price: 260 },
-            { qty: 20, price: 450 },
-            { qty: 50, price: 1000 }
-        ],
-        variants: ["Sour Diesel", "White Runtz"]
-    },
-
-    // ===== STATIC HASH =====
-    {
-        id: 11,
-        name: "Static Hash – Single Source Premium",
-        description: "Premium Static Hash",
-        image_url: null,
-        video_url: null,
-        media_type: "image",
-        media: [
-            {
-                type: "image",
-                url: "https://res.cloudinary.com/divcybeds/image/upload/v1771246304/photo_2026-02-16_19-48-12_t2q48y.jpg",
-                alt: "Static Hash - Vue principale"
-            },
-            {
-                type: "video",
-                url: "https://res.cloudinary.com/divcybeds/video/upload/v1771246032/IMG_6639_o2q1nb.mp4",
-                alt: "Static Hash - Combustion"
-            },
-        ],
-        gallery_link: null,
-        category_id: 3,
-        unit_type: "gram",
-        pricing: [
-            { qty: 5, price: 200 },
-            { qty: 10, price: 350 },
-            { qty: 20, price: 650 },
-            { qty: 50, price: 1500 }
-        ],
-        variants: [
-            "Gov. Oasis (Meltalien)",
-            "Mendo Punch (Meltalien)",
-            "Tropicana Cherry (707melts)",
-            "Grape Gas (707melts)"
-        ]
-    },
-
-    // ===== VAPES =====
-    {
-        id: 12,
-        name: "Whole Melt Vape – 100% Official",
-        description: "Lab Tested + QR Code – 20+ Flavors Available",
-        image_url: null,
-        video_url: null,
-        media_type: "image",
-        media: [
-            {
-                type: "image",
-                url: "https://res.cloudinary.com/divcybeds/image/upload/v1771246562/photo_2026-02-16_19-55-49_p0acwv.jpg",
-                alt: "Vapes Visual 1"
-            },
-            {
-                type: "image",
-                url: "https://res.cloudinary.com/divcybeds/image/upload/v1771246562/photo_2026-02-16_19-55-45_z9rluj.jpg",
-                alt: "Vapes Visual 2"
-            },
-            {
-                type: "image",
-                url: "https://res.cloudinary.com/divcybeds/image/upload/v1771246562/photo_2026-02-16_19-55-51_lhfbfb.jpg",
-                alt: "Vapes Visual 3"
-            },
-        ],
-        gallery_link: null,
-        category_id: 5,
-        unit_type: "unit",
-        pricing: [
-            { qty: 1, price: 80 },
-            { qty: 5, price: 350 },
-            { qty: 10, price: 600 },
-            { qty: 25, price: 1375 },
-            { qty: 50, price: 2300 },
-            { qty: 100, price: 3500 },
-            { qty: 200, price: 6800 },
-            { qty: 300, price: 9000 }
-        ],
-        variants: []
-    }
-
-    // 👇 Pour AJOUTER un nouveau produit, ajoutez une VIRGULE ci-dessus et copiez ceci :
-    /*
-    ,
-    {
-        id: 4,                              // Nouveau numéro unique
-        name: "Votre nouveau produit",
-        description: "Description de votre produit",
-        image_url: "https://votreimage.com/photo.jpg",
-        video_url: null,
-        media_type: "image",
-        gallery_link: null,
-        category_id: 1,
-        unit_type: "gram",
-        pricing: [
-            { qty: 1, price: 15 }
-        ],
-        variants: null
-    }
-    */
-];
+const PRODUCTS = [];
 
 // =============================================
 // 🔒 CODE APP — NE PAS MODIFIER
@@ -1327,51 +1000,24 @@ function renderProductSkeletons() {
         </div>`).join('');
 }
 
-function unwrapProxiedMediaUrl(url) {
-    let s = String(url || '').trim();
-    if (!s) return s;
-    for (let i = 0; i < 3; i++) {
-        try {
-            const u = new URL(s);
-            const path = u.pathname.replace(/\/+$/, '');
-            if (path !== '/api/media') break;
-            const inner = u.searchParams.get('u');
-            if (!inner) break;
-            const next = decodeURIComponent(inner);
-            if (next === s) break;
-            s = next;
-        } catch (e) {
-            break;
-        }
+function isCloudinaryMediaUrl(url) {
+    const s = String(url || '').trim();
+    return !!s && /res\.cloudinary\.com/i.test(s);
+}
+
+function resolveMediaUrl(url) {
+    const s = String(url || '').trim();
+    if (!s || isCloudinaryMediaUrl(s)) return null;
+    if (s.startsWith('/uploads/')) {
+        const base = String(POINTS_API_URL || window.location.origin || '').replace(/\/+$/, '');
+        return base ? `${base}${s}` : s;
     }
     return s;
 }
 
-function optimizeCloudinaryImageUrl(url, width = 520) {
-    const raw = unwrapProxiedMediaUrl(url);
-    if (!raw || !/res\.cloudinary\.com/i.test(raw) || !raw.includes('/image/upload/')) return raw;
-    if (/\/upload\/[^/]*(f_auto|q_auto|w_\d)/.test(raw)) return raw;
-    return raw.replace('/image/upload/', `/image/upload/f_auto,q_auto,w_${width}/`);
-}
-
-function catalogImageSrc(url) {
-    return optimizeCloudinaryImageUrl(unwrapProxiedMediaUrl(url));
-}
-
-function catalogVideoSrc(url) {
-    return unwrapProxiedMediaUrl(url);
-}
-
 function handleCatalogMediaError(el) {
     if (!el) return;
-    const wrap = el.closest('.product-media-wrap');
-    const direct = el.dataset.directUrl || '';
-    const retries = Number(el.dataset.mediaRetries || 0);
-    if (retries === 0 && direct && el.src !== direct) {
-        el.dataset.mediaRetries = '1';
-        el.src = direct;
-        return;
-    }
+    const wrap = el.closest('.product-media-wrap') || el.closest('.carousel-slide') || el.closest('.thumbnail');
     if (wrap && !wrap.querySelector('.product-media-placeholder')) {
         el.remove();
         const ph = document.createElement('div');
@@ -1382,10 +1028,18 @@ function handleCatalogMediaError(el) {
 }
 
 function catalogImgTag(url, alt, extraClass) {
-    const src = catalogImageSrc(url);
-    const direct = escapeHtml(unwrapProxiedMediaUrl(url));
+    const src = resolveMediaUrl(url);
+    if (!src) return '<div class="product-media-placeholder">🌿</div>';
     const cls = extraClass ? ` class="${extraClass}"` : '';
-    return `<img src="${escapeHtml(src)}" data-direct-url="${direct}"${cls} alt="${escapeHtml(alt || '')}" loading="lazy" decoding="async" onerror="handleCatalogMediaError(this)">`;
+    return `<img src="${escapeHtml(src)}"${cls} alt="${escapeHtml(alt || '')}" loading="lazy" decoding="async" onerror="handleCatalogMediaError(this)">`;
+}
+
+function catalogVideoSrc(url) {
+    return resolveMediaUrl(url) || '';
+}
+
+function catalogImageSrc(url) {
+    return resolveMediaUrl(url) || '';
 }
 
 function getPrimaryMedia(product) {
