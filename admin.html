@@ -26,8 +26,9 @@
         .hidden { display: none; }
         .import-wrap { margin-top: 1.5rem; }
         .import-wrap textarea { min-height: 120px; font-size: 12px; }
-        .upload-row { margin-top: 0.5rem; display: flex; align-items: center; gap: 0.5rem; }
-        .file-input { width: auto; padding: 0.25rem; }
+        .upload-row { margin-top: 0.5rem; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+        .upload-hint { font-size: 0.8rem; color: #666; margin: 0.2rem 0 0.35rem; }
+        .file-input { width: 100%; max-width: 100%; padding: 0.35rem; }
         .upload-status { font-size: 0.85rem; color: #666; }
         .upload-status.uploading { color: #07c; }
         .upload-status.done { color: #080; }
@@ -93,17 +94,15 @@
                     Promotion
                 </label>
             </div>
-            <label>Image (URL ou envoi)</label>
-            <input type="url" id="p-image_url" placeholder="https://... ou envoie une photo ci-dessous">
-            <div class="upload-row">
-                <input type="file" id="p-upload-image" accept="image/*" class="file-input">
-                <span id="upload-image-status" class="upload-status"></span>
-            </div>
-            <label>Vidéos (URLs, une par ligne) ou envoi</label>
+            <label>Image principale (URL)</label>
+            <input type="url" id="p-image_url" placeholder="https://...">
+            <label>Vidéos (URLs, une par ligne)</label>
             <textarea id="p-video_url" placeholder="https://.../video1.mp4&#10;https://.../video2.mp4"></textarea>
+            <label>Envoyer des fichiers (photos et vidéos)</label>
+            <p class="upload-hint">Sur mobile : utilise ce bouton pour la galerie photo — pas seulement les vidéos.</p>
             <div class="upload-row">
-                <input type="file" id="p-upload-video" accept="video/*" class="file-input" multiple>
-                <span id="upload-video-status" class="upload-status"></span>
+                <input type="file" id="p-upload-media" accept="image/jpeg,image/jpg,image/png,image/webp,image/gif,image/heic,image/heif,video/mp4,video/quicktime,video/webm,video/*" class="file-input" multiple>
+                <span id="upload-media-status" class="upload-status"></span>
             </div>
             <label>Autres médias (un URL par ligne)</label>
             <textarea id="p-media-extra" placeholder="https://... (image ou vidéo)&#10;https://..."></textarea>
@@ -205,10 +204,8 @@
         const pImageUrl = document.getElementById('p-image_url');
         const pMediaExtra = document.getElementById('p-media-extra');
         const pVideoUrl = document.getElementById('p-video_url');
-        const pUploadImage = document.getElementById('p-upload-image');
-        const pUploadVideo = document.getElementById('p-upload-video');
-        const uploadImageStatus = document.getElementById('upload-image-status');
-        const uploadVideoStatus = document.getElementById('upload-video-status');
+        const pUploadMedia = document.getElementById('p-upload-media');
+        const uploadMediaStatus = document.getElementById('upload-media-status');
         const productsList = document.getElementById('products-list');
         const categoriesList = document.getElementById('categories-list');
         const importJson = document.getElementById('import-json');
@@ -387,6 +384,20 @@
 
         function isGifUrl(url) {
             return /\.gif(?:\?|#|$)/i.test(String(url || '').trim());
+        }
+
+        function isImageFile(file) {
+            if (!file) return false;
+            const t = String(file.type || '').toLowerCase();
+            if (t.startsWith('image/')) return true;
+            return /\.(jpe?g|png|gif|webp|heic|heif|bmp)$/i.test(String(file.name || ''));
+        }
+
+        function isVideoFile(file) {
+            if (!file) return false;
+            const t = String(file.type || '').toLowerCase();
+            if (t.startsWith('video/')) return true;
+            return /\.(mp4|mov|webm|m4v|mkv)$/i.test(String(file.name || ''));
         }
 
         async function uploadFile(file, statusEl, setUploadResult) {
@@ -995,8 +1006,7 @@
             if (pMediaExtra) {
                 pMediaExtra.value = extraMedia.map(m => m.url).join('\n');
             }
-            if (uploadImageStatus) uploadImageStatus.textContent = '';
-            if (uploadVideoStatus) uploadVideoStatus.textContent = '';
+            if (uploadMediaStatus) uploadMediaStatus.textContent = '';
             productForm.classList.remove('hidden');
         }
 
@@ -1048,24 +1058,31 @@
             }
         });
 
-        pUploadImage.addEventListener('change', (e) => {
-            const file = e.target.files && e.target.files[0];
-            if (file) uploadFile(file, uploadImageStatus, (d) => { pImageUrl.value = d.url; });
-            e.target.value = '';
-        });
-        pUploadVideo.addEventListener('change', (e) => {
-            const files = e.target.files ? Array.from(e.target.files) : [];
-            if (!files.length) { e.target.value = ''; return; }
-            (async () => {
-                for (const file of files) {
-                    await uploadFile(file, uploadVideoStatus, (d) => {
-                        appendUrlLine(pVideoUrl, d.url);
-                        if (d.url && d.preview_image_url) videoThumbnailByUrl[d.url] = d.preview_image_url;
-                    });
-                }
-            })();
-            e.target.value = '';
-        });
+        if (pUploadMedia) {
+            pUploadMedia.addEventListener('change', (e) => {
+                const files = e.target.files ? Array.from(e.target.files) : [];
+                if (!files.length) { e.target.value = ''; return; }
+                (async () => {
+                    for (const file of files) {
+                        if (isImageFile(file)) {
+                            await uploadFile(file, uploadMediaStatus, (d) => {
+                                if (!String(pImageUrl.value || '').trim()) pImageUrl.value = d.url;
+                                else if (pMediaExtra) appendUrlLine(pMediaExtra, d.url);
+                            });
+                        } else if (isVideoFile(file)) {
+                            await uploadFile(file, uploadMediaStatus, (d) => {
+                                appendUrlLine(pVideoUrl, d.url);
+                                if (d.url && d.preview_image_url) videoThumbnailByUrl[d.url] = d.preview_image_url;
+                            });
+                        } else {
+                            uploadMediaStatus.textContent = 'Type non supporté : ' + (file.name || file.type);
+                            uploadMediaStatus.className = 'upload-status err';
+                        }
+                    }
+                })();
+                e.target.value = '';
+            });
+        }
 
         document.getElementById('btn-add').addEventListener('click', () => {
             editId.value = '';
@@ -1079,8 +1096,7 @@
             if (pBadgePromo) pBadgePromo.checked = false;
             pVideoUrl.value = '';
             if (pMediaExtra) pMediaExtra.value = '';
-            uploadImageStatus.textContent = '';
-            uploadVideoStatus.textContent = '';
+            if (uploadMediaStatus) uploadMediaStatus.textContent = '';
         });
         document.getElementById('btn-cancel').addEventListener('click', () => productForm.classList.add('hidden'));
 
