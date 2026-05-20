@@ -1287,6 +1287,13 @@ body {
     background: #111;
 }
 
+/* Badge NEW en haut à gauche uniquement — pas de triangle vert dans le coin */
+.product-media-wrap::before,
+.product-media-wrap::after {
+    display: none !important;
+    content: none !important;
+}
+
 .product-media-wrap img,
 .product-media-wrap video {
     width: 100%;
