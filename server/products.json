@@ -26,21 +26,10 @@
       "id": 1,
       "name": "Strainz Worldwide 7G jars",
       "description": "Top Shelf Exotic Flower – Jars 7g",
-      "image_url": "https://alpine710.art/api/media?u=https%3A%2F%2Fres.cloudinary.com%2Fdivcybeds%2Fimage%2Fupload%2Fv1771229216%2FIMG_0537_wd7aji.jpg",
+      "image_url": null,
       "video_url": null,
       "media_type": "image",
-      "media": [
-        {
-          "type": "image",
-          "url": "https://alpine710.art/api/media?u=https%3A%2F%2Fres.cloudinary.com%2Fdivcybeds%2Fimage%2Fupload%2Fv1771229216%2FIMG_0537_wd7aji.jpg",
-          "alt": "Strainz Worldwide 7G jars"
-        },
-        {
-          "type": "image",
-          "url": "https://alpine710.art/api/media?u=https%3A%2F%2Fres.cloudinary.com%2Fdivcybeds%2Fimage%2Fupload%2Fv1771229215%2FIMG_0542_q30mvc.jpg",
-          "alt": ""
-        }
-      ],
+      "media": [],
       "gallery_link": null,
       "sort": 30,
       "category_id": 1,
@@ -68,16 +57,10 @@
       "id": 3,
       "name": "Strainz Worldwide 3.5G bags",
       "description": "Top Shelf Exotic Flower – Bags 3.5g",
-      "image_url": "https://res.cloudinary.com/divcybeds/image/upload/v1771245550/photo_2026-02-16_19-39-00_em4zrk.jpg",
+      "image_url": null,
       "video_url": null,
       "media_type": "image",
-      "media": [
-        {
-          "type": "image",
-          "url": "https://res.cloudinary.com/divcybeds/image/upload/v1771245550/photo_2026-02-16_19-39-00_em4zrk.jpg",
-          "alt": "Strainz Worldwide 3.5G bags"
-        }
-      ],
+      "media": [],
       "gallery_link": null,
       "sort": 30,
       "category_id": 1,
@@ -114,26 +97,10 @@
       "id": 8,
       "name": "Live Rosin – Bored Rosin",
       "description": "",
-      "image_url": "https://alpine710.art/api/media?u=https%3A%2F%2Fres.cloudinary.com%2Fdivcybeds%2Fimage%2Fupload%2Fv1771229224%2FIMG_1189_2_enzbko.jpg",
+      "image_url": null,
       "video_url": null,
-      "media_type": "image",
-      "media": [
-        {
-          "type": "image",
-          "url": "https://alpine710.art/api/media?u=https%3A%2F%2Fres.cloudinary.com%2Fdivcybeds%2Fimage%2Fupload%2Fv1771229224%2FIMG_1189_2_enzbko.jpg",
-          "alt": "Live Rosin – Bored Rosin"
-        },
-        {
-          "type": "video",
-          "url": "https://alpine710.art/api/media?u=https%3A%2F%2Fres.cloudinary.com%2Fdivcybeds%2Fvideo%2Fupload%2Fv1773283162%2FIMG_7847_cwhblo.mp4",
-          "alt": ""
-        },
-        {
-          "type": "video",
-          "url": "https://alpine710.art/api/media?u=https%3A%2F%2Fres.cloudinary.com%2Fdivcybeds%2Fvideo%2Fupload%2Fv1773283162%2FIMG_7849_t2scrf.mp4",
-          "alt": ""
-        }
-      ],
+      "media_type": "video",
+      "media": [],
       "gallery_link": null,
       "sort": 30,
       "category_id": 2,
@@ -173,26 +140,10 @@
       "id": 9,
       "name": "ICE WPFF 🇺🇸",
       "description": "Single Source \nFrom @707Melts\nMade in USA",
-      "image_url": "https://alpine710.art/api/media?u=https%3A%2F%2Fres.cloudinary.com%2Fdivcybeds%2Fimage%2Fupload%2Fv1773283790%2Fphoto_2026-03-12_09-48-30_w6hnwj.jpg",
-      "video_url": "https://alpine710.art/api/media?u=https%3A%2F%2Fres.cloudinary.com%2Fdivcybeds%2Fvideo%2Fupload%2Fv1773283739%2FIMG_7776_j14mjb.mp4",
+      "image_url": null,
+      "video_url": null,
       "media_type": "video",
-      "media": [
-        {
-          "type": "image",
-          "url": "https://alpine710.art/api/media?u=https%3A%2F%2Fres.cloudinary.com%2Fdivcybeds%2Fimage%2Fupload%2Fv1773283790%2Fphoto_2026-03-12_09-48-30_w6hnwj.jpg",
-          "alt": "ICE WPFF 🇺🇸"
-        },
-        {
-          "type": "video",
-          "url": "https://alpine710.art/api/media?u=https%3A%2F%2Fres.cloudinary.com%2Fdivcybeds%2Fvideo%2Fupload%2Fv1773283739%2FIMG_7776_j14mjb.mp4",
-          "alt": ""
-        },
-        {
-          "type": "video",
-          "url": "https://alpine710.art/api/media?u=https%3A%2F%2Fres.cloudinary.com%2Fdivcybeds%2Fvideo%2Fupload%2Fv1773283693%2FIMG_7309_j4e2hh.mp4",
-          "alt": ""
-        }
-      ],
+      "media": [],
       "gallery_link": null,
       "sort": 20,
       "category_id": 4,
@@ -239,16 +190,10 @@
       "id": 12,
       "name": "Whole Melt Vape – 100% Official",
       "description": "Lab Tested + QR Code \n100% Officiel",
-      "image_url": "https://res.cloudinary.com/divcybeds/image/upload/v1773283160/wholemelt2_ojntoi.jpg",
+      "image_url": null,
       "video_url": null,
       "media_type": "image",
-      "media": [
-        {
-          "type": "image",
-          "url": "https://res.cloudinary.com/divcybeds/image/upload/v1773283160/wholemelt2_ojntoi.jpg",
-          "alt": "Whole Melt Vape – 100% Official"
-        }
-      ],
+      "media": [],
       "gallery_link": null,
       "sort": 20,
       "category_id": 5,
@@ -277,21 +222,10 @@
       "id": 13,
       "name": "Tenco - Yellow Zushi 🍣",
       "description": "Fresh batch - 100% Official",
-      "image_url": "https://alpine710.art/api/media?u=https%3A%2F%2Fres.cloudinary.com%2Fdivcybeds%2Fimage%2Fupload%2Fv1773705833%2FIMG_1457_sfbzs1.jpg",
+      "image_url": null,
       "video_url": null,
       "media_type": "image",
-      "media": [
-        {
-          "type": "image",
-          "url": "https://alpine710.art/api/media?u=https%3A%2F%2Fres.cloudinary.com%2Fdivcybeds%2Fimage%2Fupload%2Fv1773705833%2FIMG_1457_sfbzs1.jpg",
-          "alt": "Tenco - Yellow Zushi 🍣"
-        },
-        {
-          "type": "image",
-          "url": "https://alpine710.art/api/media?u=https%3A%2F%2Fres.cloudinary.com%2Fdivcybeds%2Fimage%2Fupload%2Fv1773705830%2FIMG_1447_hnrvf2.jpg",
-          "alt": ""
-        }
-      ],
+      "media": [],
       "gallery_link": null,
       "sort": 10,
       "category_id": 1,
@@ -321,16 +255,10 @@
       "id": 14,
       "name": "Wizard trees - Blue Magic  🧙‍♂️",
       "description": "Fresh Batch 20/03",
-      "image_url": "https://alpine710.art/api/media?u=https%3A%2F%2Fres.cloudinary.com%2Fdivcybeds%2Fimage%2Fupload%2Fv1773715374%2Fphoto_2026-03-17_09-42-33_bth9zh.jpg",
+      "image_url": null,
       "video_url": null,
       "media_type": "image",
-      "media": [
-        {
-          "type": "image",
-          "url": "https://alpine710.art/api/media?u=https%3A%2F%2Fres.cloudinary.com%2Fdivcybeds%2Fimage%2Fupload%2Fv1773715374%2Fphoto_2026-03-17_09-42-33_bth9zh.jpg",
-          "alt": "Wizard trees - Blue Magic  🧙‍♂️"
-        }
-      ],
+      "media": [],
       "gallery_link": null,
       "sort": 10,
       "category_id": 1,
@@ -360,21 +288,10 @@
       "id": 15,
       "name": "StaticLabz WPFF STATIC",
       "description": "Powered by @TheKarmaCartel\nMade by @Staticlabz.ca",
-      "image_url": "https://alpine710.art/api/media?u=https%3A%2F%2Fres.cloudinary.com%2Fdivcybeds%2Fimage%2Fupload%2Fv1774365677%2Fphoto_2026-03-24_22-20-36_qjg3j7.jpg",
-      "video_url": "https://alpine710.art/api/media?u=https%3A%2F%2Fres.cloudinary.com%2Fdivcybeds%2Fvideo%2Fupload%2Fv1774365678%2FIMG_8185_ejgt9p.mp4",
+      "image_url": null,
+      "video_url": null,
       "media_type": "video",
-      "media": [
-        {
-          "type": "image",
-          "url": "https://alpine710.art/api/media?u=https%3A%2F%2Fres.cloudinary.com%2Fdivcybeds%2Fimage%2Fupload%2Fv1774365677%2Fphoto_2026-03-24_22-20-36_qjg3j7.jpg",
-          "alt": "StaticLabz WPFF STATIC"
-        },
-        {
-          "type": "video",
-          "url": "https://alpine710.art/api/media?u=https%3A%2F%2Fres.cloudinary.com%2Fdivcybeds%2Fvideo%2Fupload%2Fv1774365678%2FIMG_8185_ejgt9p.mp4",
-          "alt": ""
-        }
-      ],
+      "media": [],
       "gallery_link": null,
       "sort": 30,
       "category_id": 3,
@@ -411,15 +328,9 @@
       "name": "Static USA",
       "description": "Made by @707Melts\nFrom USA",
       "image_url": null,
-      "video_url": "https://res.cloudinary.com/divcybeds/video/upload/v1774429978/IMG_1112_y0cm9v_2_orwqgu.mp4",
+      "video_url": null,
       "media_type": "video",
-      "media": [
-        {
-          "type": "video",
-          "url": "https://res.cloudinary.com/divcybeds/video/upload/v1774429978/IMG_1112_y0cm9v_2_orwqgu.mp4",
-          "alt": ""
-        }
-      ],
+      "media": [],
       "gallery_link": null,
       "sort": 30,
       "category_id": 3,
