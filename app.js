@@ -112,7 +112,17 @@ Important :
         contact_input_error_method: 'Choisis d’abord Signal ou Threema.',
         order_id_label: '🧾 Référence',
         order_customer_contact: '📞 Contact client',
-        order_contact_missing: 'non fourni'
+        order_contact_missing: 'non fourni',
+        checkout_sending: 'Envoi en cours…',
+        cart_checkout_prep_title: 'Après avoir validé',
+        order_success_title: 'Commande bien reçue',
+        order_success_ref: 'Référence : {ref}',
+        order_success_step1: 'Ouvre le chat du bot Telegram (bouton ci-dessous).',
+        order_success_step2: 'Choisis Signal ou Threema si le bot te le demande.',
+        order_success_step3: 'Envoie ton identifiant pour confirmer la commande.',
+        order_success_bot_note: 'Un message de confirmation t’a aussi été envoyé dans Telegram.',
+        order_success_btn: 'Ouvrir le chat Telegram',
+        order_success_close: 'Rester sur le catalogue'
     },
     en: {
         filter_all: '📂 All categories',
@@ -196,7 +206,17 @@ Important:
         contact_input_error_method: 'Please choose Signal or Threema first.',
         order_id_label: '🧾 Order ID',
         order_customer_contact: '📞 Customer contact',
-        order_contact_missing: 'not provided'
+        order_contact_missing: 'not provided',
+        checkout_sending: 'Sending…',
+        cart_checkout_prep_title: 'After you confirm',
+        order_success_title: 'Order received',
+        order_success_ref: 'Reference: {ref}',
+        order_success_step1: 'Open the Telegram bot chat (button below).',
+        order_success_step2: 'Choose Signal or Threema if the bot asks.',
+        order_success_step3: 'Send your contact ID to finalize the order.',
+        order_success_bot_note: 'A confirmation message was also sent in Telegram.',
+        order_success_btn: 'Open Telegram chat',
+        order_success_close: 'Stay on catalog'
     },
     de: {
         filter_all: '📂 Alle Kategorien',
@@ -280,7 +300,17 @@ Wichtig:
         contact_input_error_method: 'Bitte zuerst Signal oder Threema waehlen.',
         order_id_label: '🧾 Bestell-ID',
         order_customer_contact: '📞 Kundenkontakt',
-        order_contact_missing: 'nicht angegeben'
+        order_contact_missing: 'nicht angegeben',
+        checkout_sending: 'Wird gesendet…',
+        cart_checkout_prep_title: 'Nach der Bestaetigung',
+        order_success_title: 'Bestellung erhalten',
+        order_success_ref: 'Referenz: {ref}',
+        order_success_step1: 'Oeffne den Telegram-Bot-Chat (Button unten).',
+        order_success_step2: 'Waehle Signal oder Threema, falls der Bot fragt.',
+        order_success_step3: 'Sende deine Kennung zur Bestaetigung.',
+        order_success_bot_note: 'Eine Bestaetigung wurde dir auch in Telegram gesendet.',
+        order_success_btn: 'Telegram-Chat oeffnen',
+        order_success_close: 'Im Katalog bleiben'
     }
 };
 
@@ -461,6 +491,15 @@ function applyTranslations() {
         refreshOnboardingTexts(stored?.contactMethod || 'signal');
         setOnboardingStepUi(currentOnboardingStep || 1);
     }
+
+    const osTitle = document.getElementById('order-success-title');
+    if (osTitle) osTitle.textContent = t('order_success_title');
+    const osNote = document.getElementById('order-success-note');
+    if (osNote) osNote.textContent = t('order_success_bot_note');
+    const osBtn = document.getElementById('order-success-btn');
+    if (osBtn) osBtn.textContent = t('order_success_btn');
+    const osClose = document.getElementById('order-success-close');
+    if (osClose) osClose.textContent = t('order_success_close');
 }
 
 function getTelegramDestination() {
@@ -490,6 +529,7 @@ const PRODUCTS = [];
 // 🔒 CODE APP — NE PAS MODIFIER
 // =============================================
 let cart = [];
+let checkoutInFlight = false;
 let selectedPricingIdx = null;
 let selectedVariantIdxs = [];
 let currentProduct = null;
@@ -931,6 +971,8 @@ function init() {
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') refreshCatalog();
     });
+    document.getElementById('order-success-btn')?.addEventListener('click', () => closeOrderSuccess(true));
+    document.getElementById('order-success-close')?.addEventListener('click', () => closeOrderSuccess(false));
 }
 
 function showView(viewName) {
@@ -1506,15 +1548,20 @@ function renderCart() {
 
     h += `<div class="cart-footer">
         <div class="cart-total-row">
-            <span class="cart-total-label">${t('total_label')}</span>
+            <span class="cart-total-label">${t('cashback_subtotal_label')}</span>
             <span class="cart-total-amount cart-total-amount-small">${totals.subtotal.toFixed(2)} ${CURRENCY}</span>
         </div>
-        <div class="cart-total-row">
-            <span class="cart-total-label">${t('total_label')}</span>
+        <div class="cart-total-row cart-total-row-due">
+            <span class="cart-total-label">${t('cashback_payable_label')}</span>
             <span class="cart-total-amount">${totals.payableRounded.toFixed(0)} ${CURRENCY}</span>
         </div>
         <div class="checkout-hint">${t('rounded_total_note')}</div>
-        <button type="button" class="btn-checkout" onclick="checkout()">${t('cart_btn_submit')}</button>
+        <div class="cart-checkout-prep">
+            <div class="cart-checkout-prep-title">${t('cart_checkout_prep_title')}</div>
+            <p class="cart-checkout-prep-text">${escapeHtml(t('cart_bot_followup'))}</p>
+        </div>
+        <div class="checkout-error hidden" id="checkout-error" role="alert"></div>
+        <button type="button" class="btn-checkout" id="btn-checkout-submit" onclick="checkout()">${t('cart_btn_submit')}</button>
         <button type="button" class="btn-clear-cart" onclick="clearSavedCart()">${t('cart_btn_clear_saved')}</button>
     `;
     h += `</div>`;
@@ -1560,48 +1607,124 @@ function buildOrderText(totals, orderId) {
     return msg;
 }
 
+function setCheckoutBusy(busy) {
+    checkoutInFlight = !!busy;
+    const btn = document.getElementById('btn-checkout-submit');
+    if (!btn) return;
+    btn.disabled = busy;
+    btn.classList.toggle('is-loading', busy);
+    btn.textContent = busy ? t('checkout_sending') : t('cart_btn_submit');
+}
+
+function hideCheckoutError() {
+    const el = document.getElementById('checkout-error');
+    if (!el) return;
+    el.textContent = '';
+    el.classList.add('hidden');
+}
+
+function showCheckoutError(message) {
+    const el = document.getElementById('checkout-error');
+    if (!el) {
+        showToast(message);
+        return;
+    }
+    el.textContent = message;
+    el.classList.remove('hidden');
+    try {
+        window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('error');
+    } catch (e) {}
+}
+
+function showOrderSuccess(orderRef) {
+    const ref = String(orderRef || '').trim() || '—';
+    const overlay = document.getElementById('order-success-overlay');
+    const refEl = document.getElementById('order-success-ref');
+    const stepsEl = document.getElementById('order-success-steps');
+    if (refEl) refEl.textContent = t('order_success_ref').replace('{ref}', ref);
+    if (stepsEl) {
+        stepsEl.innerHTML = [
+            t('order_success_step1'),
+            t('order_success_step2'),
+            t('order_success_step3')
+        ].map((s) => `<li>${escapeHtml(s)}</li>`).join('');
+    }
+    applyTranslations();
+    if (overlay) {
+        overlay.hidden = false;
+        overlay.classList.add('active');
+    }
+    document.getElementById('cart-overlay')?.classList.remove('active');
+    hapticSuccess();
+}
+
+function closeOrderSuccess(goToTelegram) {
+    const overlay = document.getElementById('order-success-overlay');
+    if (overlay) {
+        overlay.classList.remove('active');
+        overlay.hidden = true;
+    }
+    if (goToTelegram && window.Telegram?.WebApp) {
+        window.Telegram.WebApp.close();
+    }
+}
+
 async function checkout() {
-    if (!cart.length) return;
+    if (!cart.length || checkoutInFlight) return;
+    hideCheckoutError();
     if (!isOnboardingComplete()) {
         const ok = await showAgeGate(false);
         if (!ok || !isOnboardingComplete()) return;
     }
-    await syncContactProfileToServer();
-    const totals = computeCartTotals();
-    const orderId = generateOrderId();
-    const orderText = buildOrderText(totals, orderId);
+    setCheckoutBusy(true);
+    try {
+        await syncContactProfileToServer();
+        const totals = computeCartTotals();
+        const orderId = generateOrderId();
+        const orderText = buildOrderText(totals, orderId);
 
-    if (POINTS_API_URL && getInitData()) {
-        try {
-            const res = await fetch(`${POINTS_API_URL}/api/order`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    initData: getInitData(),
-                    orderText,
-                    order_id: orderId,
-                    customer_contact: getCustomerContactSummary()
-                })
-            });
-            const data = await res.json().catch(() => ({}));
-            if (res.ok && data.ok) {
-                cart = [];
-                saveCartToStorage();
-                updateCartBadge();
-                scheduleCartActivitySync();
-                closeCart();
-                showToast(t('order_sent'));
-                if (window.Telegram?.WebApp) window.Telegram.WebApp.close();
-                return;
+        if (POINTS_API_URL && getInitData()) {
+            try {
+                const res = await fetch(`${POINTS_API_URL}/api/order`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        initData: getInitData(),
+                        orderText,
+                        order_id: orderId,
+                        customer_contact: getCustomerContactSummary()
+                    })
+                });
+                const data = await res.json().catch(() => ({}));
+                if (res.ok && data.ok) {
+                    const ref = data.order_ref || orderId;
+                    cart = [];
+                    saveCartToStorage();
+                    updateCartBadge();
+                    scheduleCartActivitySync();
+                    showOrderSuccess(ref);
+                    return;
+                }
+                if (getInitData()) {
+                    showCheckoutError(t('order_send_failed'));
+                    return;
+                }
+            } catch (e) {
+                if (getInitData()) {
+                    showCheckoutError(t('order_send_failed'));
+                    return;
+                }
             }
-        } catch (e) {}
-    }
+        }
 
-    if (getInitData()) {
-        showToast(t('order_send_failed'));
-        return;
+        if (getInitData()) {
+            showCheckoutError(t('order_send_failed'));
+            return;
+        }
+        showCheckoutError(t('cart_need_telegram'));
+    } finally {
+        setCheckoutBusy(false);
     }
-    showToast(t('cart_need_telegram'));
 }
 
 function showToast(text) {

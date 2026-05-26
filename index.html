@@ -70,6 +70,20 @@
 <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
 <!-- #endregion -->
 
+<!-- #region Order success -->
+<div class="order-success-overlay" id="order-success-overlay" role="dialog" aria-modal="true" aria-labelledby="order-success-title" hidden>
+    <div class="order-success-card">
+        <div class="order-success-icon" aria-hidden="true">✓</div>
+        <h2 class="order-success-title" id="order-success-title">Commande bien reçue</h2>
+        <p class="order-success-ref" id="order-success-ref"></p>
+        <ol class="order-success-steps" id="order-success-steps"></ol>
+        <p class="order-success-note" id="order-success-note"></p>
+        <button type="button" class="btn-order-success-primary" id="order-success-btn">Ouvrir le chat Telegram</button>
+        <button type="button" class="btn-order-success-secondary" id="order-success-close">Rester sur le catalogue</button>
+    </div>
+</div>
+<!-- #endregion -->
+
 <!-- #region App -->
 <div id="app">
     <!-- #region Header / Banner — Logo centré style hero (comme ref ) -->
@@ -149,7 +163,7 @@
 <!-- #endregion -->
 
 <!-- #region Scripts -->
-<script src="app.js?v=20260520-media-cleanup"></script>
+<script src="app.js?v=20260520-checkout-ux"></script>
 <!-- #endregion -->
 </body>
 </html>
