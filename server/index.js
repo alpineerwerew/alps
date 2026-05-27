@@ -547,15 +547,12 @@ const BOT_STRINGS = {
     help_btn: 'AIDE',
     catalog_prompt: 'Clique pour ouvrir le catalogue :',
     catalog_btn: '🌿 Ouvrir le catalogue',
-    order_received: '✅ Commande bien reçue !\n\nPour te recontacter et confirmer, choisis le canal sur lequel tu veux qu’on t’écrive :',
+    order_received: '✅ Commande bien reçue !\n\nNous te recontacterons sur ton contact enregistré (Signal ou Threema) pour confirmer.',
     order_sla_line: '⏱ En général, nous te répondons sous {hours} h.',
-    order_btn_signal: 'Signal',
-    order_btn_threema: 'Threema',
     order_question_btn: '❓ Question sur ma commande',
     order_question_prompt:
       'Pour une question liée à ta commande, envoie un message ici en t’inspirant de ce modèle :\n\n• Date / heure (approx.)\n• Ton @pseudo ou prénom\n• Ta question\n\nOn te répond dès que possible.',
-    order_ask_contact_id: 'Envoie maintenant ton identifiant {channel} (numéro, pseudo ou ID Threema) pour qu’on puisse te joindre.',
-    order_contact_saved: 'Merci ! Nous te contacterons sur {channel} pour confirmer ta commande.',
+    order_contact_line: '📞 Contact enregistré : {channel} — {value}',
     need_lang: 'Choisis d’abord ta langue avec /start.',
     contact_thanks: 'Merci, nous te recontacterons sur {channel} avec ces coordonnées.',
     menu_contact_reply: 'Pour nous contacter, envoie un message ici. Nous te répondrons au plus vite !',
@@ -593,15 +590,12 @@ Pour plus d'informations, contactez-nous !
     help_btn: 'HELP',
     catalog_prompt: 'Tap below to open the catalog:',
     catalog_btn: '🌿 Open catalog',
-    order_received: '✅ Order received!\n\nChoose how you want us to contact you to confirm:',
+    order_received: '✅ Order received!\n\nWe’ll reach you on your saved contact (Signal or Threema) to confirm.',
     order_sla_line: '⏱ We usually reply within {hours} h.',
-    order_btn_signal: 'Signal',
-    order_btn_threema: 'Threema',
     order_question_btn: '❓ Question about my order',
     order_question_prompt:
       'For a question about your order, send a message here using this template:\n\n• Date / time (approx.)\n• Your @username or first name\n• Your question\n\nWe’ll get back to you as soon as we can.',
-    order_ask_contact_id: 'Send your {channel} identifier now (number, username, or Threema ID) so we can reach you.',
-    order_contact_saved: 'Thanks! We’ll contact you on {channel} to confirm your order.',
+    order_contact_line: '📞 Saved contact: {channel} — {value}',
     need_lang: 'Please choose your language first with /start.',
     contact_thanks: 'Thanks, we will reach you on {channel} with these details.',
     menu_contact_reply: 'Message us here — we’ll reply as soon as we can!',
@@ -639,15 +633,12 @@ For more information, contact us!
     help_btn: 'HILFE',
     catalog_prompt: 'Tippe unten, um den Katalog zu öffnen:',
     catalog_btn: '🌿 Katalog öffnen',
-    order_received: '✅ Bestellung erhalten!\n\nWähle, wie wir dich zur Bestätigung erreichen sollen:',
+    order_received: '✅ Bestellung erhalten!\n\nWir melden uns über deinen gespeicherten Kontakt (Signal oder Threema) zur Bestätigung.',
     order_sla_line: '⏱ Wir antworten in der Regel innerhalb von {hours} Std.',
-    order_btn_signal: 'Signal',
-    order_btn_threema: 'Threema',
     order_question_btn: '❓ Frage zu meiner Bestellung',
     order_question_prompt:
       'Bei einer Frage zu deiner Bestellung schreib uns hier, z. B. nach dieser Vorlage:\n\n• Datum / Uhrzeit (ca.)\n• Dein @Name oder Vorname\n• Deine Frage\n\nWir melden uns sobald wie möglich.',
-    order_ask_contact_id: 'Sende jetzt deinen {channel}-Identifikator (Nummer, Nutzername oder Threema-ID).',
-    order_contact_saved: 'Danke! Wir melden uns bei dir über {channel}, um die Bestellung zu bestätigen.',
+    order_contact_line: '📞 Gespeicherter Kontakt: {channel} — {value}',
     need_lang: 'Bitte wähle zuerst deine Sprache mit /start.',
     contact_thanks: 'Danke, wir melden uns bei dir über {channel} mit diesen Angaben.',
     menu_contact_reply: 'Schreib uns hier — wir antworten schnellstmöglich!',
@@ -695,13 +686,35 @@ function getWelcomeCaption() {
   return c;
 }
 
-function getOrderReceivedText(lang) {
+function formatStoredContactLine(userId, lang) {
+  const row = loadContacts().users[String(userId)];
+  if (!row?.contact_method || !row?.contact_value) return '';
+  const channel = row.contact_method === 'signal' ? 'Signal' : row.contact_method === 'threema' ? 'Threema' : '';
+  if (!channel) return '';
   const L = BOT_STRINGS[lang] || BOT_STRINGS.fr;
-  const base = L.order_received;
+  return (L.order_contact_line || '')
+    .replace(/\{channel\}/g, channel)
+    .replace(/\{value\}/g, String(row.contact_value));
+}
+
+function getOrderReceivedText(lang, userId) {
+  const L = BOT_STRINGS[lang] || BOT_STRINGS.fr;
+  let base = L.order_received;
+  const contactLine = userId ? formatStoredContactLine(userId, lang) : '';
+  if (contactLine) base = `${base}\n\n${contactLine}`;
   const h = Number(process.env.ORDER_RESPONSE_SLA_HOURS);
   if (!Number.isFinite(h) || h <= 0) return base;
   const line = (L.order_sla_line || '').replace(/\{hours\}/g, String(Math.floor(h)));
   return line ? `${base}\n\n${line}` : base;
+}
+
+function getOrderReceivedReplyMarkup(lang) {
+  const L = BOT_STRINGS[lang] || BOT_STRINGS.fr;
+  return {
+    reply_markup: {
+      inline_keyboard: [[{ text: L.order_question_btn, callback_data: 'order_question_help' }]]
+    }
+  };
 }
 
 function getThankYouFollowupLine(lang) {
@@ -841,14 +854,10 @@ function buildHelpMessage(isOwner, lang) {
   return s;
 }
 
-// Suite commande : attente identifiant Signal / Threema
-const contactState = {};
-
 async function deliverQueuedWebOrder(user, orderText) {
   if (!bot) return;
   const userId = user.id;
   lastOrderByChat[userId] = orderText;
-  delete contactState[userId];
   const fromLabel = user.username ? `@${user.username}` : [user.first_name, user.last_name].filter(Boolean).join(' ') || `ID ${userId}`;
   if (OWNER_CHAT_ID) {
     try {
@@ -858,9 +867,8 @@ async function deliverQueuedWebOrder(user, orderText) {
     }
   }
   const langOrd = getChatLang(userId) || 'fr';
-  const L = BOT_STRINGS[langOrd];
   try {
-    await bot.sendMessage(userId, getOrderReceivedText(langOrd));
+    await bot.sendMessage(userId, getOrderReceivedText(langOrd, userId), getOrderReceivedReplyMarkup(langOrd));
   } catch (err) {
     console.error('❌ Error sending confirmation to user:', err.message);
   }
@@ -921,7 +929,6 @@ bot.onText(/\/start(?:\s+(.+))?/, async (msg) => {
   const isOwner = String(chatId) === String(OWNER_CHAT_ID);
   if (!isBotEnabled() && !isOwner) return;
   addBotUserFromMsg(msg);
-  delete contactState[chatId];
   const caption = getWelcomeCaption();
   const welcomeImage = getWelcomeImageUrl();
   if (welcomeImage) {
@@ -943,31 +950,6 @@ bot.on('message', async (msg) => {
   const userName = msg.from?.username ? `@${msg.from.username}` : [msg.from?.first_name, msg.from?.last_name].filter(Boolean).join(' ') || (userId ? `ID ${userId}` : 'Client');
   const isOwner = String(chatId) === String(OWNER_CHAT_ID);
   if (!isBotEnabled() && !isOwner) return;
-
-  // Identifiant Signal / Threema après une commande (Web App ou message)
-  if (contactState[chatId]?.type === 'order' && contactState[chatId]?.awaitingContactId && text && !text.startsWith('/')) {
-    const st = contactState[chatId];
-    delete contactState[chatId];
-    const Lc = strLang(chatId);
-    const langOrd = getChatLang(chatId) || 'fr';
-    await bot.sendMessage(chatId, Lc.order_contact_saved.replace('{channel}', st.channel));
-    const ty = getThankYouFollowupLine(langOrd);
-    if (ty) await bot.sendMessage(chatId, ty).catch(() => {});
-    const orderSnap = lastOrderByChat[chatId] || '';
-    if (OWNER_CHAT_ID) {
-      const lines = [];
-      lines.push('📇 Identifiant de contact (commande)');
-      lines.push('');
-      lines.push(`👤 Client : ${userName}`);
-      lines.push(`📲 Canal : ${st.channel}`);
-      lines.push(`📩 Identifiant : ${text}`);
-      lines.push('');
-      lines.push('──────────');
-      lines.push(orderSnap);
-      bot.sendMessage(OWNER_CHAT_ID, lines.join('\n')).catch(() => {});
-    }
-    return;
-  }
 
   // Owner: /broadcast — étape 1, demander le message à diffuser
   if (isOwner && /^\/broadcast\s*$/i.test(text)) {
@@ -1112,7 +1094,6 @@ bot.on('message', async (msg) => {
 
   if (looksLikeOrder(text)) {
     lastOrderByChat[chatId] = text;
-    delete contactState[chatId];
 
     const fromLabel = msg.chat.username ? `@${msg.chat.username}` : [msg.chat.first_name, msg.chat.last_name].filter(Boolean).join(' ') || `ID ${chatId}`;
     if (OWNER_CHAT_ID) {
@@ -1124,9 +1105,8 @@ bot.on('message', async (msg) => {
     }
     addBotUserFromMsg(msg);
     const langOrd = getChatLang(chatId) || 'fr';
-    const L = BOT_STRINGS[langOrd];
     try {
-      await bot.sendMessage(chatId, getOrderReceivedText(langOrd));
+      await bot.sendMessage(chatId, getOrderReceivedText(langOrd, userId || chatId), getOrderReceivedReplyMarkup(langOrd));
     } catch (err) {
       console.error('❌ Error sending confirmation:', err.message);
     }
@@ -1172,19 +1152,6 @@ bot.on('callback_query', async (query) => {
     const lang = getChatLang(chatId) || 'fr';
     const L = BOT_STRINGS[lang] || BOT_STRINGS.fr;
     await bot.sendMessage(chatId, L.order_question_prompt);
-    return;
-  }
-
-  if (data === 'order_contact_signal' || data === 'order_contact_threema') {
-    try {
-      await bot.answerCallbackQuery(query.id);
-    } catch (e) {}
-    if (!chatId) return;
-    const channel = data === 'order_contact_signal' ? 'Signal' : 'Threema';
-    contactState[chatId] = { type: 'order', awaitingContactId: true, channel };
-    const lang = getChatLang(chatId) || 'fr';
-    const L = BOT_STRINGS[lang];
-    await bot.sendMessage(chatId, L.order_ask_contact_id.replace('{channel}', channel));
     return;
   }
 
@@ -2020,11 +1987,9 @@ app.post('/api/order', (req, res) => {
   }
 
   lastOrderByChat[userId] = orderText;
-  delete contactState[userId];
 
   const langOrd = getChatLang(userId) || 'fr';
-  const L = BOT_STRINGS[langOrd];
-  bot.sendMessage(userId, getOrderReceivedText(langOrd)).catch((err) => {
+  bot.sendMessage(userId, getOrderReceivedText(langOrd, userId), getOrderReceivedReplyMarkup(langOrd)).catch((err) => {
     console.error('❌ Error sending confirmation to user:', err.message);
   });
 
