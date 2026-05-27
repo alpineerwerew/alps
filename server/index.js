@@ -532,7 +532,9 @@ if (IS_BOT) {
   bot = new TelegramBot(BOT_TOKEN, { polling: true });
 
   const DEFAULT_COMMANDS = [
-    { command: 'start', description: 'Ouvrir le menu' }
+    { command: 'start', description: 'Accueil & catalogue' },
+    { command: 'catalog', description: 'Ouvrir la boutique' },
+    { command: 'help', description: 'Comment commander' }
   ];
 
   const OWNER_COMMANDS = [
@@ -568,14 +570,20 @@ function getWelcomeImageUrl() {
 
 const BOT_STRINGS = {
   fr: {
-    choose_lang:
-      '👋 Bienvenue !\n\n1️⃣ Choisis ta langue ci-dessous\n2️⃣ Appuie sur MENU\n3️⃣ Ouvre le catalogue\n\n🇫🇷 Français · 🇬🇧 English · 🇩🇪 Deutsch',
-    after_lang:
-      '✅ Parfait ! Appuie sur MENU → puis sur « Ouvrir le catalogue ».\n\n💡 AIDE = comment commander en 3 étapes.',
+    choose_lang: '👋 Bienvenue sur Alpine Connexion\n\nChoisis ta langue pour accéder au catalogue :',
+    after_lang: '✅ C’est parti !',
     menu_btn: 'MENU',
     help_btn: 'AIDE',
-    catalog_prompt: 'Clique pour ouvrir le catalogue :',
-    catalog_btn: '🌿 Ouvrir le catalogue',
+    menu_catalog_btn: '🌿 Catalogue',
+    menu_help_btn: '❓ Aide',
+    menu_keyboard_hint: 'Raccourcis toujours disponibles en bas 👇',
+    menu_hub_title: '🌿 Alpine Connexion',
+    menu_hub_products: '📦 {count} produits en ligne',
+    menu_hub_sub: 'Photos, vidéos et commande en quelques taps — ouvre la boutique :',
+    menu_infos_btn: 'ℹ️ Infos',
+    menu_contact_btn: '💬 Nous écrire',
+    catalog_prompt: 'Ta boutique t’attend :',
+    catalog_btn: '🛍 Ouvrir la boutique',
     order_received: '✅ Commande bien reçue !\n\nNous te recontacterons sur ton contact enregistré (Signal ou Threema) pour confirmer.',
     order_sla_line: '⏱ En général, nous te répondons sous {hours} h.',
     order_question_btn: '❓ Question sur ma commande',
@@ -586,39 +594,30 @@ const BOT_STRINGS = {
     contact_thanks: 'Merci, nous te recontacterons sur {channel} avec ces coordonnées.',
     menu_contact_reply: 'Pour nous contacter, envoie un message ici. Nous te répondrons au plus vite !',
     menu_infos_reply:
-      'Alpine Connexion — Catalogue et commande via Telegram.\n\nAjoute des produits au panier, valide : ta commande est envoyée automatiquement.',
+      '📍 Meetup Valais (pièce d’identité obligatoire)\n📦 Envoi en Suisse\n💶 Cash (CHF) · ₿ BTC\n\nCommande : boutique → panier → envoyer au bot.',
     help_how_to:
-      '📖 Commander en 3 étapes :\n1) MENU → ouvrir le catalogue\n2) Ajouter au panier dans la boutique\n3) Envoyer la commande au bot (bouton dans le panier)',
+      '📖 Commander en 3 étapes\n\n1️⃣ Ouvre la boutique (bouton ci-dessous)\n2️⃣ Ajoute au panier dans l’app\n3️⃣ Valide — ta commande part ici automatiquement',
     cart_reminder:
-      'Coucou 👋 ton panier t’attend encore. Quand tu veux, ouvre le catalogue et envoie ta commande au bot — sans pression.',
-    cart_reminder_cta: 'Une question ? Écris-nous ici, on te répond vite.',
-    cart_reminder_question_btn: '❓ Poser une question',
-    help_detail: `🌱 Bienvenue sur notre bot !
-
-Découvrez nos produits ainsi que toutes nos vidéos en cliquant ci-dessous ⬇️
-@Alpine710_bot
-
-📍 Meetup Valais et alentours
-Vérification obligatoire pour les meetup ! 🪪
-
-📦 Expédition en Suisse  📤🌏
-
-✅ Paiement en espèces 💶 (CHF)
-✅ Paiement crypto
-
-
-Pour plus d'informations, contactez-nous !
-@Alpine710`
+      '👋 Ton panier t’attend dans la boutique — il suffit d’un tap pour finir ta commande.',
+    cart_reminder_cta: 'On est là si tu as une question.',
+    cart_reminder_question_btn: '💬 Question',
+    help_detail: '📍 Meetup Valais · 📦 Shipping CH\n💶 Cash · ₿ BTC'
   },
   en: {
-    choose_lang:
-      '👋 Welcome!\n\n1️⃣ Pick your language below\n2️⃣ Tap MENU\n3️⃣ Open the catalog\n\n🇫🇷 Français · 🇬🇧 English · 🇩🇪 Deutsch',
-    after_lang:
-      '✅ Great! Tap MENU → then « Open catalog ».\n\n💡 HELP = how to order in 3 steps.',
+    choose_lang: '👋 Welcome to Alpine Connexion\n\nPick your language to open the shop:',
+    after_lang: '✅ You’re all set!',
     menu_btn: 'MENU',
     help_btn: 'HELP',
-    catalog_prompt: 'Tap below to open the catalog:',
-    catalog_btn: '🌿 Open catalog',
+    menu_catalog_btn: '🌿 Shop',
+    menu_help_btn: '❓ Help',
+    menu_keyboard_hint: 'Shortcuts stay at the bottom 👇',
+    menu_hub_title: '🌿 Alpine Connexion',
+    menu_hub_products: '📦 {count} products live',
+    menu_hub_sub: 'Photos, videos & checkout in a few taps — open the shop:',
+    menu_infos_btn: 'ℹ️ Info',
+    menu_contact_btn: '💬 Message us',
+    catalog_prompt: 'Your shop is ready:',
+    catalog_btn: '🛍 Open shop',
     order_received: '✅ Order received!\n\nWe’ll reach you on your saved contact (Signal or Threema) to confirm.',
     order_sla_line: '⏱ We usually reply within {hours} h.',
     order_question_btn: '❓ Question about my order',
@@ -629,39 +628,30 @@ Pour plus d'informations, contactez-nous !
     contact_thanks: 'Thanks, we will reach you on {channel} with these details.',
     menu_contact_reply: 'Message us here — we’ll reply as soon as we can!',
     menu_infos_reply:
-      'Alpine Connexion — catalog and orders via Telegram.\n\nAdd items to your cart, confirm: your order is sent to the bot automatically.',
+      '📍 Meetup Wallis (Ausweis Pflicht)\n📦 Versand CH\n💶 Bar · ₿ BTC\n\nBestellen: Shop → Warenkorb → an Bot senden.',
     help_how_to:
-      '📖 Order in 3 steps:\n1) MENU → open catalog\n2) Add to cart in the shop\n3) Send the order to the bot (button in the cart)',
+      '📖 Bestellen in 3 Schritten\n\n1️⃣ Shop öffnen (Button unten)\n2️⃣ In den Warenkorb legen\n3️⃣ Bestätigen — Bestellung geht automatisch an den Bot',
     cart_reminder:
-      'Hi 👋 your cart is still waiting. Whenever you’re ready, open the catalog and send your order to the bot — no rush.',
-    cart_reminder_cta: 'Questions? Message us here, we reply quickly.',
-    cart_reminder_question_btn: '❓ Ask a question',
-    help_detail: `🌱 Welcome to our bot!
-
-Find our products and all our videos by clicking below ⬇️
-@alpine710
-
-📍 Meet up in Wallis
-Verification required for meet ups! 🪪
-
-📦 Shipping to Switzerland  📤🌏
-
-✅ Cash payment 💶 (CHF)
-✅ Crypto payment 📱
-
-
-For more information, contact us!
-@Alpine710`
+      '👋 Dein Warenkorb wartet im Shop — ein Tap zum Abschluss.',
+    cart_reminder_cta: 'Fragen? Schreib uns.',
+    cart_reminder_question_btn: '💬 Frage',
+    help_detail: '📍 Meetup Wallis · 📦 Versand CH\n💶 Bar · ₿ BTC'
   },
   de: {
-    choose_lang:
-      '👋 Willkommen!\n\n1️⃣ Wähle unten deine Sprache\n2️⃣ Tippe auf MENU\n3️⃣ Öffne den Katalog\n\n🇫🇷 Français · 🇬🇧 English · 🇩🇪 Deutsch',
-    after_lang:
-      '✅ Super! MENU → dann « Katalog öffnen ».\n\n💡 HILFE = Bestellen in 3 Schritten.',
+    choose_lang: '👋 Willkommen bei Alpine Connexion\n\nWähle deine Sprache für den Katalog:',
+    after_lang: '✅ Los geht’s!',
     menu_btn: 'MENU',
     help_btn: 'HILFE',
-    catalog_prompt: 'Tippe unten, um den Katalog zu öffnen:',
-    catalog_btn: '🌿 Katalog öffnen',
+    menu_catalog_btn: '🌿 Katalog',
+    menu_help_btn: '❓ Hilfe',
+    menu_keyboard_hint: 'Shortcuts unten immer da 👇',
+    menu_hub_title: '🌿 Alpine Connexion',
+    menu_hub_products: '📦 {count} Produkte online',
+    menu_hub_sub: 'Fotos, Videos & Bestellung in wenigen Taps — Shop öffnen:',
+    menu_infos_btn: 'ℹ️ Infos',
+    menu_contact_btn: '💬 Schreib uns',
+    catalog_prompt: 'Dein Shop wartet:',
+    catalog_btn: '🛍 Shop öffnen',
     order_received: '✅ Bestellung erhalten!\n\nWir melden uns über deinen gespeicherten Kontakt (Signal oder Threema) zur Bestätigung.',
     order_sla_line: '⏱ Wir antworten in der Regel innerhalb von {hours} Std.',
     order_question_btn: '❓ Frage zu meiner Bestellung',
@@ -672,29 +662,14 @@ For more information, contact us!
     contact_thanks: 'Danke, wir melden uns bei dir über {channel} mit diesen Angaben.',
     menu_contact_reply: 'Schreib uns hier — wir antworten schnellstmöglich!',
     menu_infos_reply:
-      'Alpine Connexion — Katalog und Bestellung per Telegram.\n\nProdukte in den Warenkorb, bestätigen: die Bestellung geht automatisch an den Bot.',
+      '📍 Meetup Wallis (Ausweis Pflicht)\n📦 Versand CH\n💶 Bar · ₿ BTC\n\nBestellen: Shop → Warenkorb → an Bot senden.',
     help_how_to:
-      '📖 Bestellen in 3 Schritten:\n1) MENU → Katalog öffnen\n2) Im Shop in den Warenkorb legen\n3) Bestellung an den Bot senden (Button im Warenkorb)',
+      '📖 Bestellen in 3 Schritten\n\n1️⃣ Shop öffnen (Button unten)\n2️⃣ In den Warenkorb legen\n3️⃣ Bestätigen — Bestellung geht automatisch an den Bot',
     cart_reminder:
-      'Hey 👋 dein Warenkorb wartet noch. Wenn du soweit bist: Katalog öffnen und Bestellung an den Bot senden — ganz ohne Druck.',
-    cart_reminder_cta: 'Fragen? Schreib uns hier, wir melden uns schnell.',
-    cart_reminder_question_btn: '❓ Frage stellen',
-    help_detail: `🌱 Willkommen bei unserem Bot!
-
-Entdecke unsere Produkte und alle unsere Videos – tippe unten auf MENU ⬇️
-@Alpine710_bot
-
-📍 Meetups im Wallis und Umgebung
-Ausweiskontrolle bei Meetups Pflicht! 🪪
-
-📦 Versand in der Schweiz 📤🌏
-
-✅ Barzahlung 💶 (CHF)
-✅ Krypto-Zahlung 📱
-
-
-Mehr Infos? Schreib uns!
-@Alpine710`
+      '👋 Dein Warenkorb wartet im Shop — ein Tap zum Abschluss.',
+    cart_reminder_cta: 'Fragen? Schreib uns.',
+    cart_reminder_question_btn: '💬 Frage',
+    help_detail: '📍 Meetup Wallis · 📦 Versand CH\n💶 Bar · ₿ BTC'
   }
 };
 
@@ -741,9 +716,57 @@ function getOrderReceivedReplyMarkup(lang) {
   const L = BOT_STRINGS[lang] || BOT_STRINGS.fr;
   return {
     reply_markup: {
-      inline_keyboard: [[{ text: L.order_question_btn, callback_data: 'order_question_help' }]]
+      inline_keyboard: [
+        [{ text: L.catalog_btn, web_app: { url: CATALOG_URL } }],
+        [{ text: L.order_question_btn, callback_data: 'order_question_help' }]
+      ]
     }
   };
+}
+
+function getCatalogProductCount() {
+  try {
+    const p = path.join(__dirname, 'products.json');
+    const o = JSON.parse(fs.readFileSync(p, 'utf8'));
+    return Array.isArray(o?.products) ? o.products.length : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function buildMenuHubMessage(lang) {
+  const L = BOT_STRINGS[lang] || BOT_STRINGS.fr;
+  const n = getCatalogProductCount();
+  const parts = [L.menu_hub_title];
+  if (n > 0 && L.menu_hub_products) {
+    parts.push(L.menu_hub_products.replace(/\{count\}/g, String(n)));
+  }
+  if (L.menu_hub_sub) parts.push(L.menu_hub_sub);
+  return parts.join('\n\n');
+}
+
+function getMainMenuInline(lang) {
+  const L = BOT_STRINGS[lang] || BOT_STRINGS.fr;
+  return {
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: L.catalog_btn, web_app: { url: CATALOG_URL } }],
+        [
+          { text: L.menu_infos_btn, callback_data: 'menu_infos' },
+          { text: L.menu_contact_btn, callback_data: 'menu_contact' }
+        ]
+      ]
+    }
+  };
+}
+
+async function sendBotMenuHub(chatId, lang, opts = {}) {
+  if (!bot) return;
+  const L = BOT_STRINGS[lang] || BOT_STRINGS.fr;
+  await bot.sendMessage(chatId, buildMenuHubMessage(lang), getMainMenuInline(lang));
+  if (opts.withKeyboard) {
+    await bot.sendMessage(chatId, L.menu_keyboard_hint, { reply_markup: getUserKeyboardReplyMarkup(lang) });
+  }
 }
 
 function getThankYouFollowupLine(lang) {
@@ -758,11 +781,10 @@ function strLang(chatId) {
 
 function getUserKeyboardReplyMarkup(lang) {
   const L = BOT_STRINGS[lang] || BOT_STRINGS.fr;
+  const catalogBtn = L.menu_catalog_btn || L.menu_btn;
+  const helpBtn = L.menu_help_btn || L.help_btn;
   return {
-    // Fallback robuste : MENU est un bouton texte.
-    // Quand l'utilisateur clique MENU, le bot répond avec un bouton `web_app` (inline),
-    // ce qui marche sur tous les clients Telegram.
-    keyboard: [[L.menu_btn, L.help_btn]],
+    keyboard: [[catalogBtn, helpBtn]],
     resize_keyboard: true,
     one_time_keyboard: false,
     is_persistent: true
@@ -770,12 +792,7 @@ function getUserKeyboardReplyMarkup(lang) {
 }
 
 function getOpenCatalogInline(lang) {
-  const L = BOT_STRINGS[lang] || BOT_STRINGS.fr;
-  return {
-    reply_markup: {
-      inline_keyboard: [[{ text: L.catalog_btn, web_app: { url: CATALOG_URL } }]]
-    }
-  };
+  return getMainMenuInline(lang);
 }
 
 function getCartReminderInline(lang) {
@@ -784,7 +801,10 @@ function getCartReminderInline(lang) {
     reply_markup: {
       inline_keyboard: [
         [{ text: L.catalog_btn, web_app: { url: CATALOG_URL } }],
-        [{ text: L.cart_reminder_question_btn, callback_data: 'menu_contact' }]
+        [
+          { text: L.menu_infos_btn, callback_data: 'menu_infos' },
+          { text: L.cart_reminder_question_btn, callback_data: 'menu_contact' }
+        ]
       ]
     }
   };
@@ -858,7 +878,7 @@ const ADMIN_INLINE = {
   }
 };
 
-const KNOWN_CMD_RE = /^\/(start|menu|admin|help|broadcast|cancel)(\s|$)/i;
+const KNOWN_CMD_RE = /^\/(start|menu|catalog|admin|help|broadcast|cancel)(\s|$)/i;
 const ORDER_PREFIXES = ['🛒 Nouvelle Commande', '🛒 New Order', '🛒 Neue Bestellung'];
 const lastOrderByChat = {};
 function looksLikeOrder(text) {
@@ -870,7 +890,7 @@ function looksLikeOrder(text) {
 
 function buildHelpMessage(isOwner, lang) {
   const L = BOT_STRINGS[lang] || BOT_STRINGS.fr;
-  let s = `${L.help_how_to}\n\n${L.help_detail}`;
+  let s = `${L.help_how_to}\n\n${L.help_detail || ''}`.trim();
   if (isOwner) {
     const adminLines = {
       fr: '/admin — Admin produits\n/broadcast — Message à tous (2 étapes, auto-suppression 0-72h)',
@@ -958,6 +978,11 @@ bot.onText(/\/start(?:\s+(.+))?/, async (msg) => {
   const isOwner = String(chatId) === String(OWNER_CHAT_ID);
   if (!isBotEnabled() && !isOwner) return;
   addBotUserFromMsg(msg);
+  const lang = getChatLang(chatId);
+  if (lang) {
+    await sendBotMenuHub(chatId, lang);
+    return;
+  }
   const caption = getWelcomeCaption();
   const welcomeImage = getWelcomeImageUrl();
   if (welcomeImage) {
@@ -969,6 +994,19 @@ bot.onText(/\/start(?:\s+(.+))?/, async (msg) => {
   } else {
     await bot.sendMessage(chatId, caption, LANG_PICK_INLINE);
   }
+});
+
+bot.onText(/\/catalog(?:\s|$)/i, async (msg) => {
+  const chatId = msg.chat.id;
+  const isOwner = String(chatId) === String(OWNER_CHAT_ID);
+  if (!isBotEnabled() && !isOwner) return;
+  addBotUserFromMsg(msg);
+  const lang = getChatLang(chatId);
+  if (!lang) {
+    await bot.sendMessage(chatId, BOT_STRINGS.fr.choose_lang, LANG_PICK_INLINE);
+    return;
+  }
+  await sendBotMenuHub(chatId, lang);
 });
 
 // Réponses aux boutons du menu (bouton Accès boutique ouvre le Web App directement)
@@ -1081,19 +1119,18 @@ bot.on('message', async (msg) => {
       await bot.sendMessage(chatId, BOT_STRINGS.fr.choose_lang, LANG_PICK_INLINE);
       return;
     }
-    await bot.sendMessage(chatId, buildHelpMessage(isOwner, lang), { reply_markup: getUserKeyboardReplyMarkup(lang) });
+    await bot.sendMessage(chatId, buildHelpMessage(isOwner, lang), getMainMenuInline(lang));
     return;
   }
 
   const langUi = getChatLang(chatId);
   const textNorm = (text || '').toLowerCase().trim();
-  if (textNorm === 'menu' || textNorm === '/menu') {
+  if (textNorm === 'menu' || textNorm === '/menu' || textNorm === '/catalog' || textNorm === 'catalog') {
     if (!langUi) {
       await bot.sendMessage(chatId, BOT_STRINGS.fr.choose_lang, LANG_PICK_INLINE);
       return;
     }
-    const L = BOT_STRINGS[langUi];
-    await bot.sendMessage(chatId, L.catalog_prompt, getOpenCatalogInline(langUi));
+    await sendBotMenuHub(chatId, langUi);
     return;
   }
   if ((text || '').trim() === CATALOG_URL || (text || '').trim() === CATALOG_URL + '/') {
@@ -1101,8 +1138,7 @@ bot.on('message', async (msg) => {
       await bot.sendMessage(chatId, BOT_STRINGS.fr.choose_lang, LANG_PICK_INLINE);
       return;
     }
-    const L = BOT_STRINGS[langUi];
-    await bot.sendMessage(chatId, L.catalog_prompt, getOpenCatalogInline(langUi));
+    await sendBotMenuHub(chatId, langUi);
     return;
   }
   if (textNorm === 'help' || textNorm === 'aide' || textNorm === 'hilfe') {
@@ -1110,13 +1146,18 @@ bot.on('message', async (msg) => {
       await bot.sendMessage(chatId, BOT_STRINGS.fr.choose_lang, LANG_PICK_INLINE);
       return;
     }
-    await bot.sendMessage(chatId, buildHelpMessage(isOwner, langUi), { reply_markup: getUserKeyboardReplyMarkup(langUi) });
+    await bot.sendMessage(chatId, buildHelpMessage(isOwner, langUi), getMainMenuInline(langUi));
     return;
   }
   if (langUi) {
     const Lb = BOT_STRINGS[langUi];
-    if (text === Lb.help_btn) {
-      await bot.sendMessage(chatId, buildHelpMessage(isOwner, langUi), { reply_markup: getUserKeyboardReplyMarkup(langUi) });
+    const catalogKeys = [Lb.menu_btn, Lb.menu_catalog_btn].filter(Boolean);
+    if (catalogKeys.includes(text)) {
+      await sendBotMenuHub(chatId, langUi);
+      return;
+    }
+    if (text === Lb.help_btn || text === Lb.menu_help_btn) {
+      await bot.sendMessage(chatId, buildHelpMessage(isOwner, langUi), getMainMenuInline(langUi));
       return;
     }
   }
@@ -1169,7 +1210,8 @@ bot.on('callback_query', async (query) => {
     const lang = data.replace('lang_', '');
     setChatLang(chatId, lang);
     const L = BOT_STRINGS[lang];
-    await bot.sendMessage(chatId, L.after_lang, { reply_markup: getUserKeyboardReplyMarkup(lang) });
+    await bot.sendMessage(chatId, L.after_lang);
+    await sendBotMenuHub(chatId, lang, { withKeyboard: true });
     return;
   }
 
@@ -1189,7 +1231,7 @@ bot.on('callback_query', async (query) => {
     if (!chatId) return;
     const lang = getChatLang(chatId) || 'fr';
     const L = BOT_STRINGS[lang] || BOT_STRINGS.fr;
-    await bot.sendMessage(chatId, L.menu_contact_reply);
+    await bot.sendMessage(chatId, L.menu_contact_reply, getMainMenuInline(lang));
     return;
   }
   if (data === 'menu_infos') {
@@ -1197,7 +1239,7 @@ bot.on('callback_query', async (query) => {
     if (!chatId) return;
     const lang = getChatLang(chatId) || 'fr';
     const L = BOT_STRINGS[lang] || BOT_STRINGS.fr;
-    await bot.sendMessage(chatId, L.menu_infos_reply);
+    await bot.sendMessage(chatId, L.menu_infos_reply, getMainMenuInline(lang));
     return;
   }
   if (!isOwner) return;
