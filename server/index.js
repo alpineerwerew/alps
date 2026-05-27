@@ -291,6 +291,28 @@ function upsertUserContact(user, payload) {
   return data.users[id];
 }
 
+function parseOrderCheckoutOptions(orderText) {
+  const lines = String(orderText || '').split('\n').map((l) => String(l || '').trim());
+  let payment_method = null;
+  let fulfillment_method = null;
+  for (const line of lines) {
+    if (/💳/.test(line) || /(?:paiement|payment|zahlung)\s*:/i.test(line)) {
+      if (/\bbtc\b/i.test(line)) payment_method = 'btc';
+      else if (/\bcash\b|\bbar\b/i.test(line)) payment_method = 'cash';
+    }
+    if (/🚚/.test(line) || /(?:récupération|recuperation|fulfillment|lieferung|abholung|versand)\s*:/i.test(line)) {
+      if (/meetup/i.test(line)) fulfillment_method = 'meetup';
+      else if (/envoi|shipping|versand/i.test(line)) fulfillment_method = 'envoi';
+    }
+  }
+  return { payment_method, fulfillment_method };
+}
+
+function normalizeCheckoutOption(value, allowed) {
+  const v = String(value || '').trim().toLowerCase();
+  return allowed.includes(v) ? v : null;
+}
+
 function parseOrderForReference(orderText) {
   const txt = String(orderText || '');
   const lines = txt.split('\n').map((l) => String(l || '').trim()).filter(Boolean);
@@ -337,9 +359,14 @@ function findMatchedProductsFromItems(items) {
   return out.filter((p) => p.id != null);
 }
 
-function appendOrderHistory(user, orderText) {
+function appendOrderHistory(user, orderText, extra = {}) {
   if (!user || !user.id) return null;
   const summary = parseOrderForReference(orderText);
+  const parsedOpts = parseOrderCheckoutOptions(orderText);
+  const payment_method =
+    normalizeCheckoutOption(extra.payment_method, ['cash', 'btc']) || parsedOpts.payment_method;
+  const fulfillment_method =
+    normalizeCheckoutOption(extra.fulfillment_method, ['envoi', 'meetup']) || parsedOpts.fulfillment_method;
   const matchedProducts = findMatchedProductsFromItems(summary.items);
   const rows = loadOrdersHistory();
   const row = {
@@ -354,6 +381,8 @@ function appendOrderHistory(user, orderText) {
     products: matchedProducts,
     product_image: matchedProducts[0]?.image_url || null,
     total_chf: summary.total_chf,
+    payment_method: payment_method || null,
+    fulfillment_method: fulfillment_method || null,
     created_at: new Date().toISOString(),
     status: 'confirmed'
   };
@@ -1661,6 +1690,8 @@ app.get('/api/admin/orders-history', (req, res) => {
         last_name: o.last_name || u.last_name || null,
         items: Array.isArray(o.items) ? o.items : [],
         total_chf: Number(o.total_chf) || 0,
+        payment_method: o.payment_method || parseOrderCheckoutOptions(o.order_text).payment_method,
+        fulfillment_method: o.fulfillment_method || parseOrderCheckoutOptions(o.order_text).fulfillment_method,
         status: o.status || 'confirmed',
         created_at: o.created_at || null
       };
@@ -1961,9 +1992,20 @@ app.post('/api/order', (req, res) => {
   if (!orderText || !looksLikeOrder(orderText)) {
     return res.status(400).json({ error: 'Invalid order' });
   }
+  const parsedOpts = parseOrderCheckoutOptions(orderText);
+  const payment_method =
+    normalizeCheckoutOption(req.body?.payment_method, ['cash', 'btc']) || parsedOpts.payment_method;
+  const fulfillment_method =
+    normalizeCheckoutOption(req.body?.fulfillment_method, ['envoi', 'meetup']) || parsedOpts.fulfillment_method;
+  if (!payment_method || !fulfillment_method) {
+    return res.status(400).json({ error: 'checkout_options_required' });
+  }
   const userId = user.id;
   addOrUpdateBotUserFromWebAppUser(user);
-  const orderHist = appendOrderHistory(user, orderText);
+  const orderHist = appendOrderHistory(user, orderText, {
+    payment_method,
+    fulfillment_method
+  });
   if (PROCESS_ROLE === 'web') {
     try {
       enqueueWebOrderSync(user, orderText);

@@ -113,6 +113,15 @@ Important :
         order_id_label: '🧾 Référence',
         order_customer_contact: '📞 Contact client',
         order_contact_missing: 'non fourni',
+        order_payment_label: 'Paiement',
+        order_fulfillment_label: 'Récupération',
+        checkout_payment_title: 'Moyen de paiement',
+        checkout_fulfillment_title: 'Moyen de récupération',
+        order_payment_cash: 'Cash',
+        order_payment_btc: 'BTC',
+        order_fulfillment_envoi: 'Envoi',
+        order_fulfillment_meetup: 'Meetup',
+        checkout_options_required: 'Choisis un moyen de paiement et un moyen de récupération avant d’envoyer.',
         checkout_sending: 'Envoi en cours…',
         cart_checkout_prep_title: 'Après avoir validé',
         order_success_title: 'Commande bien reçue',
@@ -206,6 +215,15 @@ Important:
         order_id_label: '🧾 Order ID',
         order_customer_contact: '📞 Customer contact',
         order_contact_missing: 'not provided',
+        order_payment_label: 'Payment',
+        order_fulfillment_label: 'Fulfillment',
+        checkout_payment_title: 'Payment method',
+        checkout_fulfillment_title: 'Delivery / pickup',
+        order_payment_cash: 'Cash',
+        order_payment_btc: 'BTC',
+        order_fulfillment_envoi: 'Shipping',
+        order_fulfillment_meetup: 'Meetup',
+        checkout_options_required: 'Select a payment method and fulfillment option before sending.',
         checkout_sending: 'Sending…',
         cart_checkout_prep_title: 'After you confirm',
         order_success_title: 'Order received',
@@ -299,6 +317,15 @@ Wichtig:
         order_id_label: '🧾 Bestell-ID',
         order_customer_contact: '📞 Kundenkontakt',
         order_contact_missing: 'nicht angegeben',
+        order_payment_label: 'Zahlung',
+        order_fulfillment_label: 'Abholung / Versand',
+        checkout_payment_title: 'Zahlungsart',
+        checkout_fulfillment_title: 'Lieferung / Meetup',
+        order_payment_cash: 'Bar',
+        order_payment_btc: 'BTC',
+        order_fulfillment_envoi: 'Versand',
+        order_fulfillment_meetup: 'Meetup',
+        checkout_options_required: 'Waehle Zahlungsart und Lieferoption vor dem Senden.',
         checkout_sending: 'Wird gesendet…',
         cart_checkout_prep_title: 'Nach der Bestaetigung',
         order_success_title: 'Bestellung erhalten',
@@ -497,6 +524,9 @@ function applyTranslations() {
     if (osBtn) osBtn.textContent = t('order_success_btn');
     const osClose = document.getElementById('order-success-close');
     if (osClose) osClose.textContent = t('order_success_close');
+
+    const cartOverlay = document.getElementById('cart-overlay');
+    if (cart.length && cartOverlay?.classList.contains('active')) renderCart();
 }
 
 function getTelegramDestination() {
@@ -527,6 +557,79 @@ const PRODUCTS = [];
 // =============================================
 let cart = [];
 let checkoutInFlight = false;
+let checkoutPayment = '';
+let checkoutFulfillment = '';
+const CHECKOUT_PREFS_KEY = 'alps_checkout_prefs';
+
+function loadCheckoutPrefs() {
+    try {
+        const o = JSON.parse(sessionStorage.getItem(CHECKOUT_PREFS_KEY) || '{}');
+        if (o.payment === 'cash' || o.payment === 'btc') checkoutPayment = o.payment;
+        if (o.fulfillment === 'envoi' || o.fulfillment === 'meetup') checkoutFulfillment = o.fulfillment;
+    } catch (e) { /* ignore */ }
+}
+
+function saveCheckoutPrefs() {
+    try {
+        sessionStorage.setItem(CHECKOUT_PREFS_KEY, JSON.stringify({
+            payment: checkoutPayment,
+            fulfillment: checkoutFulfillment
+        }));
+    } catch (e) { /* ignore */ }
+}
+
+function readCheckoutOptionsFromDom() {
+    const p = document.querySelector('input[name="checkout-payment"]:checked');
+    const f = document.querySelector('input[name="checkout-fulfillment"]:checked');
+    checkoutPayment = p?.value === 'cash' || p?.value === 'btc' ? p.value : '';
+    checkoutFulfillment = f?.value === 'envoi' || f?.value === 'meetup' ? f.value : '';
+    saveCheckoutPrefs();
+}
+
+function onCheckoutOptionChange() {
+    readCheckoutOptionsFromDom();
+    hideCheckoutError();
+    document.getElementById('cart-checkout-options')?.classList.remove('is-invalid');
+}
+
+function getCheckoutPaymentLabel() {
+    if (checkoutPayment === 'btc') return t('order_payment_btc');
+    if (checkoutPayment === 'cash') return t('order_payment_cash');
+    return '';
+}
+
+function getCheckoutFulfillmentLabel() {
+    if (checkoutFulfillment === 'envoi') return t('order_fulfillment_envoi');
+    if (checkoutFulfillment === 'meetup') return t('order_fulfillment_meetup');
+    return '';
+}
+
+function validateCheckoutOptions() {
+    readCheckoutOptionsFromDom();
+    if (checkoutPayment && checkoutFulfillment) return true;
+    document.getElementById('cart-checkout-options')?.classList.add('is-invalid');
+    showCheckoutError(t('checkout_options_required'));
+    return false;
+}
+
+function renderCheckoutOptionsHtml() {
+    const payCash = checkoutPayment === 'cash' ? ' checked' : '';
+    const payBtc = checkoutPayment === 'btc' ? ' checked' : '';
+    const fulEnvoi = checkoutFulfillment === 'envoi' ? ' checked' : '';
+    const fulMeet = checkoutFulfillment === 'meetup' ? ' checked' : '';
+    return `<div class="cart-checkout-options" id="cart-checkout-options">
+        <fieldset class="checkout-option-group">
+            <legend>${escapeHtml(t('checkout_payment_title'))}</legend>
+            <label class="checkout-option"><input type="radio" name="checkout-payment" value="cash"${payCash} onchange="onCheckoutOptionChange()"> ${escapeHtml(t('order_payment_cash'))}</label>
+            <label class="checkout-option"><input type="radio" name="checkout-payment" value="btc"${payBtc} onchange="onCheckoutOptionChange()"> ${escapeHtml(t('order_payment_btc'))}</label>
+        </fieldset>
+        <fieldset class="checkout-option-group">
+            <legend>${escapeHtml(t('checkout_fulfillment_title'))}</legend>
+            <label class="checkout-option"><input type="radio" name="checkout-fulfillment" value="envoi"${fulEnvoi} onchange="onCheckoutOptionChange()"> ${escapeHtml(t('order_fulfillment_envoi'))}</label>
+            <label class="checkout-option"><input type="radio" name="checkout-fulfillment" value="meetup"${fulMeet} onchange="onCheckoutOptionChange()"> ${escapeHtml(t('order_fulfillment_meetup'))}</label>
+        </fieldset>
+    </div>`;
+}
 let selectedPricingIdx = null;
 let selectedVariantIdxs = [];
 let currentProduct = null;
@@ -933,6 +1036,8 @@ function computeCartTotals() {
 }
 
 function init() {
+    loadCheckoutPrefs();
+    window.onCheckoutOptionChange = onCheckoutOptionChange;
     document.title = "Alpine Connexion";
     const editContactBtn = document.getElementById('btn-edit-contact');
     editContactBtn?.addEventListener('click', async () => {
@@ -1553,6 +1658,7 @@ function renderCart() {
             <span class="cart-total-amount">${totals.payableRounded.toFixed(0)} ${CURRENCY}</span>
         </div>
         <div class="checkout-hint">${t('rounded_total_note')}</div>
+        ${renderCheckoutOptionsHtml()}
         <div class="cart-checkout-prep">
             <div class="cart-checkout-prep-title">${t('cart_checkout_prep_title')}</div>
             <p class="cart-checkout-prep-text">${escapeHtml(t('cart_bot_followup'))}</p>
@@ -1591,9 +1697,14 @@ function generateOrderId() {
 function buildOrderText(totals, orderId) {
     const tvals = totals || computeCartTotals();
     const contactSummary = getCustomerContactSummary() || t('order_contact_missing');
+    const paymentLabel = getCheckoutPaymentLabel();
+    const fulfillmentLabel = getCheckoutFulfillmentLabel();
     let msg = `${t('order_header')}\n\n`;
     if (orderId) msg += `${t('order_id_label')} : ${orderId}\n`;
-    msg += `${t('order_customer_contact')} : ${contactSummary}\n\n`;
+    msg += `${t('order_customer_contact')} : ${contactSummary}\n`;
+    if (paymentLabel) msg += `💳 ${t('order_payment_label')} : ${paymentLabel}\n`;
+    if (fulfillmentLabel) msg += `🚚 ${t('order_fulfillment_label')} : ${fulfillmentLabel}\n`;
+    msg += '\n';
     cart.forEach((item, i) => {
         const u = formatUnitDisplay(item);
         msg += `${i+1}. ${item.name}`;
@@ -1668,6 +1779,7 @@ function closeOrderSuccess(goToTelegram) {
 async function checkout() {
     if (!cart.length || checkoutInFlight) return;
     hideCheckoutError();
+    if (!validateCheckoutOptions()) return;
     if (!isOnboardingComplete()) {
         const ok = await showAgeGate(false);
         if (!ok || !isOnboardingComplete()) return;
@@ -1688,7 +1800,9 @@ async function checkout() {
                         initData: getInitData(),
                         orderText,
                         order_id: orderId,
-                        customer_contact: getCustomerContactSummary()
+                        customer_contact: getCustomerContactSummary(),
+                        payment_method: checkoutPayment,
+                        fulfillment_method: checkoutFulfillment
                     })
                 });
                 const data = await res.json().catch(() => ({}));
@@ -1699,6 +1813,10 @@ async function checkout() {
                     updateCartBadge();
                     scheduleCartActivitySync();
                     showOrderSuccess(ref);
+                    return;
+                }
+                if (data.error === 'checkout_options_required') {
+                    validateCheckoutOptions();
                     return;
                 }
                 if (getInitData()) {

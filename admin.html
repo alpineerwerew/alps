@@ -714,6 +714,8 @@
                 const userLabel = o.username || [o.first_name, o.last_name].filter(Boolean).join(' ') || `ID ${o.user_id}`;
                 const items = Array.isArray(o.items) ? o.items.filter(Boolean).join(', ') : '';
                 const total = Number.isFinite(Number(o.total_chf)) ? `${Number(o.total_chf).toFixed(2)} CHF` : '—';
+                const payment = formatOrderPaymentLabel(o.payment_method);
+                const fulfillment = formatOrderFulfillmentLabel(o.fulfillment_method);
                 const dt = o.created_at ? new Date(o.created_at).toLocaleString() : '—';
                 return `<tr>
                     <td>${i + 1}</td>
@@ -721,6 +723,8 @@
                     <td>${escapeHtml(String(o.user_id || ''))}</td>
                     <td>${escapeHtml(String(o.ref || '—'))}</td>
                     <td>${escapeHtml(items || '—')}</td>
+                    <td>${escapeHtml(payment)}</td>
+                    <td>${escapeHtml(fulfillment)}</td>
                     <td>${escapeHtml(total)}</td>
                     <td>${escapeHtml(String(o.status || 'confirmed'))}</td>
                     <td>${escapeHtml(dt)}</td>
@@ -732,7 +736,7 @@
             });
             ordersHistoryList.innerHTML = `
                 <table>
-                    <thead><tr><th>#</th><th>Client</th><th>chat_id</th><th>Réf</th><th>Articles</th><th>Total</th><th>Statut</th><th>Date</th><th>Action</th></tr></thead>
+                    <thead><tr><th>#</th><th>Client</th><th>chat_id</th><th>Réf</th><th>Articles</th><th>Paiement</th><th>Récup.</th><th>Total</th><th>Statut</th><th>Date</th><th>Action</th></tr></thead>
                     <tbody>${rows.join('')}</tbody>
                 </table>
             `;
@@ -796,6 +800,20 @@
             });
         }
 
+        function formatOrderPaymentLabel(v) {
+            const x = String(v || '').toLowerCase();
+            if (x === 'cash') return 'Cash';
+            if (x === 'btc') return 'BTC';
+            return '—';
+        }
+
+        function formatOrderFulfillmentLabel(v) {
+            const x = String(v || '').toLowerCase();
+            if (x === 'envoi') return 'Envoi';
+            if (x === 'meetup') return 'Meetup';
+            return '—';
+        }
+
         function escapeCsv(v) {
             const s = String(v == null ? '' : v);
             if (/[",\n;]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
@@ -808,7 +826,7 @@
                 alert('Aucune ligne à exporter.');
                 return;
             }
-            const header = ['ref', 'chat_id', 'client', 'items', 'total_chf', 'status', 'created_at'];
+            const header = ['ref', 'chat_id', 'client', 'items', 'payment_method', 'fulfillment_method', 'total_chf', 'status', 'created_at'];
             const lines = [header.join(';')];
             rows.forEach((o) => {
                 const client = o.username || [o.first_name, o.last_name].filter(Boolean).join(' ') || '';
@@ -818,6 +836,8 @@
                     o.user_id || '',
                     client,
                     items,
+                    o.payment_method || '',
+                    o.fulfillment_method || '',
                     Number.isFinite(Number(o.total_chf)) ? Number(o.total_chf).toFixed(2) : '',
                     o.status || 'confirmed',
                     o.created_at || ''
