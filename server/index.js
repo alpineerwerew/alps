@@ -95,6 +95,7 @@ function getInitDataUser(initData) {
 const BOT_USERS_FILE = path.join(__dirname, 'bot_users.json');
 const CART_ACTIVITY_FILE = path.join(__dirname, 'cart_activity.json');
 const BOT_CHAT_LANG_FILE = path.join(__dirname, 'bot_chat_lang.json');
+const CHECKOUT_PREFS_FILE = path.join(__dirname, 'checkout_prefs.json');
 const CART_REMINDERS_FILE = path.join(__dirname, 'cart_reminders.json');
 const ORDERS_HISTORY_FILE = path.join(__dirname, 'orders_history.json');
 const CONTACTS_FILE = path.join(__dirname, 'contacts.json');
@@ -294,18 +295,22 @@ function upsertUserContact(user, payload) {
 function parseOrderCheckoutOptions(orderText) {
   const lines = String(orderText || '').split('\n').map((l) => String(l || '').trim());
   let payment_method = null;
+  let shipping_method = null;
   let fulfillment_method = null;
   for (const line of lines) {
     if (/💳/.test(line) || /(?:paiement|payment|zahlung)\s*:/i.test(line)) {
       if (/\bbtc\b/i.test(line)) payment_method = 'btc';
       else if (/\bcash\b|\bbar\b/i.test(line)) payment_method = 'cash';
     }
-    if (/🚚/.test(line) || /(?:récupération|recuperation|fulfillment|lieferung|abholung|versand)\s*:/i.test(line)) {
-      if (/meetup/i.test(line)) fulfillment_method = 'meetup';
+    if (/🚚/.test(line) || /(?:livraison|delivery|lieferung|récupération|recuperation|fulfillment|abholung|versand)\s*:/i.test(line)) {
+      if (/express/i.test(line)) shipping_method = 'express';
+      else if (/normal|standard|next day|nächster|lendemain/i.test(line)) shipping_method = 'normal';
+      else if (/meetup/i.test(line)) fulfillment_method = 'meetup';
       else if (/envoi|shipping|versand/i.test(line)) fulfillment_method = 'envoi';
     }
   }
-  return { payment_method, fulfillment_method };
+  if (!shipping_method && fulfillment_method === 'envoi') shipping_method = 'normal';
+  return { payment_method, shipping_method, fulfillment_method };
 }
 
 function normalizeCheckoutOption(value, allowed) {
@@ -365,6 +370,8 @@ function appendOrderHistory(user, orderText, extra = {}) {
   const parsedOpts = parseOrderCheckoutOptions(orderText);
   const payment_method =
     normalizeCheckoutOption(extra.payment_method, ['cash', 'btc']) || parsedOpts.payment_method;
+  const shipping_method =
+    normalizeCheckoutOption(extra.shipping_method, ['normal', 'express']) || parsedOpts.shipping_method;
   const fulfillment_method =
     normalizeCheckoutOption(extra.fulfillment_method, ['envoi', 'meetup']) || parsedOpts.fulfillment_method;
   const matchedProducts = findMatchedProductsFromItems(summary.items);
@@ -382,6 +389,7 @@ function appendOrderHistory(user, orderText, extra = {}) {
     product_image: matchedProducts[0]?.image_url || null,
     total_chf: summary.total_chf,
     payment_method: payment_method || null,
+    shipping_method: shipping_method || null,
     fulfillment_method: fulfillment_method || null,
     created_at: new Date().toISOString(),
     status: 'confirmed'
@@ -444,6 +452,51 @@ function saveChatLangMap(map) {
 function getChatLang(chatId) {
   const v = loadChatLangMap()[String(chatId)];
   return v === 'fr' || v === 'en' || v === 'de' ? v : null;
+}
+
+function loadCheckoutPrefsMap() {
+  try {
+    const raw = fs.readFileSync(CHECKOUT_PREFS_FILE, 'utf8');
+    const o = JSON.parse(raw);
+    return o && typeof o === 'object' && !Array.isArray(o) ? o : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveCheckoutPrefsMap(map) {
+  try {
+    fs.writeFileSync(CHECKOUT_PREFS_FILE, JSON.stringify(map, null, 2), 'utf8');
+  } catch (e) {
+    console.error('❌ Could not save checkout_prefs.json:', e.message);
+  }
+}
+
+function getCheckoutPrefs(chatId) {
+  const row = loadCheckoutPrefsMap()[String(chatId)] || {};
+  const payment = normalizeCheckoutOption(row.payment, ['cash', 'btc']);
+  const shipping = normalizeCheckoutOption(row.shipping, ['normal', 'express']);
+  return { payment, shipping };
+}
+
+function setCheckoutPrefs(chatId, patch) {
+  const id = String(chatId);
+  const map = loadCheckoutPrefsMap();
+  const prev = map[id] && typeof map[id] === 'object' ? map[id] : {};
+  const next = { ...prev, updated_at: new Date().toISOString() };
+  if (patch && Object.prototype.hasOwnProperty.call(patch, 'payment')) {
+    const p = normalizeCheckoutOption(patch.payment, ['cash', 'btc']);
+    if (p) next.payment = p;
+    else delete next.payment;
+  }
+  if (patch && Object.prototype.hasOwnProperty.call(patch, 'shipping')) {
+    const s = normalizeCheckoutOption(patch.shipping, ['normal', 'express']);
+    if (s) next.shipping = s;
+    else delete next.shipping;
+  }
+  map[id] = next;
+  saveCheckoutPrefsMap(map);
+  return getCheckoutPrefs(chatId);
 }
 
 function setChatLang(chatId, lang) {
@@ -593,6 +646,15 @@ const BOT_STRINGS = {
     menu_start_btn: '▶️ Start',
     menu_welcome: '😊 Bienvenue sur Alpine Connexion !\n\nMerci de votre confiance — commande rapide via la boutique 👇',
     menu_shop_btn: '🌿 Accès boutique',
+    menu_pay_cash_btn: '💶 CASH',
+    menu_pay_btc_btn: '₿ BTC −5%',
+    menu_ship_normal_btn: '📦 Normal',
+    menu_ship_express_btn: '⚡ Express',
+    pref_pay_cash_set: 'Paiement : CASH (prix catalogue)',
+    pref_pay_btc_set: 'Paiement : BTC (−5 % sur les articles)',
+    pref_ship_normal_set: 'Livraison : Normal (5.90 CHF)',
+    pref_ship_express_set: 'Livraison : Express avant 09h00 (20.00 CHF)',
+    order_recap_title: 'Ton choix pour cette commande',
     menu_contact_btn: '📞 Nous contacter',
     menu_contact_alert: 'Écris ton message ici, on te répond rapidement.',
     catalog_btn: '🌿 Accès boutique',
@@ -617,6 +679,15 @@ const BOT_STRINGS = {
     menu_start_btn: '▶️ Start',
     menu_welcome: '😊 Welcome to Alpine Connexion!\n\nThanks for your trust — order quickly via the shop 👇',
     menu_shop_btn: '🌿 Open shop',
+    menu_pay_cash_btn: '💶 CASH',
+    menu_pay_btc_btn: '₿ BTC −5%',
+    menu_ship_normal_btn: '📦 Standard',
+    menu_ship_express_btn: '⚡ Express',
+    pref_pay_cash_set: 'Payment: CASH (catalog prices)',
+    pref_pay_btc_set: 'Payment: BTC (−5% on items)',
+    pref_ship_normal_set: 'Delivery: Standard (5.90 CHF)',
+    pref_ship_express_set: 'Delivery: Express before 09:00 (20.00 CHF)',
+    order_recap_title: 'Your choices for this order',
     menu_contact_btn: '📞 Contact us',
     menu_contact_alert: 'Send your message here, we reply quickly.',
     catalog_btn: '🌿 Open shop',
@@ -640,6 +711,15 @@ const BOT_STRINGS = {
     menu_start_btn: '▶️ Start',
     menu_welcome: '😊 Willkommen bei Alpine Connexion!\n\nDanke für dein Vertrauen — schnell bestellen im Shop 👇',
     menu_shop_btn: '🌿 Shop öffnen',
+    menu_pay_cash_btn: '💶 BAR',
+    menu_pay_btc_btn: '₿ BTC −5%',
+    menu_ship_normal_btn: '📦 Normal',
+    menu_ship_express_btn: '⚡ Express',
+    pref_pay_cash_set: 'Zahlung: BAR (Katalogpreise)',
+    pref_pay_btc_set: 'Zahlung: BTC (−5 % auf Artikel)',
+    pref_ship_normal_set: 'Lieferung: Normal (5.90 CHF)',
+    pref_ship_express_set: 'Lieferung: Express vor 09:00 (20.00 CHF)',
+    order_recap_title: 'Deine Auswahl fuer diese Bestellung',
     menu_contact_btn: '📞 Kontakt',
     menu_contact_alert: 'Schreib uns hier, wir antworten schnell.',
     catalog_btn: '🌿 Shop öffnen',
@@ -688,9 +768,30 @@ function formatStoredContactLine(userId, lang) {
     .replace(/\{value\}/g, String(row.contact_value));
 }
 
-function getOrderReceivedText(lang, userId) {
+function buildOrderRecapFromText(orderText, lang) {
+  const L = BOT_STRINGS[lang] || BOT_STRINGS.fr;
+  const opts = parseOrderCheckoutOptions(orderText);
+  const lines = [];
+  if (opts.payment_method === 'btc') lines.push(`💳 ${L.menu_pay_btc_btn}`);
+  else if (opts.payment_method === 'cash') lines.push(`💳 ${L.menu_pay_cash_btn}`);
+  if (opts.shipping_method === 'normal') lines.push(`🚚 ${L.menu_ship_normal_btn} — 5.90 CHF`);
+  else if (opts.shipping_method === 'express') lines.push(`🚚 ${L.menu_ship_express_btn} — 20.00 CHF`);
+  const totalLine = String(orderText || '')
+    .split('\n')
+    .find((l) => /(?:total|gesamt)\s*:/i.test(l));
+  const totalMatch = totalLine && totalLine.match(/([\d.,]+)\s*CHF/i);
+  if (totalMatch) lines.push(`💰 Total : ${totalMatch[1]} CHF`);
+  if (!lines.length) return '';
+  return `${L.order_recap_title || 'Récap'} :\n${lines.join('\n')}`;
+}
+
+function getOrderReceivedText(lang, userId, orderText) {
   const L = BOT_STRINGS[lang] || BOT_STRINGS.fr;
   let base = L.order_received;
+  const recap =
+    orderText || (userId && lastOrderByChat[userId] ? lastOrderByChat[userId] : '');
+  const recapBlock = recap ? buildOrderRecapFromText(recap, lang) : '';
+  if (recapBlock) base = `${base}\n\n${recapBlock}`;
   const contactLine = userId ? formatStoredContactLine(userId, lang) : '';
   if (contactLine) base = `${base}\n\n${contactLine}`;
   const h = Number(process.env.ORDER_RESPONSE_SLA_HOURS);
@@ -723,8 +824,13 @@ function getHubContactButton(lang) {
   return { text: L.menu_contact_btn, callback_data: 'menu_contact' };
 }
 
-function getHubMenuInline(lang) {
+function hubPrefBtn(label, selected) {
+  return selected ? `✓ ${label}` : label;
+}
+
+function getHubMenuInline(lang, chatId) {
   const L = BOT_STRINGS[lang] || BOT_STRINGS.fr;
+  const prefs = chatId ? getCheckoutPrefs(chatId) : { payment: null, shipping: null };
   const contact = getHubContactButton(lang);
   const contactRow = contact.url
     ? { text: contact.text, url: contact.url }
@@ -733,6 +839,14 @@ function getHubMenuInline(lang) {
     reply_markup: {
       inline_keyboard: [
         [{ text: L.menu_shop_btn, web_app: { url: CATALOG_URL } }],
+        [
+          { text: hubPrefBtn(L.menu_pay_cash_btn, prefs.payment === 'cash'), callback_data: 'pref_pay_cash' },
+          { text: hubPrefBtn(L.menu_pay_btc_btn, prefs.payment === 'btc'), callback_data: 'pref_pay_btc' }
+        ],
+        [
+          { text: hubPrefBtn(L.menu_ship_normal_btn, prefs.shipping === 'normal'), callback_data: 'pref_ship_normal' },
+          { text: hubPrefBtn(L.menu_ship_express_btn, prefs.shipping === 'express'), callback_data: 'pref_ship_express' }
+        ],
         [contactRow]
       ]
     }
@@ -751,7 +865,7 @@ function getShopOnlyInline(lang) {
 async function sendBotMenuHub(chatId, lang, opts = {}) {
   if (!bot) return;
   const imageUrl = getWelcomeImageUrl();
-  const markup = getHubMenuInline(lang);
+  const markup = getHubMenuInline(lang, chatId);
   const welcomeText = buildWelcomeHubText(lang);
 
   if (imageUrl) {
@@ -906,7 +1020,7 @@ async function deliverQueuedWebOrder(user, orderText) {
   }
   const langOrd = getChatLang(userId) || 'fr';
   try {
-    await bot.sendMessage(userId, getOrderReceivedText(langOrd, userId), getOrderReceivedReplyMarkup(langOrd));
+    await bot.sendMessage(userId, getOrderReceivedText(langOrd, userId, orderText), getOrderReceivedReplyMarkup(langOrd));
   } catch (err) {
     console.error('❌ Error sending confirmation to user:', err.message);
   }
@@ -1160,7 +1274,11 @@ bot.on('message', async (msg) => {
     addBotUserFromMsg(msg);
     const langOrd = getChatLang(chatId) || 'fr';
     try {
-      await bot.sendMessage(chatId, getOrderReceivedText(langOrd, userId || chatId), getOrderReceivedReplyMarkup(langOrd));
+      await bot.sendMessage(
+        chatId,
+        getOrderReceivedText(langOrd, userId || chatId, text),
+        getOrderReceivedReplyMarkup(langOrd)
+      );
     } catch (err) {
       console.error('❌ Error sending confirmation:', err.message);
     }
@@ -1207,6 +1325,32 @@ bot.on('callback_query', async (query) => {
     const lang = getChatLang(chatId) || 'fr';
     const L = BOT_STRINGS[lang] || BOT_STRINGS.fr;
     await bot.sendMessage(chatId, L.order_question_prompt);
+    return;
+  }
+
+  const prefMap = {
+    pref_pay_cash: { patch: { payment: 'cash' }, alert: 'pref_pay_cash_set' },
+    pref_pay_btc: { patch: { payment: 'btc' }, alert: 'pref_pay_btc_set' },
+    pref_ship_normal: { patch: { shipping: 'normal' }, alert: 'pref_ship_normal_set' },
+    pref_ship_express: { patch: { shipping: 'express' }, alert: 'pref_ship_express_set' }
+  };
+  if (prefMap[data]) {
+    if (!chatId) return;
+    const lang = getChatLang(chatId) || 'fr';
+    const L = BOT_STRINGS[lang] || BOT_STRINGS.fr;
+    const cfg = prefMap[data];
+    setCheckoutPrefs(chatId, cfg.patch);
+    try {
+      await bot.answerCallbackQuery(query.id, { text: L[cfg.alert] || 'OK' });
+    } catch (e) {}
+    if (query.message?.message_id) {
+      try {
+        await bot.editMessageReplyMarkup(getHubMenuInline(lang, chatId).reply_markup, {
+          chat_id: chatId,
+          message_id: query.message.message_id
+        });
+      } catch (e) { /* ignore */ }
+    }
     return;
   }
 
@@ -1713,7 +1857,12 @@ app.get('/api/admin/orders-history', (req, res) => {
         items: Array.isArray(o.items) ? o.items : [],
         total_chf: Number(o.total_chf) || 0,
         payment_method: o.payment_method || parseOrderCheckoutOptions(o.order_text).payment_method,
-        fulfillment_method: o.fulfillment_method || parseOrderCheckoutOptions(o.order_text).fulfillment_method,
+        fulfillment_method:
+          o.shipping_method ||
+          o.fulfillment_method ||
+          parseOrderCheckoutOptions(o.order_text).shipping_method ||
+          parseOrderCheckoutOptions(o.order_text).fulfillment_method,
+        shipping_method: o.shipping_method || parseOrderCheckoutOptions(o.order_text).shipping_method,
         status: o.status || 'confirmed',
         created_at: o.created_at || null
       };
@@ -2017,16 +2166,17 @@ app.post('/api/order', (req, res) => {
   const parsedOpts = parseOrderCheckoutOptions(orderText);
   const payment_method =
     normalizeCheckoutOption(req.body?.payment_method, ['cash', 'btc']) || parsedOpts.payment_method;
-  const fulfillment_method =
-    normalizeCheckoutOption(req.body?.fulfillment_method, ['envoi', 'meetup']) || parsedOpts.fulfillment_method;
-  if (!payment_method || !fulfillment_method) {
+  const shipping_method =
+    normalizeCheckoutOption(req.body?.shipping_method, ['normal', 'express']) || parsedOpts.shipping_method;
+  if (!payment_method || !shipping_method) {
     return res.status(400).json({ error: 'checkout_options_required' });
   }
   const userId = user.id;
   addOrUpdateBotUserFromWebAppUser(user);
+  setCheckoutPrefs(userId, { payment: payment_method, shipping: shipping_method });
   const orderHist = appendOrderHistory(user, orderText, {
     payment_method,
-    fulfillment_method
+    shipping_method
   });
   if (PROCESS_ROLE === 'web') {
     try {
@@ -2053,7 +2203,7 @@ app.post('/api/order', (req, res) => {
   lastOrderByChat[userId] = orderText;
 
   const langOrd = getChatLang(userId) || 'fr';
-  bot.sendMessage(userId, getOrderReceivedText(langOrd, userId), getOrderReceivedReplyMarkup(langOrd)).catch((err) => {
+  bot.sendMessage(userId, getOrderReceivedText(langOrd, userId, orderText), getOrderReceivedReplyMarkup(langOrd)).catch((err) => {
     console.error('❌ Error sending confirmation to user:', err.message);
   });
 
@@ -2061,6 +2211,23 @@ app.post('/api/order', (req, res) => {
     ok: true,
     order_ref: orderHist?.ref || null
   });
+});
+
+app.get('/api/checkout-prefs', (req, res) => {
+  const user = getInitDataUser(req.query?.initData);
+  if (!user?.id) return res.status(401).json({ error: 'Invalid initData' });
+  const prefs = getCheckoutPrefs(user.id);
+  res.json({ ok: true, payment: prefs.payment, shipping: prefs.shipping });
+});
+
+app.post('/api/checkout-prefs', (req, res) => {
+  const user = getInitDataUser(req.body?.initData);
+  if (!user?.id) return res.status(401).json({ error: 'Invalid initData' });
+  const prefs = setCheckoutPrefs(user.id, {
+    payment: req.body?.payment,
+    shipping: req.body?.shipping
+  });
+  res.json({ ok: true, payment: prefs.payment, shipping: prefs.shipping });
 });
 
 app.post('/api/cart-activity', (req, res) => {

@@ -114,14 +114,21 @@ Important :
         order_customer_contact: '📞 Contact client',
         order_contact_missing: 'non fourni',
         order_payment_label: 'Paiement',
-        order_fulfillment_label: 'Récupération',
-        checkout_payment_title: 'Moyen de paiement',
-        checkout_fulfillment_title: 'Moyen de récupération',
-        order_payment_cash: 'Cash',
-        order_payment_btc: 'BTC',
-        order_fulfillment_envoi: 'Envoi',
-        order_fulfillment_meetup: 'Meetup',
-        checkout_options_required: 'Choisis un moyen de paiement et un moyen de récupération avant d’envoyer.',
+        order_shipping_label: 'Livraison',
+        checkout_payment_title: 'Paiement',
+        checkout_shipping_title: 'Livraison',
+        order_payment_cash: '💶 CASH',
+        order_payment_btc: '₿ BTC (−5 %)',
+        order_payment_btc_note: '−5 % sur les articles uniquement',
+        order_shipping_normal: 'Normal (lendemain)',
+        order_shipping_express: 'Express (avant 09h00)',
+        order_shipping_normal_price: '5.90 CHF',
+        order_shipping_express_price: '20.00 CHF',
+        btc_discount_label: 'Remise BTC (−5 %)',
+        shipping_fee_label: 'Livraison',
+        checkout_options_required: 'Choisis CASH ou BTC en haut, puis Normal ou Express dans le panier.',
+        payment_pref_aria: 'Mode de paiement',
+        order_success_recap: 'Récapitulatif',
         checkout_sending: 'Envoi en cours…',
         cart_checkout_prep_title: 'Après avoir validé',
         order_success_title: 'Commande bien reçue',
@@ -216,14 +223,21 @@ Important:
         order_customer_contact: '📞 Customer contact',
         order_contact_missing: 'not provided',
         order_payment_label: 'Payment',
-        order_fulfillment_label: 'Fulfillment',
-        checkout_payment_title: 'Payment method',
-        checkout_fulfillment_title: 'Delivery / pickup',
-        order_payment_cash: 'Cash',
-        order_payment_btc: 'BTC',
-        order_fulfillment_envoi: 'Shipping',
-        order_fulfillment_meetup: 'Meetup',
-        checkout_options_required: 'Select a payment method and fulfillment option before sending.',
+        order_shipping_label: 'Delivery',
+        checkout_payment_title: 'Payment',
+        checkout_shipping_title: 'Delivery',
+        order_payment_cash: '💶 CASH',
+        order_payment_btc: '₿ BTC (−5%)',
+        order_payment_btc_note: '−5% on items only',
+        order_shipping_normal: 'Standard (next day)',
+        order_shipping_express: 'Express (before 09:00)',
+        order_shipping_normal_price: '5.90 CHF',
+        order_shipping_express_price: '20.00 CHF',
+        btc_discount_label: 'BTC discount (−5%)',
+        shipping_fee_label: 'Shipping',
+        checkout_options_required: 'Select CASH or BTC at the top, then Standard or Express in the cart.',
+        payment_pref_aria: 'Payment method',
+        order_success_recap: 'Summary',
         checkout_sending: 'Sending…',
         cart_checkout_prep_title: 'After you confirm',
         order_success_title: 'Order received',
@@ -318,14 +332,21 @@ Wichtig:
         order_customer_contact: '📞 Kundenkontakt',
         order_contact_missing: 'nicht angegeben',
         order_payment_label: 'Zahlung',
-        order_fulfillment_label: 'Abholung / Versand',
-        checkout_payment_title: 'Zahlungsart',
-        checkout_fulfillment_title: 'Lieferung / Meetup',
-        order_payment_cash: 'Bar',
-        order_payment_btc: 'BTC',
-        order_fulfillment_envoi: 'Versand',
-        order_fulfillment_meetup: 'Meetup',
-        checkout_options_required: 'Waehle Zahlungsart und Lieferoption vor dem Senden.',
+        order_shipping_label: 'Lieferung',
+        checkout_payment_title: 'Zahlung',
+        checkout_shipping_title: 'Lieferung',
+        order_payment_cash: '💶 BAR',
+        order_payment_btc: '₿ BTC (−5 %)',
+        order_payment_btc_note: '−5 % nur auf Artikel',
+        order_shipping_normal: 'Normal (nächster Tag)',
+        order_shipping_express: 'Express (vor 09:00)',
+        order_shipping_normal_price: '5.90 CHF',
+        order_shipping_express_price: '20.00 CHF',
+        btc_discount_label: 'BTC-Rabatt (−5 %)',
+        shipping_fee_label: 'Versand',
+        checkout_options_required: 'Waehle BAR oder BTC oben, dann Normal oder Express im Warenkorb.',
+        payment_pref_aria: 'Zahlungsart',
+        order_success_recap: 'Zusammenfassung',
         checkout_sending: 'Wird gesendet…',
         cart_checkout_prep_title: 'Nach der Bestaetigung',
         order_success_title: 'Bestellung erhalten',
@@ -497,6 +518,7 @@ function applyTranslations() {
     if (langSelect) {
         langSelect.value = currentLang;
     }
+    syncPaymentBarUi();
 
     // Bouton d'ajout au panier si la modal est ouverte
     const addBtn = document.getElementById('btn-add');
@@ -558,14 +580,17 @@ const PRODUCTS = [];
 let cart = [];
 let checkoutInFlight = false;
 let checkoutPayment = '';
-let checkoutFulfillment = '';
-const CHECKOUT_PREFS_KEY = 'alps_checkout_prefs';
+let checkoutShipping = '';
+const CHECKOUT_PREFS_KEY = 'alps_checkout_prefs_v2';
+const BTC_DISCOUNT_RATE = 0.05;
+const SHIPPING_NORMAL_CHF = 5.9;
+const SHIPPING_EXPRESS_CHF = 20;
 
 function loadCheckoutPrefs() {
     try {
         const o = JSON.parse(sessionStorage.getItem(CHECKOUT_PREFS_KEY) || '{}');
         if (o.payment === 'cash' || o.payment === 'btc') checkoutPayment = o.payment;
-        if (o.fulfillment === 'envoi' || o.fulfillment === 'meetup') checkoutFulfillment = o.fulfillment;
+        if (o.shipping === 'normal' || o.shipping === 'express') checkoutShipping = o.shipping;
     } catch (e) { /* ignore */ }
 }
 
@@ -573,23 +598,91 @@ function saveCheckoutPrefs() {
     try {
         sessionStorage.setItem(CHECKOUT_PREFS_KEY, JSON.stringify({
             payment: checkoutPayment,
-            fulfillment: checkoutFulfillment
+            shipping: checkoutShipping
         }));
     } catch (e) { /* ignore */ }
 }
 
-function readCheckoutOptionsFromDom() {
-    const p = document.querySelector('input[name="checkout-payment"]:checked');
-    const f = document.querySelector('input[name="checkout-fulfillment"]:checked');
-    checkoutPayment = p?.value === 'cash' || p?.value === 'btc' ? p.value : '';
-    checkoutFulfillment = f?.value === 'envoi' || f?.value === 'meetup' ? f.value : '';
-    saveCheckoutPrefs();
+async function loadCheckoutPrefsFromServer() {
+    if (!POINTS_API_URL || !getInitData()) return;
+    try {
+        const r = await fetch(
+            `${POINTS_API_URL}/api/checkout-prefs?initData=${encodeURIComponent(getInitData())}`,
+            { cache: 'no-store', headers: catalogApiHeaders() }
+        );
+        if (!r.ok) return;
+        const d = await r.json();
+        if (d.payment === 'cash' || d.payment === 'btc') checkoutPayment = d.payment;
+        if (d.shipping === 'normal' || d.shipping === 'express') checkoutShipping = d.shipping;
+        saveCheckoutPrefs();
+        syncPaymentBarUi();
+    } catch (e) { /* ignore */ }
 }
 
-function onCheckoutOptionChange() {
-    readCheckoutOptionsFromDom();
+async function syncCheckoutPrefsToServer() {
+    if (!POINTS_API_URL || !getInitData()) return;
+    if (!checkoutPayment && !checkoutShipping) return;
+    try {
+        await fetch(`${POINTS_API_URL}/api/checkout-prefs`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...catalogApiHeaders() },
+            body: JSON.stringify({
+                initData: getInitData(),
+                payment: checkoutPayment || null,
+                shipping: checkoutShipping || null
+            })
+        });
+    } catch (e) { /* ignore */ }
+}
+
+function syncPaymentBarUi() {
+    const bar = document.getElementById('payment-pref-bar');
+    const cashBtn = document.getElementById('pay-pref-cash');
+    const btcBtn = document.getElementById('pay-pref-btc');
+    if (bar) {
+        bar.classList.toggle('is-unset', !checkoutPayment);
+        bar.classList.remove('is-invalid');
+        bar.setAttribute('aria-label', t('payment_pref_aria'));
+    }
+    if (cashBtn) {
+        cashBtn.classList.toggle('is-active', checkoutPayment === 'cash');
+        cashBtn.textContent = t('order_payment_cash');
+    }
+    if (btcBtn) {
+        btcBtn.classList.toggle('is-active', checkoutPayment === 'btc');
+        btcBtn.textContent = t('order_payment_btc');
+    }
+}
+
+function setCheckoutPayment(method) {
+    checkoutPayment = method === 'btc' || method === 'cash' ? method : '';
+    saveCheckoutPrefs();
+    syncCheckoutPrefsToServer();
+    hideCheckoutError();
+    syncPaymentBarUi();
+    renderProducts();
+    if (currentProduct && document.getElementById('product-modal')?.classList.contains('active')) {
+        document.querySelectorAll('.pricing-row').forEach((el, j) => {
+            const tier = currentProduct.pricing?.[j];
+            const priceSpan = el.querySelector('.pricing-price');
+            if (!tier || !priceSpan) return;
+            priceSpan.innerHTML = `${getCatalogDisplayPrice(tier.price)} ${CURRENCY}${
+                checkoutPayment === 'btc' ? ' <span class="price-btc-tag">−5%</span>' : ''
+            }`;
+        });
+        updateBtn();
+    }
+    const cartOverlay = document.getElementById('cart-overlay');
+    if (cart.length && cartOverlay?.classList.contains('active')) renderCart();
+}
+
+function setCheckoutShipping(method) {
+    checkoutShipping = method === 'normal' || method === 'express' ? method : '';
+    saveCheckoutPrefs();
+    syncCheckoutPrefsToServer();
     hideCheckoutError();
     document.getElementById('cart-checkout-options')?.classList.remove('is-invalid');
+    renderCart();
 }
 
 function getCheckoutPaymentLabel() {
@@ -598,37 +691,57 @@ function getCheckoutPaymentLabel() {
     return '';
 }
 
-function getCheckoutFulfillmentLabel() {
-    if (checkoutFulfillment === 'envoi') return t('order_fulfillment_envoi');
-    if (checkoutFulfillment === 'meetup') return t('order_fulfillment_meetup');
+function getCheckoutShippingLabel() {
+    if (checkoutShipping === 'normal') {
+        return `${t('order_shipping_normal')} — ${t('order_shipping_normal_price')}`;
+    }
+    if (checkoutShipping === 'express') {
+        return `${t('order_shipping_express')} — ${t('order_shipping_express_price')}`;
+    }
     return '';
 }
 
 function validateCheckoutOptions() {
-    readCheckoutOptionsFromDom();
-    if (checkoutPayment && checkoutFulfillment) return true;
-    document.getElementById('cart-checkout-options')?.classList.add('is-invalid');
+    const paymentOk = !!checkoutPayment;
+    const shippingOk = !!checkoutShipping;
+    document.getElementById('payment-pref-bar')?.classList.toggle('is-invalid', !paymentOk);
+    document.getElementById('cart-checkout-options')?.classList.toggle('is-invalid', !shippingOk);
+    if (paymentOk && shippingOk) return true;
     showCheckoutError(t('checkout_options_required'));
     return false;
 }
 
 function renderCheckoutOptionsHtml() {
-    const payCash = checkoutPayment === 'cash' ? ' checked' : '';
-    const payBtc = checkoutPayment === 'btc' ? ' checked' : '';
-    const fulEnvoi = checkoutFulfillment === 'envoi' ? ' checked' : '';
-    const fulMeet = checkoutFulfillment === 'meetup' ? ' checked' : '';
+    const shipNormalActive = checkoutShipping === 'normal' ? ' is-active' : '';
+    const shipExpressActive = checkoutShipping === 'express' ? ' is-active' : '';
+    const paymentSummary =
+        checkoutPayment === 'btc' || checkoutPayment === 'cash'
+            ? `<p class="checkout-payment-summary">💳 ${escapeHtml(getCheckoutPaymentLabel())}${
+                  checkoutPayment === 'btc' ? ` · ${escapeHtml(t('order_payment_btc_note'))}` : ''
+              }</p>`
+            : '';
     return `<div class="cart-checkout-options" id="cart-checkout-options">
-        <fieldset class="checkout-option-group">
-            <legend>${escapeHtml(t('checkout_payment_title'))}</legend>
-            <label class="checkout-option"><input type="radio" name="checkout-payment" value="cash"${payCash} onchange="onCheckoutOptionChange()"> ${escapeHtml(t('order_payment_cash'))}</label>
-            <label class="checkout-option"><input type="radio" name="checkout-payment" value="btc"${payBtc} onchange="onCheckoutOptionChange()"> ${escapeHtml(t('order_payment_btc'))}</label>
-        </fieldset>
-        <fieldset class="checkout-option-group">
-            <legend>${escapeHtml(t('checkout_fulfillment_title'))}</legend>
-            <label class="checkout-option"><input type="radio" name="checkout-fulfillment" value="envoi"${fulEnvoi} onchange="onCheckoutOptionChange()"> ${escapeHtml(t('order_fulfillment_envoi'))}</label>
-            <label class="checkout-option"><input type="radio" name="checkout-fulfillment" value="meetup"${fulMeet} onchange="onCheckoutOptionChange()"> ${escapeHtml(t('order_fulfillment_meetup'))}</label>
-        </fieldset>
+        ${paymentSummary}
+        <div class="checkout-option-group">
+            <div class="checkout-option-legend">${escapeHtml(t('checkout_shipping_title'))}</div>
+            <div class="checkout-btn-row">
+                <button type="button" class="checkout-toggle-btn checkout-toggle-btn-stack${shipNormalActive}" onclick="setCheckoutShipping('normal')">
+                    <span>${escapeHtml(t('order_shipping_normal'))}</span>
+                    <span class="checkout-toggle-price">${escapeHtml(t('order_shipping_normal_price'))}</span>
+                </button>
+                <button type="button" class="checkout-toggle-btn checkout-toggle-btn-stack${shipExpressActive}" onclick="setCheckoutShipping('express')">
+                    <span>${escapeHtml(t('order_shipping_express'))}</span>
+                    <span class="checkout-toggle-price">${escapeHtml(t('order_shipping_express_price'))}</span>
+                </button>
+            </div>
+        </div>
     </div>`;
+}
+
+function getCatalogDisplayPrice(price) {
+    const p = Number(price) || 0;
+    if (checkoutPayment !== 'btc') return p;
+    return Math.round(p * (1 - BTC_DISCOUNT_RATE) * 100) / 100;
 }
 let selectedPricingIdx = null;
 let selectedVariantIdxs = [];
@@ -1031,13 +1144,33 @@ function formatChfAmount(n) {
 
 function computeCartTotals() {
     const subtotal = cart.reduce((sum, item) => sum + (Number(item?.price) || 0), 0);
-    const payableRounded = Math.max(0, Math.round(subtotal));
-    return { subtotal, payableRounded };
+    const btcDiscount =
+        checkoutPayment === 'btc' ? Math.round(subtotal * BTC_DISCOUNT_RATE * 100) / 100 : 0;
+    const afterDiscount = Math.max(0, subtotal - btcDiscount);
+    const shipping =
+        checkoutShipping === 'express'
+            ? SHIPPING_EXPRESS_CHF
+            : checkoutShipping === 'normal'
+              ? SHIPPING_NORMAL_CHF
+              : 0;
+    const payableRaw = afterDiscount + shipping;
+    const payableRounded = Math.max(0, Math.round(payableRaw));
+    return { subtotal, btcDiscount, afterDiscount, shipping, payableRaw, payableRounded };
 }
 
 function init() {
     loadCheckoutPrefs();
-    window.onCheckoutOptionChange = onCheckoutOptionChange;
+    window.setCheckoutPayment = setCheckoutPayment;
+    window.setCheckoutShipping = setCheckoutShipping;
+    document.getElementById('pay-pref-cash')?.addEventListener('click', () => {
+        hapticLight();
+        setCheckoutPayment('cash');
+    });
+    document.getElementById('pay-pref-btc')?.addEventListener('click', () => {
+        hapticLight();
+        setCheckoutPayment('btc');
+    });
+    syncPaymentBarUi();
     document.title = "Alpine Connexion";
     const editContactBtn = document.getElementById('btn-edit-contact');
     editContactBtn?.addEventListener('click', async () => {
@@ -1054,6 +1187,7 @@ function init() {
     (async () => {
         if (isTelegramWebApp()) await waitForInitData();
         await loadContactProfileFromServer();
+        await loadCheckoutPrefsFromServer();
         loadCartFromStorage();
         updateCartBadge();
         scheduleCartActivitySync();
@@ -1289,7 +1423,15 @@ function renderProducts() {
         }
 
         const fp = p.pricing?.[0];
-        const price = fp ? `<span class="price-from">${t('price_from_prefix')}</span>${fp.price} ${CURRENCY}` : '';
+        let price = '';
+        if (fp) {
+            const shown = getCatalogDisplayPrice(fp.price);
+            const btcHint =
+                checkoutPayment === 'btc'
+                    ? ` <span class="price-btc-tag">−5%</span>`
+                    : '';
+            price = `<span class="price-from">${t('price_from_prefix')}</span>${shown} ${CURRENCY}${btcHint}`;
+        }
         return `
             <div class="product-card${isNew ? ' is-new' : ''}" onclick="openProduct(${p.id})">
                 <div class="product-media-wrap">${badgeHtml}${media}</div>
@@ -1345,7 +1487,7 @@ function openProduct(id) {
             <div class="pricing-options">${p.pricing.map((t,i) =>
                 `<div class="pricing-row" onclick="pickPricing(${i})" id="price-${i}">
                     <span class="pricing-qty">${t.qty} ${unit}</span>
-                    <span class="pricing-price">${t.price} ${CURRENCY}</span>
+                    <span class="pricing-price">${getCatalogDisplayPrice(t.price)} ${CURRENCY}${checkoutPayment === 'btc' ? ' <span class="price-btc-tag">−5%</span>' : ''}</span>
                 </div>`
             ).join('')}</div></div>`;
     }
@@ -1566,7 +1708,11 @@ function updateBtn() {
     if (priceEl) {
         if (state.ready && selectedPricingIdx !== null && currentProduct?.pricing?.[selectedPricingIdx]) {
             const tier = currentProduct.pricing[selectedPricingIdx];
-            priceEl.textContent = `${tier.price} ${CURRENCY}`;
+            const shown = getCatalogDisplayPrice(tier.price);
+            priceEl.textContent =
+                checkoutPayment === 'btc'
+                    ? `${shown} ${CURRENCY} (−5%)`
+                    : `${shown} ${CURRENCY}`;
             priceEl.classList.remove('hidden');
         } else {
             priceEl.textContent = '';
@@ -1648,17 +1794,33 @@ function renderCart() {
         </div>`;
     });
 
+    const discountRow =
+        totals.btcDiscount > 0
+            ? `<div class="cart-total-row cart-total-row-discount">
+            <span class="cart-total-label">${t('btc_discount_label')}</span>
+            <span class="cart-total-amount cart-total-discount">−${totals.btcDiscount.toFixed(2)} ${CURRENCY}</span>
+        </div>`
+            : '';
+    const shippingRow =
+        totals.shipping > 0
+            ? `<div class="cart-total-row">
+            <span class="cart-total-label">${t('shipping_fee_label')}</span>
+            <span class="cart-total-amount cart-total-amount-small">${totals.shipping.toFixed(2)} ${CURRENCY}</span>
+        </div>`
+            : '';
     h += `<div class="cart-footer">
+        ${renderCheckoutOptionsHtml()}
         <div class="cart-total-row">
             <span class="cart-total-label">${t('cashback_subtotal_label')}</span>
             <span class="cart-total-amount cart-total-amount-small">${totals.subtotal.toFixed(2)} ${CURRENCY}</span>
         </div>
+        ${discountRow}
+        ${shippingRow}
         <div class="cart-total-row cart-total-row-due">
             <span class="cart-total-label">${t('cashback_payable_label')}</span>
             <span class="cart-total-amount">${totals.payableRounded.toFixed(0)} ${CURRENCY}</span>
         </div>
         <div class="checkout-hint">${t('rounded_total_note')}</div>
-        ${renderCheckoutOptionsHtml()}
         <div class="cart-checkout-prep">
             <div class="cart-checkout-prep-title">${t('cart_checkout_prep_title')}</div>
             <p class="cart-checkout-prep-text">${escapeHtml(t('cart_bot_followup'))}</p>
@@ -1698,12 +1860,16 @@ function buildOrderText(totals, orderId) {
     const tvals = totals || computeCartTotals();
     const contactSummary = getCustomerContactSummary() || t('order_contact_missing');
     const paymentLabel = getCheckoutPaymentLabel();
-    const fulfillmentLabel = getCheckoutFulfillmentLabel();
+    const shippingLabel = getCheckoutShippingLabel();
     let msg = `${t('order_header')}\n\n`;
     if (orderId) msg += `${t('order_id_label')} : ${orderId}\n`;
     msg += `${t('order_customer_contact')} : ${contactSummary}\n`;
-    if (paymentLabel) msg += `💳 ${t('order_payment_label')} : ${paymentLabel}\n`;
-    if (fulfillmentLabel) msg += `🚚 ${t('order_fulfillment_label')} : ${fulfillmentLabel}\n`;
+    if (paymentLabel) {
+        msg += `💳 ${t('order_payment_label')} : ${paymentLabel}`;
+        if (checkoutPayment === 'btc') msg += ` (${t('order_payment_btc_note')})`;
+        msg += '\n';
+    }
+    if (shippingLabel) msg += `🚚 ${t('order_shipping_label')} : ${shippingLabel}\n`;
     msg += '\n';
     cart.forEach((item, i) => {
         const u = formatUnitDisplay(item);
@@ -1711,6 +1877,13 @@ function buildOrderText(totals, orderId) {
         if (item.variant) msg += ` (${item.variant})`;
         msg += `\n   📦 ${item.qty} ${u} — ${item.price} ${CURRENCY}\n\n`;
     });
+    msg += `${t('cashback_subtotal_label')} : ${tvals.subtotal.toFixed(2)} ${CURRENCY}\n`;
+    if (tvals.btcDiscount > 0) {
+        msg += `${t('btc_discount_label')} : −${tvals.btcDiscount.toFixed(2)} ${CURRENCY}\n`;
+    }
+    if (tvals.shipping > 0) {
+        msg += `${t('shipping_fee_label')} : ${tvals.shipping.toFixed(2)} ${CURRENCY}\n`;
+    }
     msg += `${t('order_total')} : ${tvals.payableRounded.toFixed(0)} ${CURRENCY}`;
     return msg;
 }
@@ -1744,12 +1917,23 @@ function showCheckoutError(message) {
     } catch (e) {}
 }
 
-function showOrderSuccess(orderRef) {
+function showOrderSuccess(orderRef, recap) {
     const ref = String(orderRef || '').trim() || '—';
     const overlay = document.getElementById('order-success-overlay');
     const refEl = document.getElementById('order-success-ref');
+    const recapEl = document.getElementById('order-success-recap');
     const stepsEl = document.getElementById('order-success-steps');
     if (refEl) refEl.textContent = t('order_success_ref').replace('{ref}', ref);
+    if (recapEl && recap) {
+        const lines = [];
+        if (recap.payment) lines.push(`💳 ${escapeHtml(recap.payment)}`);
+        if (recap.shipping) lines.push(`🚚 ${escapeHtml(recap.shipping)}`);
+        if (recap.total != null) lines.push(`💰 ${escapeHtml(String(recap.total))} ${CURRENCY}`);
+        recapEl.innerHTML = lines.length
+            ? `<strong>${escapeHtml(t('order_success_recap'))}</strong><br>${lines.join('<br>')}`
+            : '';
+        recapEl.hidden = !lines.length;
+    }
     if (stepsEl) {
         stepsEl.innerHTML = [
             t('order_success_step1'),
@@ -1790,6 +1974,11 @@ async function checkout() {
         const totals = computeCartTotals();
         const orderId = generateOrderId();
         const orderText = buildOrderText(totals, orderId);
+        const orderRecap = {
+            payment: getCheckoutPaymentLabel(),
+            shipping: getCheckoutShippingLabel(),
+            total: `${totals.payableRounded.toFixed(0)}`
+        };
 
         if (POINTS_API_URL && getInitData()) {
             try {
@@ -1802,7 +1991,7 @@ async function checkout() {
                         order_id: orderId,
                         customer_contact: getCustomerContactSummary(),
                         payment_method: checkoutPayment,
-                        fulfillment_method: checkoutFulfillment
+                        shipping_method: checkoutShipping
                     })
                 });
                 const data = await res.json().catch(() => ({}));
@@ -1812,7 +2001,7 @@ async function checkout() {
                     saveCartToStorage();
                     updateCartBadge();
                     scheduleCartActivitySync();
-                    showOrderSuccess(ref);
+                    showOrderSuccess(ref, orderRecap);
                     return;
                 }
                 if (data.error === 'checkout_options_required') {

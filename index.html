@@ -9,7 +9,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <link rel="stylesheet" href="styles.css?v=20260520-checkout-options">
+    <link rel="stylesheet" href="styles.css?v=20260520-payment-bar">
 </head>
 <body>
 
@@ -76,6 +76,7 @@
         <div class="order-success-icon" aria-hidden="true">✓</div>
         <h2 class="order-success-title" id="order-success-title">Commande bien reçue</h2>
         <p class="order-success-ref" id="order-success-ref"></p>
+        <p class="order-success-recap" id="order-success-recap" hidden></p>
         <ol class="order-success-steps" id="order-success-steps"></ol>
         <p class="order-success-note" id="order-success-note"></p>
         <button type="button" class="btn-order-success-primary" id="order-success-btn">Ouvrir le chat Telegram</button>
@@ -103,6 +104,10 @@
                     <option value="en">EN</option>
                     <option value="de">DE</option>
                 </select>
+                <div class="payment-pref-bar" id="payment-pref-bar" role="group" aria-label="Paiement">
+                    <button type="button" class="payment-pref-btn" id="pay-pref-cash" data-payment="cash">CASH</button>
+                    <button type="button" class="payment-pref-btn" id="pay-pref-btc" data-payment="btc">BTC −5%</button>
+                </div>
                 <button type="button" class="contact-edit-btn" id="btn-edit-contact"></button>
             </div>
             <div class="category-chips-scroll" id="category-chips" role="tablist" aria-label="Catégories"></div>
@@ -163,7 +168,7 @@
 <!-- #endregion -->
 
 <!-- #region Scripts -->
-<script src="app.js?v=20260520-checkout-options"></script>
+<script src="app.js?v=20260520-payment-bar"></script>
 <!-- #endregion -->
 </body>
 </html>

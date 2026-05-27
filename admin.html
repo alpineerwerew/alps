@@ -809,6 +809,8 @@
 
         function formatOrderFulfillmentLabel(v) {
             const x = String(v || '').toLowerCase();
+            if (x === 'normal') return 'Normal (5.90)';
+            if (x === 'express') return 'Express (20.00)';
             if (x === 'envoi') return 'Envoi';
             if (x === 'meetup') return 'Meetup';
             return '—';
