@@ -306,8 +306,8 @@ function parseOrderCheckoutOptions(orderText) {
   let fulfillment_method = null;
   for (const line of lines) {
     if (/💳/.test(line) || /(?:paiement|payment|zahlung)\s*:/i.test(line)) {
-      if (/\bbtc\b/i.test(line)) payment_method = 'btc';
-      else if (/\bcash\b|\bbar\b/i.test(line)) payment_method = 'cash';
+      if (/\bbtc\b|₿/i.test(line)) payment_method = 'btc';
+      else if (/\bcash\b|\bbar\b|💶/i.test(line)) payment_method = 'cash';
     }
     if (/🚚/.test(line) || /(?:livraison|delivery|lieferung|récupération|recuperation|fulfillment|abholung|versand)\s*:/i.test(line)) {
       if (/meetup/i.test(line)) fulfillment_method = 'meetup';
@@ -322,6 +322,36 @@ function normalizeCheckoutOption(value, allowed) {
   return allowed.includes(v) ? v : null;
 }
 
+function extractOrderFinalTotal(orderText) {
+  const lines = String(orderText || '')
+    .split('\n')
+    .map((l) => String(l || '').trim())
+    .filter(Boolean);
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const l = lines[i];
+    if (/(?:sous[- ]?total|subtotal|zwischensumme)/i.test(l)) continue;
+    if (/💰/.test(l) || /(?:^|\s)(?:total|gesamt)\s*:/i.test(l)) {
+      const m = l.match(/([\d.,]+)\s*CHF/i);
+      if (m) {
+        const n = Number(String(m[1]).replace(',', '.'));
+        if (Number.isFinite(n)) return n;
+      }
+    }
+  }
+  return null;
+}
+
+function extractOrderBtcDiscount(orderText) {
+  const line = String(orderText || '')
+    .split('\n')
+    .find((l) => /(?:remise btc|btc discount|btc-rabatt)/i.test(l));
+  if (!line) return null;
+  const m = line.match(/([\d.,]+)\s*CHF/i);
+  if (!m) return null;
+  const n = Number(String(m[1]).replace(',', '.'));
+  return Number.isFinite(n) ? n : null;
+}
+
 function parseOrderForReference(orderText) {
   const txt = String(orderText || '');
   const lines = txt.split('\n').map((l) => String(l || '').trim()).filter(Boolean);
@@ -333,13 +363,11 @@ function parseOrderForReference(orderText) {
       if (core) itemNames.push(core);
     }
   }
-  const totalLine = lines.find((l) => /(?:total|gesamt)\s*:/i.test(l)) || '';
-  const totalMatch = totalLine.match(/([\d.,]+)\s*CHF/i);
-  const totalChf = totalMatch ? Number(String(totalMatch[1]).replace(',', '.')) : null;
+  const totalChf = extractOrderFinalTotal(orderText);
   return {
     items: itemNames.slice(0, 8),
     items_label: itemNames.slice(0, 3).join(', '),
-    total_chf: Number.isFinite(totalChf) ? totalChf : null
+    total_chf: totalChf
   };
 }
 
@@ -801,11 +829,12 @@ function buildOrderRecapFromText(orderText, lang) {
   else if (opts.payment_method === 'cash') lines.push(`💳 ${L.menu_pay_cash_btn}`);
   if (opts.fulfillment_method === 'meetup') lines.push(`🚚 ${L.menu_fulfill_meetup_btn}`);
   else if (opts.fulfillment_method === 'envoi') lines.push(`🚚 ${L.menu_fulfill_envoi_btn} — gratuit`);
-  const totalLine = String(orderText || '')
-    .split('\n')
-    .find((l) => /(?:total|gesamt)\s*:/i.test(l));
-  const totalMatch = totalLine && totalLine.match(/([\d.,]+)\s*CHF/i);
-  if (totalMatch) lines.push(`💰 Total : ${totalMatch[1]} CHF`);
+  const btcDiscount = extractOrderBtcDiscount(orderText);
+  if (btcDiscount != null && btcDiscount > 0) {
+    lines.push(`🏷 −${btcDiscount.toFixed(2)} CHF (BTC)`);
+  }
+  const totalChf = extractOrderFinalTotal(orderText);
+  if (totalChf != null) lines.push(`💰 Total : ${Math.round(totalChf)} CHF`);
   if (!lines.length) return '';
   return `${L.order_recap_title || 'Récap'} :\n${lines.join('\n')}`;
 }

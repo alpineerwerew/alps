@@ -132,6 +132,7 @@ Important :
         price_cash_short: 'Cash',
         price_btc_short: 'BTC −5%',
         order_success_recap: 'Récapitulatif',
+        order_success_btc_discount: 'Remise BTC (−5 %)',
         checkout_sending: 'Envoi en cours…',
         cart_checkout_prep_title: 'Après avoir validé',
         order_success_title: 'Commande bien reçue',
@@ -244,6 +245,7 @@ Important:
         price_cash_short: 'Cash',
         price_btc_short: 'BTC −5%',
         order_success_recap: 'Summary',
+        order_success_btc_discount: 'BTC discount (−5%)',
         checkout_sending: 'Sending…',
         cart_checkout_prep_title: 'After you confirm',
         order_success_title: 'Order received',
@@ -356,6 +358,7 @@ Wichtig:
         price_cash_short: 'Bar',
         price_btc_short: 'BTC −5%',
         order_success_recap: 'Zusammenfassung',
+        order_success_btc_discount: 'BTC-Rabatt (−5 %)',
         checkout_sending: 'Wird gesendet…',
         cart_checkout_prep_title: 'Nach der Bestaetigung',
         order_success_title: 'Bestellung erhalten',
@@ -2049,7 +2052,10 @@ function showOrderSuccess(orderRef, recap) {
         const lines = [];
         if (recap.payment) lines.push(`💳 ${escapeHtml(recap.payment)}`);
         if (recap.shipping) lines.push(`🚚 ${escapeHtml(recap.shipping)}`);
-        if (recap.total != null) lines.push(`💰 ${escapeHtml(String(recap.total))} ${CURRENCY}`);
+        if (recap.btcDiscount > 0) {
+            lines.push(`🏷 ${escapeHtml(t('order_success_btc_discount'))} : −${recap.btcDiscount.toFixed(2)} ${CURRENCY}`);
+        }
+        if (recap.total != null) lines.push(`💰 Total : ${escapeHtml(String(recap.total))} ${CURRENCY}`);
         recapEl.innerHTML = lines.length
             ? `<strong>${escapeHtml(t('order_success_recap'))}</strong><br>${lines.join('<br>')}`
             : '';
@@ -2098,6 +2104,7 @@ async function checkout() {
         const orderRecap = {
             payment: getCheckoutPaymentLabel(),
             shipping: getCheckoutFulfillmentLabel(),
+            btcDiscount: totals.btcDiscount > 0 ? totals.btcDiscount : 0,
             total: `${totals.payableRounded.toFixed(0)}`
         };
 
