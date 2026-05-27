@@ -784,6 +784,93 @@ body {
     color: var(--text-secondary);
 }
 
+.checkout-payment-group.is-invalid,
+.checkout-shipping-group.is-invalid {
+    padding: 0.5rem;
+    margin: -0.5rem -0.5rem 0.35rem;
+    border-radius: 10px;
+    border: 1px solid rgba(248, 113, 113, 0.55);
+}
+
+.modal-payment-section {
+    margin-bottom: 0.85rem;
+}
+
+.modal-payment-toggle .checkout-toggle-btn {
+    min-height: 2.65rem;
+}
+
+.pricing-price-dual {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.35rem;
+}
+
+.pricing-price-line {
+    display: flex;
+    align-items: baseline;
+    gap: 0.35rem;
+    font-size: 0.82rem;
+    line-height: 1.2;
+    padding: 0.2rem 0.45rem;
+    border-radius: 6px;
+    border: 1px solid transparent;
+    color: var(--text-secondary);
+}
+
+.pricing-price-line.is-selected {
+    border-color: rgba(134, 239, 172, 0.55);
+    background: rgba(34, 197, 94, 0.12);
+    color: #ecfdf5;
+}
+
+.pricing-price-line .pricing-price-value {
+    font-weight: 700;
+    color: inherit;
+}
+
+.pricing-price-btc .pricing-price-value {
+    color: #86efac;
+}
+
+.pricing-row.selected .pricing-price-line.is-selected .pricing-price-value {
+    color: #ecfdf5;
+}
+
+.modal-sticky-prices {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.15rem;
+    font-size: 0.78rem;
+    line-height: 1.25;
+    margin-right: 0.5rem;
+    min-width: 0;
+}
+
+.modal-sticky-price-line {
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+.modal-sticky-price-line.is-selected {
+    color: var(--gold-light);
+    font-weight: 700;
+}
+
+.modal-sticky-price-btc.is-selected {
+    color: #86efac;
+}
+
+@media (min-width: 380px) {
+    .pricing-price-dual {
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+    }
+}
+
 /* filter-select retiré au profit des category-chip (mobile) */
 
 /* === PRODUCT GRID === */

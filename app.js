@@ -126,8 +126,11 @@ Important :
         order_shipping_express_price: '20.00 CHF',
         btc_discount_label: 'Remise BTC (−5 %)',
         shipping_fee_label: 'Livraison',
-        checkout_options_required: 'Choisis CASH ou BTC en haut, puis Normal ou Express dans le panier.',
+        checkout_options_required: 'Choisis CASH ou BTC et une option de livraison avant d’envoyer.',
         payment_pref_aria: 'Mode de paiement',
+        product_payment_picker_title: 'Prix selon le paiement',
+        price_cash_short: 'Cash',
+        price_btc_short: 'BTC −5%',
         order_success_recap: 'Récapitulatif',
         checkout_sending: 'Envoi en cours…',
         cart_checkout_prep_title: 'Après avoir validé',
@@ -235,8 +238,11 @@ Important:
         order_shipping_express_price: '20.00 CHF',
         btc_discount_label: 'BTC discount (−5%)',
         shipping_fee_label: 'Shipping',
-        checkout_options_required: 'Select CASH or BTC at the top, then Standard or Express in the cart.',
+        checkout_options_required: 'Select CASH or BTC and a delivery option before sending.',
         payment_pref_aria: 'Payment method',
+        product_payment_picker_title: 'Prices by payment method',
+        price_cash_short: 'Cash',
+        price_btc_short: 'BTC −5%',
         order_success_recap: 'Summary',
         checkout_sending: 'Sending…',
         cart_checkout_prep_title: 'After you confirm',
@@ -344,8 +350,11 @@ Wichtig:
         order_shipping_express_price: '20.00 CHF',
         btc_discount_label: 'BTC-Rabatt (−5 %)',
         shipping_fee_label: 'Versand',
-        checkout_options_required: 'Waehle BAR oder BTC oben, dann Normal oder Express im Warenkorb.',
+        checkout_options_required: 'Waehle BAR oder BTC und eine Lieferoption vor dem Senden.',
         payment_pref_aria: 'Zahlungsart',
+        product_payment_picker_title: 'Preise nach Zahlungsart',
+        price_cash_short: 'Bar',
+        price_btc_short: 'BTC −5%',
         order_success_recap: 'Zusammenfassung',
         checkout_sending: 'Wird gesendet…',
         cart_checkout_prep_title: 'Nach der Bestaetigung',
@@ -659,18 +668,11 @@ function setCheckoutPayment(method) {
     saveCheckoutPrefs();
     syncCheckoutPrefsToServer();
     hideCheckoutError();
+    document.getElementById('cart-payment-group')?.classList.remove('is-invalid');
     syncPaymentBarUi();
     renderProducts();
     if (currentProduct && document.getElementById('product-modal')?.classList.contains('active')) {
-        document.querySelectorAll('.pricing-row').forEach((el, j) => {
-            const tier = currentProduct.pricing?.[j];
-            const priceSpan = el.querySelector('.pricing-price');
-            if (!tier || !priceSpan) return;
-            priceSpan.innerHTML = `${getCatalogDisplayPrice(tier.price)} ${CURRENCY}${
-                checkoutPayment === 'btc' ? ' <span class="price-btc-tag">−5%</span>' : ''
-            }`;
-        });
-        updateBtn();
+        syncModalPaymentUi();
     }
     const cartOverlay = document.getElementById('cart-overlay');
     if (cart.length && cartOverlay?.classList.contains('active')) renderCart();
@@ -681,7 +683,7 @@ function setCheckoutShipping(method) {
     saveCheckoutPrefs();
     syncCheckoutPrefsToServer();
     hideCheckoutError();
-    document.getElementById('cart-checkout-options')?.classList.remove('is-invalid');
+    document.getElementById('cart-shipping-group')?.classList.remove('is-invalid');
     renderCart();
 }
 
@@ -705,24 +707,76 @@ function validateCheckoutOptions() {
     const paymentOk = !!checkoutPayment;
     const shippingOk = !!checkoutShipping;
     document.getElementById('payment-pref-bar')?.classList.toggle('is-invalid', !paymentOk);
-    document.getElementById('cart-checkout-options')?.classList.toggle('is-invalid', !shippingOk);
+    document.getElementById('cart-payment-group')?.classList.toggle('is-invalid', !paymentOk);
+    document.getElementById('cart-shipping-group')?.classList.toggle('is-invalid', !shippingOk);
     if (paymentOk && shippingOk) return true;
     showCheckoutError(t('checkout_options_required'));
     return false;
 }
 
+function renderPaymentToggleButtonsHtml(extraClass) {
+    const cls = extraClass ? ` ${extraClass}` : '';
+    const payCashActive = checkoutPayment === 'cash' ? ' is-active' : '';
+    const payBtcActive = checkoutPayment === 'btc' ? ' is-active' : '';
+    return `<div class="checkout-btn-row payment-toggle-row${cls}">
+        <button type="button" class="checkout-toggle-btn${payCashActive}" data-payment="cash" onclick="setCheckoutPayment('cash')">${escapeHtml(t('order_payment_cash'))}</button>
+        <button type="button" class="checkout-toggle-btn${payBtcActive}" data-payment="btc" onclick="setCheckoutPayment('btc')">${escapeHtml(t('order_payment_btc'))}</button>
+    </div>`;
+}
+
+function getBtcPrice(price) {
+    const p = Number(price) || 0;
+    return Math.round(p * (1 - BTC_DISCOUNT_RATE) * 100) / 100;
+}
+
+function formatDualPriceHtml(basePrice) {
+    const base = Number(basePrice) || 0;
+    const btc = getBtcPrice(base);
+    const cashSel = checkoutPayment === 'cash' ? ' is-selected' : '';
+    const btcSel = checkoutPayment === 'btc' ? ' is-selected' : '';
+    return `<span class="pricing-price-dual">
+        <span class="pricing-price-line pricing-price-cash${cashSel}">
+            <span class="pricing-price-label">${escapeHtml(t('price_cash_short'))}</span>
+            <span class="pricing-price-value">${base} ${CURRENCY}</span>
+        </span>
+        <span class="pricing-price-line pricing-price-btc${btcSel}">
+            <span class="pricing-price-label">${escapeHtml(t('price_btc_short'))}</span>
+            <span class="pricing-price-value">${btc} ${CURRENCY}</span>
+        </span>
+    </span>`;
+}
+
+function renderModalPaymentPickerHtml() {
+    return `<div class="selector-section modal-payment-section">
+        <div class="selector-title">${escapeHtml(t('product_payment_picker_title'))}</div>
+        <div id="modal-payment-bar">${renderPaymentToggleButtonsHtml('modal-payment-toggle')}</div>
+    </div>`;
+}
+
+function syncModalPaymentUi() {
+    const bar = document.getElementById('modal-payment-bar');
+    if (!bar) return;
+    bar.querySelectorAll('[data-payment]').forEach((btn) => {
+        btn.classList.toggle('is-active', btn.dataset.payment === checkoutPayment);
+    });
+    document.querySelectorAll('.pricing-row').forEach((el, j) => {
+        const tier = currentProduct?.pricing?.[j];
+        const wrap = el.querySelector('.pricing-price');
+        if (!tier || !wrap) return;
+        wrap.innerHTML = formatDualPriceHtml(tier.price);
+    });
+    updateBtn();
+}
+
 function renderCheckoutOptionsHtml() {
     const shipNormalActive = checkoutShipping === 'normal' ? ' is-active' : '';
     const shipExpressActive = checkoutShipping === 'express' ? ' is-active' : '';
-    const paymentSummary =
-        checkoutPayment === 'btc' || checkoutPayment === 'cash'
-            ? `<p class="checkout-payment-summary">💳 ${escapeHtml(getCheckoutPaymentLabel())}${
-                  checkoutPayment === 'btc' ? ` · ${escapeHtml(t('order_payment_btc_note'))}` : ''
-              }</p>`
-            : '';
     return `<div class="cart-checkout-options" id="cart-checkout-options">
-        ${paymentSummary}
-        <div class="checkout-option-group">
+        <div class="checkout-option-group checkout-payment-group" id="cart-payment-group">
+            <div class="checkout-option-legend">${escapeHtml(t('checkout_payment_title'))}</div>
+            ${renderPaymentToggleButtonsHtml()}
+        </div>
+        <div class="checkout-option-group checkout-shipping-group" id="cart-shipping-group">
             <div class="checkout-option-legend">${escapeHtml(t('checkout_shipping_title'))}</div>
             <div class="checkout-btn-row">
                 <button type="button" class="checkout-toggle-btn checkout-toggle-btn-stack${shipNormalActive}" onclick="setCheckoutShipping('normal')">
@@ -741,7 +795,7 @@ function renderCheckoutOptionsHtml() {
 function getCatalogDisplayPrice(price) {
     const p = Number(price) || 0;
     if (checkoutPayment !== 'btc') return p;
-    return Math.round(p * (1 - BTC_DISCOUNT_RATE) * 100) / 100;
+    return getBtcPrice(p);
 }
 let selectedPricingIdx = null;
 let selectedVariantIdxs = [];
@@ -1487,7 +1541,7 @@ function openProduct(id) {
             <div class="pricing-options">${p.pricing.map((t,i) =>
                 `<div class="pricing-row" onclick="pickPricing(${i})" id="price-${i}">
                     <span class="pricing-qty">${t.qty} ${unit}</span>
-                    <span class="pricing-price">${getCatalogDisplayPrice(t.price)} ${CURRENCY}${checkoutPayment === 'btc' ? ' <span class="price-btc-tag">−5%</span>' : ''}</span>
+                    <span class="pricing-price">${formatDualPriceHtml(t.price)}</span>
                 </div>`
             ).join('')}</div></div>`;
     }
@@ -1499,6 +1553,7 @@ function openProduct(id) {
         <div class="modal-body">
             <div class="modal-title">${escapeHtml(p.name)}</div>
             <div class="modal-category-badge">${escapeHtml(cat?.name || '')}</div>
+            ${renderModalPaymentPickerHtml()}
             <div class="modal-description">${escapeHtml(p.description || '')}</div>
             ${gallery}${variants}${pricing}
         </div>`;
@@ -1516,6 +1571,7 @@ function openProduct(id) {
     if (modalScroll) modalScroll.scrollTop = 0;
 
     document.getElementById('product-modal').classList.add('active');
+    syncModalPaymentUi();
     hapticLight();
     updateBtn();
 }
@@ -1708,11 +1764,12 @@ function updateBtn() {
     if (priceEl) {
         if (state.ready && selectedPricingIdx !== null && currentProduct?.pricing?.[selectedPricingIdx]) {
             const tier = currentProduct.pricing[selectedPricingIdx];
-            const shown = getCatalogDisplayPrice(tier.price);
-            priceEl.textContent =
-                checkoutPayment === 'btc'
-                    ? `${shown} ${CURRENCY} (−5%)`
-                    : `${shown} ${CURRENCY}`;
+            const base = Number(tier.price) || 0;
+            const btc = getBtcPrice(base);
+            priceEl.innerHTML = `<span class="modal-sticky-prices">
+                <span class="modal-sticky-price-line${checkoutPayment === 'cash' ? ' is-selected' : ''}">${escapeHtml(t('price_cash_short'))} ${base} ${CURRENCY}</span>
+                <span class="modal-sticky-price-line modal-sticky-price-btc${checkoutPayment === 'btc' ? ' is-selected' : ''}">${escapeHtml(t('price_btc_short'))} ${btc} ${CURRENCY}</span>
+            </span>`;
             priceEl.classList.remove('hidden');
         } else {
             priceEl.textContent = '';
