@@ -835,31 +835,15 @@ function getHubContactButton(lang) {
   return { text: L.menu_contact_btn, callback_data: 'menu_contact' };
 }
 
-function hubPrefBtn(label, selected) {
-  return selected ? `✓ ${label}` : label;
-}
-
-function getHubMenuInline(lang, chatId) {
+function getHubMenuInline(lang) {
   const L = BOT_STRINGS[lang] || BOT_STRINGS.fr;
-  const prefs = chatId ? getCheckoutPrefs(chatId) : { payment: null, fulfillment: null };
   const contact = getHubContactButton(lang);
   const contactRow = contact.url
     ? { text: contact.text, url: contact.url }
     : { text: contact.text, callback_data: contact.callback_data };
   return {
     reply_markup: {
-      inline_keyboard: [
-        [{ text: L.menu_shop_btn, web_app: { url: CATALOG_URL } }],
-        [
-          { text: hubPrefBtn(L.menu_pay_cash_btn, prefs.payment === 'cash'), callback_data: 'pref_pay_cash' },
-          { text: hubPrefBtn(L.menu_pay_btc_btn, prefs.payment === 'btc'), callback_data: 'pref_pay_btc' }
-        ],
-        [
-          { text: hubPrefBtn(L.menu_fulfill_meetup_btn, prefs.fulfillment === 'meetup'), callback_data: 'pref_fulfill_meetup' },
-          { text: hubPrefBtn(L.menu_fulfill_envoi_btn, prefs.fulfillment === 'envoi'), callback_data: 'pref_fulfill_envoi' }
-        ],
-        [contactRow]
-      ]
+      inline_keyboard: [[{ text: L.menu_shop_btn, web_app: { url: CATALOG_URL } }], [contactRow]]
     }
   };
 }
@@ -876,7 +860,7 @@ function getShopOnlyInline(lang) {
 async function sendBotMenuHub(chatId, lang, opts = {}) {
   if (!bot) return;
   const imageUrl = getWelcomeImageUrl();
-  const markup = getHubMenuInline(lang, chatId);
+  const markup = getHubMenuInline(lang);
   const welcomeText = buildWelcomeHubText(lang);
 
   if (imageUrl) {
@@ -1336,32 +1320,6 @@ bot.on('callback_query', async (query) => {
     const lang = getChatLang(chatId) || 'fr';
     const L = BOT_STRINGS[lang] || BOT_STRINGS.fr;
     await bot.sendMessage(chatId, L.order_question_prompt);
-    return;
-  }
-
-  const prefMap = {
-    pref_pay_cash: { patch: { payment: 'cash' }, alert: 'pref_pay_cash_set' },
-    pref_pay_btc: { patch: { payment: 'btc' }, alert: 'pref_pay_btc_set' },
-    pref_fulfill_meetup: { patch: { fulfillment: 'meetup' }, alert: 'pref_fulfill_meetup_set' },
-    pref_fulfill_envoi: { patch: { fulfillment: 'envoi' }, alert: 'pref_fulfill_envoi_set' }
-  };
-  if (prefMap[data]) {
-    if (!chatId) return;
-    const lang = getChatLang(chatId) || 'fr';
-    const L = BOT_STRINGS[lang] || BOT_STRINGS.fr;
-    const cfg = prefMap[data];
-    setCheckoutPrefs(chatId, cfg.patch);
-    try {
-      await bot.answerCallbackQuery(query.id, { text: L[cfg.alert] || 'OK' });
-    } catch (e) {}
-    if (query.message?.message_id) {
-      try {
-        await bot.editMessageReplyMarkup(getHubMenuInline(lang, chatId).reply_markup, {
-          chat_id: chatId,
-          message_id: query.message.message_id
-        });
-      } catch (e) { /* ignore */ }
-    }
     return;
   }
 
