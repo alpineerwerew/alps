@@ -592,11 +592,8 @@ const BOT_STRINGS = {
     after_lang: '',
     menu_start_btn: '▶️ Start',
     menu_welcome: '😊 Bienvenue sur Alpine Connexion !\n\nMerci de votre confiance — commande rapide via la boutique 👇',
-    menu_hub_products: '📦 {count} produits disponibles',
     menu_shop_btn: '🌿 Accès boutique',
     menu_contact_btn: '📞 Nous contacter',
-    menu_infos_btn: 'ℹ️ Infos',
-    menu_infos_alert: '📍 Meetup Valais (pièce d’identité)\n📦 Envoi en Suisse\n💶 Cash (CHF) · ₿ BTC',
     menu_contact_alert: 'Écris ton message ici, on te répond rapidement.',
     catalog_btn: '🌿 Accès boutique',
     order_received: '✅ Commande bien reçue !\n\nNous te recontacterons sur ton contact enregistré (Signal ou Threema) pour confirmer.',
@@ -619,11 +616,8 @@ const BOT_STRINGS = {
     after_lang: '',
     menu_start_btn: '▶️ Start',
     menu_welcome: '😊 Welcome to Alpine Connexion!\n\nThanks for your trust — order quickly via the shop 👇',
-    menu_hub_products: '📦 {count} products available',
     menu_shop_btn: '🌿 Open shop',
     menu_contact_btn: '📞 Contact us',
-    menu_infos_btn: 'ℹ️ Info',
-    menu_infos_alert: '📍 Meetup Wallis (ID required)\n📦 Shipping in Switzerland\n💶 Cash (CHF) · ₿ BTC',
     menu_contact_alert: 'Send your message here, we reply quickly.',
     catalog_btn: '🌿 Open shop',
     order_received: '✅ Order received!\n\nWe’ll reach you on your saved contact (Signal or Threema) to confirm.',
@@ -645,11 +639,8 @@ const BOT_STRINGS = {
     after_lang: '',
     menu_start_btn: '▶️ Start',
     menu_welcome: '😊 Willkommen bei Alpine Connexion!\n\nDanke für dein Vertrauen — schnell bestellen im Shop 👇',
-    menu_hub_products: '📦 {count} Produkte verfügbar',
     menu_shop_btn: '🌿 Shop öffnen',
     menu_contact_btn: '📞 Kontakt',
-    menu_infos_btn: 'ℹ️ Infos',
-    menu_infos_alert: '📍 Meetup Wallis (Ausweis Pflicht)\n📦 Versand CH\n💶 Bar · ₿ BTC',
     menu_contact_alert: 'Schreib uns hier, wir antworten schnell.',
     catalog_btn: '🌿 Shop öffnen',
     order_received: '✅ Bestellung erhalten!\n\nWir melden uns über deinen gespeicherten Kontakt (Signal oder Threema) zur Bestätigung.',
@@ -720,24 +711,9 @@ function getOrderReceivedReplyMarkup(lang) {
   };
 }
 
-function getCatalogProductCount() {
-  try {
-    const p = path.join(__dirname, 'products.json');
-    const o = JSON.parse(fs.readFileSync(p, 'utf8'));
-    return Array.isArray(o?.products) ? o.products.length : 0;
-  } catch {
-    return 0;
-  }
-}
-
 function buildWelcomeHubText(lang) {
   const L = BOT_STRINGS[lang] || BOT_STRINGS.fr;
-  const n = getCatalogProductCount();
-  let text = L.menu_welcome || 'Bienvenue !';
-  if (n > 0 && L.menu_hub_products) {
-    text += `\n\n${L.menu_hub_products.replace(/\{count\}/g, String(n))}`;
-  }
-  return text;
+  return L.menu_welcome || 'Bienvenue !';
 }
 
 function getHubContactButton(lang) {
@@ -757,8 +733,7 @@ function getHubMenuInline(lang) {
     reply_markup: {
       inline_keyboard: [
         [{ text: L.menu_shop_btn, web_app: { url: CATALOG_URL } }],
-        [contactRow],
-        [{ text: L.menu_infos_btn, callback_data: 'menu_infos' }]
+        [contactRow]
       ]
     }
   };
@@ -1242,18 +1217,6 @@ bot.on('callback_query', async (query) => {
     try {
       await bot.answerCallbackQuery(query.id, {
         text: L.menu_contact_alert || L.menu_contact_reply || 'Message us here.',
-        show_alert: true
-      });
-    } catch (e) {}
-    return;
-  }
-  if (data === 'menu_infos') {
-    if (!chatId) return;
-    const lang = getChatLang(chatId) || 'fr';
-    const L = BOT_STRINGS[lang] || BOT_STRINGS.fr;
-    try {
-      await bot.answerCallbackQuery(query.id, {
-        text: L.menu_infos_alert || L.menu_infos_reply || L.help_detail || '',
         show_alert: true
       });
     } catch (e) {}
