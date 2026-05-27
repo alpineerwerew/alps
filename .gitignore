@@ -11,13 +11,6 @@ server/order_queue.jsonl
 server/orders_history.json
 server/contacts.json
 server/uploads/
+server/backups/
 .DS_Store
 Thumbs.db
-
-# Python — instagram_contest
-instagram_contest/.env
-instagram_contest/.venv/
-instagram_contest/**/__pycache__/
-instagram_contest/*.db
-instagram_contest/.pytest_cache/
-

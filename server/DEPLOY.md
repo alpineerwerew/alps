@@ -277,50 +277,27 @@ certbot --nginx -d alpine710.art -d www.alpine710.art
 
 ---
 
-## 9. Migration Supabase (Postgres) + backups SQL
+## 9. Sauvegarde des données JSON (VPS)
 
-Si tu veux remplacer les JSON locaux par une base SQL managée:
-
-1) Dans Supabase, ouvre **SQL Editor** et exécute:
-
-```sql
--- copier/coller le contenu de server/sql/supabase_schema.sql
-```
-
-2) Dans `server/.env`, ajoute:
-
-```bash
-SUPABASE_DB_URL=postgres://postgres:...@db.xxx.supabase.co:5432/postgres
-```
-
-3) Depuis le VPS:
+Le bot stocke catalogue, commandes et contacts dans `server/*.json`. Sauvegarde manuelle :
 
 ```bash
 cd /opt/alps/server
-npm install --production
-npm run db:bootstrap
-npm run db:import:json
+chmod +x scripts/backup-json.sh
+./scripts/backup-json.sh
 ```
 
-4) Backup SQL (manuel):
+Les archives vont dans `server/backups/` (30 dernières conservées).
 
-```bash
-cd /opt/alps/server
-chmod +x scripts/backup-supabase.sh
-SUPABASE_DB_URL="$SUPABASE_DB_URL" ./scripts/backup-supabase.sh
-```
-
-5) Backup SQL (cron quotidien, exemple 03:15):
+Cron quotidien (exemple 03:15) :
 
 ```cron
-15 3 * * * cd /opt/alps/server && SUPABASE_DB_URL='postgres://...' ./scripts/backup-supabase.sh >>/var/log/alps-supabase-backup.log 2>&1
+15 3 * * * cd /opt/alps/server && ./scripts/backup-json.sh >>/var/log/alps-json-backup.log 2>&1
 ```
-
-Résultat : **https://alpine710.art** sert le catalogue et les routes **`/api/*`** (produits, commande, etc.) via le proxy. Dans `app.js`, `POINTS_API_URL` pointe en pratique sur la même origine (`window.location.origin` en prod) — ce n’est pas un système de « points » séparé dans le code actuel.
 
 ---
 
-## 9. (Optionnel) API sur un sous-domaine uniquement
+## 10. (Optionnel) API sur un sous-domaine uniquement
 
 Si tu préfères séparer (ex. site ailleurs, API sur `api.alpine710.art`) :
 
@@ -352,3 +329,4 @@ pm2 restart alps-web alps-bot
 | `pm2 restart alps-web alps-bot` | Redémarrer web + bot (mode 2 processus) |
 | `pm2 restart alps-bot` | Redémarrer l’ancien processus unique |
 | `pm2 stop alps-bot` | Arrêter le bot |
+| `./scripts/backup-json.sh` | Sauvegarder les JSON (produits, commandes, contacts) |
