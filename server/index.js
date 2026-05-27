@@ -221,6 +221,14 @@ function saveCartReminders(map) {
   }
 }
 
+function clearCartReminderSent(chatId) {
+  const key = String(chatId);
+  const reminders = loadCartReminders();
+  if (!reminders[key]) return;
+  delete reminders[key];
+  saveCartReminders(reminders);
+}
+
 function roundMoneyChf(n) {
   const x = Number(n);
   if (!Number.isFinite(x)) return 0;
@@ -402,6 +410,7 @@ function upsertCartActivity(user, payload) {
   const itemsCount = Math.max(0, Number(payload?.items_count) || 0);
   const nonEmpty = payload?.cart_non_empty !== undefined ? !!payload.cart_non_empty : itemsCount > 0;
 
+  const wasEmpty = row ? !row.cart_non_empty : true;
   if (!row) {
     row = {
       chat_id: user.id,
@@ -422,6 +431,8 @@ function upsertCartActivity(user, payload) {
     row.updated_at = now;
   }
   saveCartActivity(rows);
+  if (nonEmpty && wasEmpty) clearCartReminderSent(user.id);
+  if (!nonEmpty) clearCartReminderSent(user.id);
 }
 
 function loadChatLangMap() {
@@ -679,8 +690,9 @@ const BOT_STRINGS = {
     contact_thanks: 'Merci, nous te recontacterons sur {channel} avec ces coordonnées.',
     help_how_to: 'Boutique → panier → valider. Ta commande arrive ici automatiquement.',
     cart_reminder:
-      '👋 Ton panier t’attend dans la boutique — il suffit d’un tap pour finir ta commande.',
-    cart_reminder_cta: 'On est là si tu as une question.',
+      '🛒 Panier oublié — tu as encore des articles en attente dans la boutique.',
+    cart_reminder_cta: 'Un tap suffit pour reprendre et valider ta commande.',
+    cart_reminder_btn: '🌿 Reprendre ma commande',
     cart_reminder_question_btn: '💬 Question',
     help_detail: '📍 Meetup Valais · 📦 Shipping CH\n💶 Cash · ₿ BTC'
   },
@@ -711,8 +723,9 @@ const BOT_STRINGS = {
     need_lang: 'Please choose your language first with /start.',
     contact_thanks: 'Thanks, we will reach you on {channel} with these details.',
     help_how_to: 'Shop → cart → confirm. Your order is sent here automatically.',
-    cart_reminder: '👋 Your cart is waiting in the shop — one tap to finish.',
-    cart_reminder_cta: 'We are here if you have a question.',
+    cart_reminder: '🛒 Forgotten cart — you still have items waiting in the shop.',
+    cart_reminder_cta: 'One tap to resume and place your order.',
+    cart_reminder_btn: '🌿 Resume my order',
     cart_reminder_question_btn: '💬 Question',
     help_detail: '📍 Meetup Wallis · 📦 Shipping CH\n💶 Cash · ₿ BTC'
   },
@@ -744,8 +757,9 @@ const BOT_STRINGS = {
     contact_thanks: 'Danke, wir melden uns bei dir über {channel} mit diesen Angaben.',
     help_how_to: 'Shop → Warenkorb → bestätigen. Bestellung geht automatisch an den Bot.',
     cart_reminder:
-      '👋 Dein Warenkorb wartet im Shop — ein Tap zum Abschluss.',
-    cart_reminder_cta: 'Fragen? Schreib uns.',
+      '🛒 Vergessener Warenkorb — du hast noch Artikel in der Boutique.',
+    cart_reminder_cta: 'Ein Tap genügt, um fortzufahren und zu bestellen.',
+    cart_reminder_btn: '🌿 Bestellung fortsetzen',
     cart_reminder_question_btn: '💬 Frage',
     help_detail: '📍 Meetup Wallis · 📦 Versand CH\n💶 Bar · ₿ BTC'
   }
@@ -905,20 +919,32 @@ function getOpenCatalogInline(lang) {
 }
 
 function getCartReminderInline(lang) {
-  return getShopOnlyInline(lang);
+  const L = BOT_STRINGS[lang] || BOT_STRINGS.fr;
+  return {
+    reply_markup: {
+      inline_keyboard: [[{ text: L.cart_reminder_btn || L.menu_shop_btn, web_app: { url: CATALOG_URL } }]]
+    }
+  };
 }
 
 function startCartReminderScheduler() {
   const enabled = process.env.CART_REMINDER_ENABLED !== '0';
-  if (!enabled) return;
+  if (!enabled) {
+    console.log('ℹ️ Rappels panier désactivés (CART_REMINDER_ENABLED=0).');
+    return;
+  }
 
-  const afterMin = Number(process.env.CART_REMINDER_AFTER_MINUTES ?? 15);
+  const afterMin = Number(process.env.CART_REMINDER_AFTER_MINUTES ?? 20);
   const repeatHours = Number(process.env.CART_REMINDER_REPEAT_HOURS ?? 24);
   const checkSeconds = Number(process.env.CART_REMINDER_CHECK_EVERY_SECONDS ?? 120);
 
   const afterMs = Math.max(1, afterMin) * 60 * 1000;
   const repeatMs = Math.max(1, repeatHours) * 60 * 60 * 1000;
   const intervalMs = Math.max(20, checkSeconds) * 1000;
+
+  console.log(
+    `ℹ️ Rappels panier actifs : après ${afterMin} min d’inactivité, répétition toutes les ${repeatHours} h.`
+  );
 
   const interval = setInterval(async () => {
     if (!isBotEnabled()) return;
@@ -1004,6 +1030,8 @@ function buildHelpMessage(isOwner, lang) {
 async function deliverQueuedWebOrder(user, orderText) {
   if (!bot) return;
   const userId = user.id;
+  upsertCartActivity(user, { cart_non_empty: false, items_count: 0 });
+  clearCartReminderSent(userId);
   lastOrderByChat[userId] = orderText;
   const fromLabel = user.username ? `@${user.username}` : [user.first_name, user.last_name].filter(Boolean).join(' ') || `ID ${userId}`;
   if (OWNER_CHAT_ID) {
@@ -2139,6 +2167,8 @@ app.post('/api/order', (req, res) => {
   const userId = user.id;
   addOrUpdateBotUserFromWebAppUser(user);
   setCheckoutPrefs(userId, { payment: payment_method, fulfillment: fulfillment_method });
+  upsertCartActivity(user, { cart_non_empty: false, items_count: 0 });
+  clearCartReminderSent(userId);
   const orderHist = appendOrderHistory(user, orderText, {
     payment_method,
     fulfillment_method

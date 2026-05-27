@@ -72,7 +72,7 @@ echo 'CATALOG_URL=https://alpine710.art' >> .env
 
 **`CATALOG_URL`** = URL **HTTPS** publique du catalogue (sans `/` à la fin). Sert au bouton **Web App** Telegram, aux liens admin, aux URLs d’upload. Si absent, le code utilise par défaut `https://alpine710.art` — mais il vaut mieux la fixer dans `.env` pour un autre domaine.
 
-Optionnel : `WELCOME_IMAGE_URL=…` (image au /start), `WELCOME_PROMO_LINE=…` (une ligne sous l’accueil `/start`, avant choix de langue), `ORDER_RESPONSE_SLA_HOURS=12` (délai de réponse affiché après commande), `THANK_YOU_LINE_FR` / `THANK_YOU_LINE_EN` / `THANK_YOU_LINE_DE` (message court après identifiant Signal/Threema), rappels panier : `CART_REMINDER_ENABLED=1` (défaut répétition **24 h** via `CART_REMINDER_REPEAT_HOURS`).
+Optionnel : `WELCOME_IMAGE_URL=…` (image au /start), `WELCOME_PROMO_LINE=…` (une ligne sous l’accueil `/start`, avant choix de langue), `ORDER_RESPONSE_SLA_HOURS=12` (délai de réponse affiché après commande), `THANK_YOU_LINE_FR` / `THANK_YOU_LINE_EN` / `THANK_YOU_LINE_DE` (message court après identifiant Signal/Threema). **Rappel panier oublié** : actif par défaut sur `alps-bot` — `CART_REMINDER_AFTER_MINUTES=20` (inactivité), `CART_REMINDER_REPEAT_HOURS=24`, `CART_REMINDER_ENABLED=0` pour désactiver.
 
 > **Points / parrainage / avis Instagram** : pas implémentés dans ce dépôt (des fichiers `points.json` / `refs.json` dans `.gitignore` sont des vestiges). La section Nginx qui cite `/api/points` est un exemple générique ; le bot actuel n’expose pas ces routes.
 

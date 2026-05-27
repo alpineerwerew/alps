@@ -1107,7 +1107,7 @@ function escapeHtml(s) {
 }
 
 function getCartItemsCount() {
-    return cart.reduce((sum, item) => sum + (Number(item && item.count) || 1), 0);
+    return cart.length;
 }
 
 function syncCartActivity() {
@@ -1268,8 +1268,17 @@ function init() {
         }
     })();
     document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible') refreshCatalog();
+        if (document.visibilityState === 'visible') {
+            refreshCatalog();
+        } else {
+            syncCartActivity();
+        }
     });
+    try {
+        window.Telegram?.WebApp?.onEvent('visibility_changed', (ev) => {
+            if (ev && ev.is_visible === false) syncCartActivity();
+        });
+    } catch (e) { /* ignore */ }
     document.getElementById('order-success-btn')?.addEventListener('click', () => closeOrderSuccess(true));
     document.getElementById('order-success-close')?.addEventListener('click', () => closeOrderSuccess(false));
 }
