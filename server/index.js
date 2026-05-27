@@ -295,7 +295,6 @@ function upsertUserContact(user, payload) {
 function parseOrderCheckoutOptions(orderText) {
   const lines = String(orderText || '').split('\n').map((l) => String(l || '').trim());
   let payment_method = null;
-  let shipping_method = null;
   let fulfillment_method = null;
   for (const line of lines) {
     if (/💳/.test(line) || /(?:paiement|payment|zahlung)\s*:/i.test(line)) {
@@ -303,14 +302,11 @@ function parseOrderCheckoutOptions(orderText) {
       else if (/\bcash\b|\bbar\b/i.test(line)) payment_method = 'cash';
     }
     if (/🚚/.test(line) || /(?:livraison|delivery|lieferung|récupération|recuperation|fulfillment|abholung|versand)\s*:/i.test(line)) {
-      if (/express/i.test(line)) shipping_method = 'express';
-      else if (/normal|standard|next day|nächster|lendemain/i.test(line)) shipping_method = 'normal';
-      else if (/meetup/i.test(line)) fulfillment_method = 'meetup';
-      else if (/envoi|shipping|versand/i.test(line)) fulfillment_method = 'envoi';
+      if (/meetup/i.test(line)) fulfillment_method = 'meetup';
+      else if (/envoi|shipping|versand|normal|standard|lendemain|next day/i.test(line)) fulfillment_method = 'envoi';
     }
   }
-  if (!shipping_method && fulfillment_method === 'envoi') shipping_method = 'normal';
-  return { payment_method, shipping_method, fulfillment_method };
+  return { payment_method, fulfillment_method };
 }
 
 function normalizeCheckoutOption(value, allowed) {
@@ -370,8 +366,6 @@ function appendOrderHistory(user, orderText, extra = {}) {
   const parsedOpts = parseOrderCheckoutOptions(orderText);
   const payment_method =
     normalizeCheckoutOption(extra.payment_method, ['cash', 'btc']) || parsedOpts.payment_method;
-  const shipping_method =
-    normalizeCheckoutOption(extra.shipping_method, ['normal', 'express']) || parsedOpts.shipping_method;
   const fulfillment_method =
     normalizeCheckoutOption(extra.fulfillment_method, ['envoi', 'meetup']) || parsedOpts.fulfillment_method;
   const matchedProducts = findMatchedProductsFromItems(summary.items);
@@ -389,7 +383,6 @@ function appendOrderHistory(user, orderText, extra = {}) {
     product_image: matchedProducts[0]?.image_url || null,
     total_chf: summary.total_chf,
     payment_method: payment_method || null,
-    shipping_method: shipping_method || null,
     fulfillment_method: fulfillment_method || null,
     created_at: new Date().toISOString(),
     status: 'confirmed'
@@ -472,11 +465,18 @@ function saveCheckoutPrefsMap(map) {
   }
 }
 
+function normalizeFulfillmentPref(value) {
+  const v = String(value || '').trim().toLowerCase();
+  if (v === 'meetup' || v === 'envoi') return v;
+  if (v === 'normal' || v === 'express') return 'envoi';
+  return null;
+}
+
 function getCheckoutPrefs(chatId) {
   const row = loadCheckoutPrefsMap()[String(chatId)] || {};
   const payment = normalizeCheckoutOption(row.payment, ['cash', 'btc']);
-  const shipping = normalizeCheckoutOption(row.shipping, ['normal', 'express']);
-  return { payment, shipping };
+  const fulfillment = normalizeFulfillmentPref(row.fulfillment || row.shipping);
+  return { payment, fulfillment, shipping: fulfillment };
 }
 
 function setCheckoutPrefs(chatId, patch) {
@@ -489,10 +489,21 @@ function setCheckoutPrefs(chatId, patch) {
     if (p) next.payment = p;
     else delete next.payment;
   }
-  if (patch && Object.prototype.hasOwnProperty.call(patch, 'shipping')) {
-    const s = normalizeCheckoutOption(patch.shipping, ['normal', 'express']);
-    if (s) next.shipping = s;
-    else delete next.shipping;
+  const fulfillmentPatch =
+    patch && Object.prototype.hasOwnProperty.call(patch, 'fulfillment')
+      ? patch.fulfillment
+      : patch && Object.prototype.hasOwnProperty.call(patch, 'shipping')
+        ? patch.shipping
+        : undefined;
+  if (fulfillmentPatch !== undefined) {
+    const f = normalizeFulfillmentPref(fulfillmentPatch);
+    if (f) {
+      next.fulfillment = f;
+      delete next.shipping;
+    } else {
+      delete next.fulfillment;
+      delete next.shipping;
+    }
   }
   map[id] = next;
   saveCheckoutPrefsMap(map);
@@ -648,12 +659,12 @@ const BOT_STRINGS = {
     menu_shop_btn: '🌿 Accès boutique',
     menu_pay_cash_btn: '💶 CASH',
     menu_pay_btc_btn: '₿ BTC −5%',
-    menu_ship_normal_btn: '📦 Normal',
-    menu_ship_express_btn: '⚡ Express',
+    menu_fulfill_meetup_btn: '📍 Meetup',
+    menu_fulfill_envoi_btn: '📦 Envoi',
     pref_pay_cash_set: 'Paiement : CASH (prix catalogue)',
     pref_pay_btc_set: 'Paiement : BTC (−5 % sur les articles)',
-    pref_ship_normal_set: 'Livraison : Normal (5.90 CHF)',
-    pref_ship_express_set: 'Livraison : Express avant 09h00 (20.00 CHF)',
+    pref_fulfill_meetup_set: 'Récupération : Meetup',
+    pref_fulfill_envoi_set: 'Récupération : Envoi (livraison gratuite)',
     order_recap_title: 'Ton choix pour cette commande',
     menu_contact_btn: '📞 Nous contacter',
     menu_contact_alert: 'Écris ton message ici, on te répond rapidement.',
@@ -681,12 +692,12 @@ const BOT_STRINGS = {
     menu_shop_btn: '🌿 Open shop',
     menu_pay_cash_btn: '💶 CASH',
     menu_pay_btc_btn: '₿ BTC −5%',
-    menu_ship_normal_btn: '📦 Standard',
-    menu_ship_express_btn: '⚡ Express',
+    menu_fulfill_meetup_btn: '📍 Meetup',
+    menu_fulfill_envoi_btn: '📦 Shipping',
     pref_pay_cash_set: 'Payment: CASH (catalog prices)',
     pref_pay_btc_set: 'Payment: BTC (−5% on items)',
-    pref_ship_normal_set: 'Delivery: Standard (5.90 CHF)',
-    pref_ship_express_set: 'Delivery: Express before 09:00 (20.00 CHF)',
+    pref_fulfill_meetup_set: 'Fulfillment: Meetup',
+    pref_fulfill_envoi_set: 'Fulfillment: Shipping (free standard delivery)',
     order_recap_title: 'Your choices for this order',
     menu_contact_btn: '📞 Contact us',
     menu_contact_alert: 'Send your message here, we reply quickly.',
@@ -713,12 +724,12 @@ const BOT_STRINGS = {
     menu_shop_btn: '🌿 Shop öffnen',
     menu_pay_cash_btn: '💶 BAR',
     menu_pay_btc_btn: '₿ BTC −5%',
-    menu_ship_normal_btn: '📦 Normal',
-    menu_ship_express_btn: '⚡ Express',
+    menu_fulfill_meetup_btn: '📍 Meetup',
+    menu_fulfill_envoi_btn: '📦 Versand',
     pref_pay_cash_set: 'Zahlung: BAR (Katalogpreise)',
     pref_pay_btc_set: 'Zahlung: BTC (−5 % auf Artikel)',
-    pref_ship_normal_set: 'Lieferung: Normal (5.90 CHF)',
-    pref_ship_express_set: 'Lieferung: Express vor 09:00 (20.00 CHF)',
+    pref_fulfill_meetup_set: 'Abholung: Meetup',
+    pref_fulfill_envoi_set: 'Versand: gratis (Standard)',
     order_recap_title: 'Deine Auswahl fuer diese Bestellung',
     menu_contact_btn: '📞 Kontakt',
     menu_contact_alert: 'Schreib uns hier, wir antworten schnell.',
@@ -774,8 +785,8 @@ function buildOrderRecapFromText(orderText, lang) {
   const lines = [];
   if (opts.payment_method === 'btc') lines.push(`💳 ${L.menu_pay_btc_btn}`);
   else if (opts.payment_method === 'cash') lines.push(`💳 ${L.menu_pay_cash_btn}`);
-  if (opts.shipping_method === 'normal') lines.push(`🚚 ${L.menu_ship_normal_btn} — 5.90 CHF`);
-  else if (opts.shipping_method === 'express') lines.push(`🚚 ${L.menu_ship_express_btn} — 20.00 CHF`);
+  if (opts.fulfillment_method === 'meetup') lines.push(`🚚 ${L.menu_fulfill_meetup_btn}`);
+  else if (opts.fulfillment_method === 'envoi') lines.push(`🚚 ${L.menu_fulfill_envoi_btn} — gratuit`);
   const totalLine = String(orderText || '')
     .split('\n')
     .find((l) => /(?:total|gesamt)\s*:/i.test(l));
@@ -830,7 +841,7 @@ function hubPrefBtn(label, selected) {
 
 function getHubMenuInline(lang, chatId) {
   const L = BOT_STRINGS[lang] || BOT_STRINGS.fr;
-  const prefs = chatId ? getCheckoutPrefs(chatId) : { payment: null, shipping: null };
+  const prefs = chatId ? getCheckoutPrefs(chatId) : { payment: null, fulfillment: null };
   const contact = getHubContactButton(lang);
   const contactRow = contact.url
     ? { text: contact.text, url: contact.url }
@@ -844,8 +855,8 @@ function getHubMenuInline(lang, chatId) {
           { text: hubPrefBtn(L.menu_pay_btc_btn, prefs.payment === 'btc'), callback_data: 'pref_pay_btc' }
         ],
         [
-          { text: hubPrefBtn(L.menu_ship_normal_btn, prefs.shipping === 'normal'), callback_data: 'pref_ship_normal' },
-          { text: hubPrefBtn(L.menu_ship_express_btn, prefs.shipping === 'express'), callback_data: 'pref_ship_express' }
+          { text: hubPrefBtn(L.menu_fulfill_meetup_btn, prefs.fulfillment === 'meetup'), callback_data: 'pref_fulfill_meetup' },
+          { text: hubPrefBtn(L.menu_fulfill_envoi_btn, prefs.fulfillment === 'envoi'), callback_data: 'pref_fulfill_envoi' }
         ],
         [contactRow]
       ]
@@ -1331,8 +1342,8 @@ bot.on('callback_query', async (query) => {
   const prefMap = {
     pref_pay_cash: { patch: { payment: 'cash' }, alert: 'pref_pay_cash_set' },
     pref_pay_btc: { patch: { payment: 'btc' }, alert: 'pref_pay_btc_set' },
-    pref_ship_normal: { patch: { shipping: 'normal' }, alert: 'pref_ship_normal_set' },
-    pref_ship_express: { patch: { shipping: 'express' }, alert: 'pref_ship_express_set' }
+    pref_fulfill_meetup: { patch: { fulfillment: 'meetup' }, alert: 'pref_fulfill_meetup_set' },
+    pref_fulfill_envoi: { patch: { fulfillment: 'envoi' }, alert: 'pref_fulfill_envoi_set' }
   };
   if (prefMap[data]) {
     if (!chatId) return;
@@ -1858,11 +1869,7 @@ app.get('/api/admin/orders-history', (req, res) => {
         total_chf: Number(o.total_chf) || 0,
         payment_method: o.payment_method || parseOrderCheckoutOptions(o.order_text).payment_method,
         fulfillment_method:
-          o.shipping_method ||
-          o.fulfillment_method ||
-          parseOrderCheckoutOptions(o.order_text).shipping_method ||
-          parseOrderCheckoutOptions(o.order_text).fulfillment_method,
-        shipping_method: o.shipping_method || parseOrderCheckoutOptions(o.order_text).shipping_method,
+          o.fulfillment_method || parseOrderCheckoutOptions(o.order_text).fulfillment_method,
         status: o.status || 'confirmed',
         created_at: o.created_at || null
       };
@@ -2166,17 +2173,17 @@ app.post('/api/order', (req, res) => {
   const parsedOpts = parseOrderCheckoutOptions(orderText);
   const payment_method =
     normalizeCheckoutOption(req.body?.payment_method, ['cash', 'btc']) || parsedOpts.payment_method;
-  const shipping_method =
-    normalizeCheckoutOption(req.body?.shipping_method, ['normal', 'express']) || parsedOpts.shipping_method;
-  if (!payment_method || !shipping_method) {
+  const fulfillment_method =
+    normalizeCheckoutOption(req.body?.fulfillment_method, ['envoi', 'meetup']) || parsedOpts.fulfillment_method;
+  if (!payment_method || !fulfillment_method) {
     return res.status(400).json({ error: 'checkout_options_required' });
   }
   const userId = user.id;
   addOrUpdateBotUserFromWebAppUser(user);
-  setCheckoutPrefs(userId, { payment: payment_method, shipping: shipping_method });
+  setCheckoutPrefs(userId, { payment: payment_method, fulfillment: fulfillment_method });
   const orderHist = appendOrderHistory(user, orderText, {
     payment_method,
-    shipping_method
+    fulfillment_method
   });
   if (PROCESS_ROLE === 'web') {
     try {
@@ -2217,7 +2224,12 @@ app.get('/api/checkout-prefs', (req, res) => {
   const user = getInitDataUser(req.query?.initData);
   if (!user?.id) return res.status(401).json({ error: 'Invalid initData' });
   const prefs = getCheckoutPrefs(user.id);
-  res.json({ ok: true, payment: prefs.payment, shipping: prefs.shipping });
+  res.json({
+    ok: true,
+    payment: prefs.payment,
+    fulfillment: prefs.fulfillment,
+    shipping: prefs.shipping
+  });
 });
 
 app.post('/api/checkout-prefs', (req, res) => {
@@ -2225,9 +2237,15 @@ app.post('/api/checkout-prefs', (req, res) => {
   if (!user?.id) return res.status(401).json({ error: 'Invalid initData' });
   const prefs = setCheckoutPrefs(user.id, {
     payment: req.body?.payment,
+    fulfillment: req.body?.fulfillment,
     shipping: req.body?.shipping
   });
-  res.json({ ok: true, payment: prefs.payment, shipping: prefs.shipping });
+  res.json({
+    ok: true,
+    payment: prefs.payment,
+    fulfillment: prefs.fulfillment,
+    shipping: prefs.shipping
+  });
 });
 
 app.post('/api/cart-activity', (req, res) => {
